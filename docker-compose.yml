@@ -1,0 +1,127 @@
+name: clawboard
+
+services:
+  # PostgreSQL Database
+  clawboard-db:
+    image: postgres:16-alpine
+    container_name: clawboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clawboard}
+      POSTGRES_USER: ${POSTGRES_USER:-clawboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clawboard} -d ${POSTGRES_DB:-clawboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=false"
+
+  # Backend API
+  clawboard-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clawboard-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: ${PORT:-3001}
+      
+      # Database
+      DB_HOST: clawboard-db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-clawboard}
+      DB_USER: ${POSTGRES_USER:-clawboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      
+      # Auth
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      LOGIN_PASSWORD: ${LOGIN_PASSWORD:-changeme}
+      
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8082}
+      
+      # OpenClaw paths (mounted via volumes)
+      OPENCLAW_SESSIONS_PATH: /openclaw/sessions/sessions.json
+      OPENCLAW_TRANSCRIPTS_DIR: /openclaw/sessions
+      OPENCLAW_CONFIG_PATH: /openclaw/config/openclaw.json
+      OPENCLAW_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:3120}
+    volumes:
+      # OpenClaw mounts (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/openclaw/sessions:ro
+      - ${OPENCLAW_DIR:-~/.openclaw}:/openclaw/config:ro
+      
+      # Data directory (read-write)
+      - ${DATA_DIR:-./data}:/data:rw
+      
+      # Config file (read-only)
+      - ./clawboard.config.json:/app/clawboard.config.json:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      clawboard-db:
+        condition: service_healthy
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3001}/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+    #   - "traefik.http.routers.clawboard-api.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard-api.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard-api.loadbalancer.server.port=${PORT:-3001}"
+
+  # Frontend (React + Vite built into nginx)
+  clawboard-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:${PORT:-3001}}
+        - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:${PORT:-3001}}
+    container_name: clawboard-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - clawboard-backend
+    networks:
+      - clawboard-network
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.clawboard.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard.loadbalancer.server.port=80"
+
+volumes:
+  postgres_data:
+    name: clawboard_postgres_data
+
+networks:
+  clawboard-network:
+    name: clawboard_network
+    driver: bridge

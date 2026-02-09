@@ -1,0 +1,134 @@
+/* Workspace Files Widget */
+
+.workspace-files {
+  margin-bottom: 20px;
+}
+
+/* Foldable section header */
+.workspace-files-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+
+.workspace-files-header:hover {
+  opacity: 0.85;
+}
+
+.workspace-files-chevron {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.workspace-files-chevron.open {
+  transform: rotate(90deg);
+}
+
+.workspace-files-count {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: auto;
+}
+
+.workspace-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.workspace-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-size: 12px;
+}
+
+.workspace-file-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workspace-file-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.workspace-file-name {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-file-meta {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.workspace-file-changed {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+  animation: changed-pulse 2s ease-in-out infinite;
+}
+
+@keyframes changed-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Memory directory header */
+.workspace-memory-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.workspace-memory-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workspace-memory-chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.workspace-memory-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Loading state */
+.workspace-files-loading {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}

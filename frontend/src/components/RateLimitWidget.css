@@ -1,0 +1,147 @@
+.rate-limit-widget {
+  background: var(--card-bg, #1a1a2e);
+  border: 1px solid var(--border-color, #2a2a4a);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--text-primary, #e0e0ff);
+}
+
+.rlw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rlw-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rlw-toggle {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.rlw-loading,
+.rlw-unavailable {
+  font-size: 12px;
+  opacity: 0.5;
+  padding: 8px 0 0;
+}
+
+.rlw-active {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.rlw-active-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
+  margin-bottom: 6px;
+}
+
+.rlw-active-model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rlw-fallback-notice {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #ffaa33;
+  background: rgba(255, 170, 51, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.rlw-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.rlw-status-dot.ok {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+}
+
+.rlw-status-dot.limited {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.rlw-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.rlw-limited {
+  color: #f87171;
+  opacity: 1;
+}
+
+.rlw-sep {
+  opacity: 0.3;
+}
+
+.rlw-model-list {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-color, #2a2a4a);
+  padding-top: 12px;
+}
+
+.rlw-section {
+  margin-bottom: 10px;
+}
+
+.rlw-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.4;
+  margin-bottom: 6px;
+}
+
+.rlw-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.rlw-model-row .rlw-model-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlw-cached {
+  font-size: 10px;
+  opacity: 0.3;
+  text-align: right;
+  margin-top: 8px;
+}

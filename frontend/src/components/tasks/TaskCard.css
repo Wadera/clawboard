@@ -1,0 +1,400 @@
+/* Compact Task Card - Glass Morphism Design */
+@import '../../styles/variables.css';
+
+.task-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base) ease;
+  backdrop-filter: blur(12px);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  max-width: 100%;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.task-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* Hover Effect - Subtle highlight */
+.task-card:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.task-card:hover::before {
+  opacity: 1;
+}
+
+.task-card:active:not(.dragging) {
+  transform: scale(0.98);
+}
+
+/* Dragging State */
+.task-card.dragging {
+  opacity: 0.6;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 2px rgba(139, 92, 246, 0.5);
+  cursor: grabbing;
+  z-index: 100;
+}
+
+/* Compact Card Layout */
+.task-card-compact {
+  padding: var(--space-4);
+}
+
+.task-card-compact-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Status Dot */
+.task-card-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px currentColor;
+}
+
+.status-ideas {
+  background: #f59e0b;
+  color: #f59e0b;
+}
+
+.status-todo {
+  background: #3b82f6;
+  color: #3b82f6;
+}
+
+.status-in-progress {
+  background: #10b981;
+  color: #10b981;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-stuck {
+  background: #f59e0b;
+  color: #f59e0b;
+}
+
+.status-completed {
+  background: #6b7280;
+  color: #6b7280;
+}
+
+.status-archived {
+  background: #4b5563;
+  color: #4b5563;
+}
+
+/* Priority Badge (Compact - Single Letter) */
+.task-card-priority-compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff !important;
+  flex-shrink: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.priority-urgent {
+  background: #dc2626;
+}
+
+.priority-high {
+  background: #16a34a;
+}
+
+.priority-normal {
+  background: #7c3aed;
+}
+
+.priority-low {
+  background: #6b7280;
+}
+
+.priority-someday {
+  background: #a855f7;
+}
+
+/* Title (Compact - 1 Line) */
+.task-card-title-compact {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* Agent Indicator (Compact) */
+/* Project Badge */
+.task-card-project-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  font-size: 0.68rem;
+  color: rgba(139, 92, 246, 0.9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+.task-card-project-badge:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.task-card-project-badge span {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tags Display */
+.task-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.task-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  font-size: 0.65rem;
+  color: rgba(59, 130, 246, 0.9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.task-card-tag:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: scale(1.05);
+}
+
+.task-card-tag:active {
+  transform: scale(0.95);
+}
+
+.task-card-tag span {
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-card-tag-more {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 2px 4px;
+}
+
+.task-card-agent-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--purple-300);
+  animation: agentPulse 2s ease-in-out infinite;
+  width: fit-content;
+}
+
+.task-card-agent-compact span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+@keyframes agentPulse {
+  0%, 100% { border-color: rgba(139, 92, 246, 0.25); }
+  50% { border-color: rgba(139, 92, 246, 0.5); }
+}
+
+/* Thinking Level Indicator */
+.task-card-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  width: fit-content;
+}
+
+.task-card-thinking span {
+  white-space: nowrap;
+}
+
+.thinking-low {
+  background: rgba(107, 114, 128, 0.12);
+  border: 1px solid rgba(107, 114, 128, 0.25);
+  color: rgba(156, 163, 175, 0.9);
+}
+
+.thinking-medium {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: rgba(251, 191, 36, 0.9);
+}
+
+.thinking-high {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: rgba(248, 113, 113, 0.9);
+}
+
+.task-card-thinking-auto {
+  font-size: 0.6rem;
+  opacity: 0.6;
+}
+
+.task-card-attempt {
+  font-size: 0.65rem;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+
+/* Dependency Badges */
+.task-card-blocked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: rgba(248, 113, 113, 0.9);
+  width: fit-content;
+  cursor: help;
+}
+
+.task-card-blocks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: rgba(96, 165, 250, 0.9);
+  width: fit-content;
+  cursor: help;
+}
+
+.task-card-blocked span,
+.task-card-blocks span {
+  white-space: nowrap;
+}
+
+/* Blocked/Dimmed State */
+.task-card.task-blocked {
+  opacity: 0.6;
+  filter: grayscale(0.3);
+}
+
+.task-card.task-blocked::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  border-radius: var(--radius-md);
+}
+
+/* Accessibility */
+.task-card:focus {
+  outline: 2px solid rgba(139, 92, 246, 0.5);
+  outline-offset: 2px;
+}
+
+.task-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .task-card-compact {
+    padding: var(--space-3);
+  }
+
+  .task-card-priority-compact {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .task-card-title-compact {
+    font-size: var(--text-xs);
+  }
+}

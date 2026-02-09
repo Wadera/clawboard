@@ -1,0 +1,260 @@
+.model-status-card {
+  background: var(--card-bg, #1a1a2e);
+  border: 1px solid var(--border-color, #2a2a4a);
+  border-radius: var(--radius-md, 12px);
+  padding: var(--space-4, 16px);
+  color: var(--text-primary, #e0e0ff);
+}
+
+.msc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.msc-header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold, 600);
+}
+
+.msc-loading {
+  font-size: var(--text-xs, 12px);
+  opacity: 0.5;
+  padding: var(--space-2, 8px) 0 0;
+}
+
+/* Section labels */
+.msc-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-quaternary, #6b7280);
+  margin-bottom: var(--space-2, 8px);
+  font-weight: var(--font-medium, 500);
+}
+
+.msc-section-label.msc-clickable {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.msc-toggle {
+  font-size: 9px;
+  opacity: 0.5;
+}
+
+/* Status dots */
+.msc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.msc-dot-available {
+  background: var(--green-400, #4ade80);
+  box-shadow: 0 0 6px var(--green-glow, rgba(74, 222, 128, 0.3));
+}
+
+.msc-dot-cooldown {
+  background: var(--red-400, #f87171);
+  box-shadow: 0 0 6px var(--red-glow, rgba(248, 113, 113, 0.3));
+  animation: msc-pulse 1.5s ease-in-out infinite;
+}
+
+.msc-dot-error {
+  background: var(--yellow-400, #facc15);
+  box-shadow: 0 0 6px var(--yellow-glow, rgba(250, 204, 21, 0.3));
+}
+
+.msc-dot-inactive {
+  background: var(--text-quaternary, #6b7280);
+  opacity: 0.5;
+}
+
+@keyframes msc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Active model section */
+.msc-active-section {
+  margin-top: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  background: var(--bg-glass, rgba(255, 255, 255, 0.03));
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.msc-active-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.msc-active-name {
+  font-size: var(--text-base, 16px);
+  font-weight: var(--font-semibold, 600);
+}
+
+.msc-active-full {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-quaternary, #6b7280);
+}
+
+.msc-active-profile {
+  margin-top: var(--space-1, 4px);
+  font-size: var(--text-xs, 12px);
+  color: var(--text-tertiary, #9ca3af);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+}
+
+/* Profile badges */
+.msc-profile-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.msc-profile-active {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green-400, #4ade80);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.msc-profile-cooldown {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--red-400, #f87171);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.msc-profile-idle {
+  background: rgba(156, 163, 175, 0.1);
+  color: var(--text-tertiary, #9ca3af);
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.msc-profile-litellm {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--blue-400, #60a5fa);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+/* Auth Profiles section */
+.msc-profiles-section {
+  margin-top: var(--space-3, 12px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.msc-profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) 0;
+  font-size: var(--text-xs, 12px);
+}
+
+.msc-profile-name {
+  flex: 1;
+  color: var(--text-secondary, #e5e7eb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msc-error-count {
+  color: var(--yellow-400, #facc15);
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  background: rgba(250, 204, 21, 0.1);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.msc-cooldown-timer {
+  color: var(--red-400, #f87171);
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+
+.msc-last-used {
+  color: var(--text-quaternary, #6b7280);
+  font-size: 10px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* Fallbacks section */
+.msc-fallbacks-section {
+  margin-top: var(--space-3, 12px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+/* Other models section */
+.msc-other-section {
+  margin-top: var(--space-3, 12px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+/* Model rows (fallback + other) */
+.msc-model-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) 0;
+  font-size: var(--text-xs, 12px);
+}
+
+.msc-model-row.msc-model-primary {
+  font-weight: var(--font-semibold, 600);
+}
+
+.msc-model-name {
+  color: var(--text-secondary, #e5e7eb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Use button */
+.msc-use-btn {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.msc-use-btn:hover:not(:disabled) {
+  background: var(--bg-glass-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #f9fafb);
+  border-color: var(--accent-color, #06b6d4);
+}
+
+.msc-use-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

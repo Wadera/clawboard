@@ -1,0 +1,78 @@
+{
+  "bot": {
+    "name": "ClawBot",
+    "displayName": "My ClawBoard",
+    "emoji": "🤖",
+    "description": "My OpenClaw Dashboard",
+    "avatarUrl": "/assets/avatar-placeholder.png"
+  },
+  "branding": {
+    "primaryColor": "#6366f1",
+    "accentColor": "#8b5cf6",
+    "backgroundColor": "#0f172a",
+    "surfaceColor": "#1e293b",
+    "textColor": "#e2e8f0",
+    "sidebarTitle": "ClawBoard",
+    "loginTitle": "Welcome to ClawBoard",
+    "loginSubtitle": "Your AI Dashboard"
+  },
+  "features": {
+    "journal": true,
+    "imageGeneration": false,
+    "taskBoard": true,
+    "projects": true,
+    "tools": true,
+    "auditLog": true,
+    "stats": true,
+    "botStatus": true,
+    "avatarPage": true
+  },
+  "paths": {
+    "dataDir": "/data",
+    "openclawDir": "/home/user/.openclaw",
+    "mediaDir": "/data/media",
+    "sessionsDir": "/home/user/.openclaw/agents/main/sessions"
+  },
+  "services": {
+    "taskApiUrl": "http://localhost:3001/api",
+    "openclawGatewayWs": "ws://localhost:3120",
+    "openclawApiUrl": "http://localhost:3120",
+    "imageGenEndpoint": "",
+    "imageGenProvider": "none"
+  },
+  "deployment": {
+    "domain": "localhost",
+    "port": 8082,
+    "useHttps": false,
+    "corsOrigin": "http://localhost:8082"
+  },
+  "_comments": {
+    "bot.name": "Internal name for your bot (used in code)",
+    "bot.displayName": "Display name shown in the UI",
+    "bot.emoji": "Emoji to represent your bot",
+    "bot.description": "Brief description of your dashboard",
+    "bot.avatarUrl": "Path or URL to bot avatar image",
+    "branding.primaryColor": "Primary brand color (hex)",
+    "branding.accentColor": "Accent color for highlights (hex)",
+    "branding.backgroundColor": "Main background color (hex)",
+    "branding.surfaceColor": "Card/surface background color (hex)",
+    "branding.textColor": "Primary text color (hex)",
+    "branding.sidebarTitle": "Title shown in the sidebar",
+    "branding.loginTitle": "Main title on login page",
+    "branding.loginSubtitle": "Subtitle on login page",
+    "features.*": "Enable/disable dashboard features (true/false)",
+    "paths.dataDir": "Base data directory path",
+    "paths.openclawDir": "OpenClaw installation directory",
+    "paths.mediaDir": "Media files directory",
+    "paths.sessionsDir": "OpenClaw sessions directory",
+    "services.taskApiUrl": "Task management API endpoint",
+    "services.openclawGatewayWs": "OpenClaw Gateway WebSocket URL",
+    "services.openclawApiUrl": "OpenClaw Gateway HTTP API URL",
+    "services.imageGenEndpoint": "Image generation endpoint (optional)",
+    "services.imageGenProvider": "Image generation provider (none/comfyui/etc)",
+    "deployment.domain": "Deployment domain",
+    "deployment.port": "Frontend server port",
+    "deployment.useHttps": "Use HTTPS (true/false)",
+    "deployment.corsOrigin": "CORS allowed origin"
+  }
+}

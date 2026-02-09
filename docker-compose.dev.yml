@@ -1,0 +1,119 @@
+name: clawboard-dev
+
+services:
+  # PostgreSQL Database (Development)
+  db:
+    image: postgres:16-alpine
+    container_name: clawboard-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clawboard_dev
+      POSTGRES_USER: clawboard_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD_DEV:-dev_password_change_me}
+    ports:
+      - "5433:5432"  # Different port for dev
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clawboard_dev -d clawboard_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: clawboard_dev
+      DB_USER: clawboard_dev
+      DB_PASSWORD: ${DB_PASSWORD_DEV:-dev_password_change_me}
+      JWT_SECRET: ${JWT_SECRET_DEV:-dev_secret_change_me}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
+      CORS_ORIGIN: http://localhost:8082
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
+      CLAWDBOT_GATEWAY_WS_URL: ws://host.docker.internal:18789
+      AUTH_PROFILES_PATH: /clawdbot/auth-profiles.json
+      MEMORY_DIR: /workspace/memory
+      TASKS_FILE: /workspace/memory/tasks.json
+      AGENT_HISTORY_FILE: /workspace/memory/agent-history.json
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /home/clawd/.openclaw/agents/main/sessions:/clawdbot/sessions:ro
+      - /home/clawd/.openclaw/openclaw.json:/clawdbot/clawdbot.json:ro
+      - /home/clawd/.openclaw/agents/main/agent/models.json:/clawdbot/models.json:ro
+      - /home/clawd/.openclaw/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
+      - /home/clawd/.openclaw/media:/clawdbot/media:ro
+      - /home/clawd/clawd:/workspace:rw
+      - 
+      - /home/clawd/clawd/media/generated:/clawd-media/generated:rw
+      - /home/clawd/clawd/media/projects:/clawd-media/projects:rw
+      - /mnt/nfs/NimsProjects:/nfs-projects:rw
+      - /home/clawd/clawd/projects:/project-sources:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - clawboard-network-dev
+    command: npm run dev
+
+  # Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: /api/dev
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - clawboard-network-dev
+    command: npm run dev
+
+  # Nginx Reverse Proxy (Development)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: clawboard-dev-nginx
+    restart: unless-stopped
+    ports:
+      - "8082:80"  # Development port
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - clawboard-network-dev
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  clawboard-network-dev:
+    driver: bridge

@@ -1,0 +1,613 @@
+/* Model Status Badge - Shows model + context % next to avatar */
+
+.model-status-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.model-status-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: default;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .model-status-badge {
+    max-width: 56px;
+    overflow: hidden;
+  }
+  
+  .model-status-text {
+    font-size: 10px;
+    gap: 3px;
+    justify-content: center;
+  }
+}
+
+.model-name {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+.model-override-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: #fbbf24;
+  opacity: 0.8;
+}
+
+.model-default-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.model-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.context-percent {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s ease;
+}
+
+.context-percent.low {
+  color: #10b981; /* green */
+}
+
+.context-percent.medium {
+  color: #f59e0b; /* yellow */
+}
+
+.context-percent.high {
+  color: #ef4444; /* red */
+}
+
+/* Usage percent in main badge (session quota remaining) */
+.usage-percent {
+  font-weight: 600;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s ease;
+}
+
+.usage-percent.low {
+  color: #10b981;
+}
+
+.usage-percent.medium {
+  color: #f59e0b;
+}
+
+.usage-percent.high {
+  color: #ef4444;
+}
+
+/* Fallback warning icon */
+.fallback-warning-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4));
+}
+
+/* Profile name display */
+.profile-name {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.profile-name.fallback {
+  color: #fbbf24;
+}
+
+/* Agent status indicator dot */
+.model-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.model-status-indicator .status-dot-glow {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.model-status-indicator.status-working .status-dot-glow {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.model-status-indicator.status-idle .status-dot-glow {
+  background: #6b7280;
+  box-shadow: none;
+}
+
+.model-status-indicator.status-unknown .status-dot-glow {
+  background: #f59e0b;
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* Agent count next to model name */
+.model-agent-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(16, 185, 129, 0.8);
+}
+
+/* Context bar */
+.context-bar-container {
+  width: 100%;
+  max-width: 200px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.context-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease, background-color 0.5s ease;
+}
+
+.context-bar-fill.low {
+  background: #10b981;
+}
+
+.context-bar-fill.medium {
+  background: #f59e0b;
+}
+
+.context-bar-fill.high {
+  background: #ef4444;
+}
+
+/* Tooltip */
+.model-status-tooltip-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+.model-status-tooltip {
+  position: fixed;
+  left: calc(var(--sidebar-width, 280px) + 12px);
+  top: 160px;
+  z-index: 600;
+  min-width: 290px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  animation: tooltip-fade-in 0.15s ease-out;
+  pointer-events: none;
+}
+
+/* Sticky tooltip - enable pointer events for clicking buttons */
+.tooltip-sticky .model-status-tooltip {
+  pointer-events: auto;
+  border-color: rgba(96, 165, 250, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(96, 165, 250, 0.2);
+}
+
+/* Hide tooltip in collapsed state to prevent overlap */
+.sidebar-collapsed .model-status-tooltip {
+  display: none;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-model-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.tooltip-override {
+  font-size: 11px;
+  font-weight: 500;
+  color: #fbbf24;
+  margin-left: 4px;
+}
+
+.tooltip-default-model {
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 4px;
+  padding: 6px 8px !important;
+  margin-top: 4px;
+}
+
+/* Close button (X) for sticky tooltip */
+.tooltip-close-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.tooltip-close-button:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  transform: scale(1.05);
+}
+
+.tooltip-close-button:active {
+  transform: scale(0.95);
+}
+
+/* Reset to Default button */
+.tooltip-reset-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+  pointer-events: auto;
+}
+
+.tooltip-reset-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.tooltip-reset-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.tooltip-reset-button:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tooltip-session-age {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.tooltip-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tooltip-value {
+  color: #f8fafc;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Agent status row in tooltip */
+.tooltip-agent-status {
+  margin-bottom: 4px;
+}
+
+.tooltip-agent-status.status-working .tooltip-status-value {
+  color: #10b981;
+}
+
+.tooltip-agent-status.status-idle .tooltip-status-value {
+  color: #6b7280;
+}
+
+.tooltip-agent-status.status-unknown .tooltip-status-value {
+  color: #f59e0b;
+}
+
+.tooltip-accumulating {
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-style: italic;
+  font-weight: 400 !important;
+}
+
+/* Auth profile status labels */
+.tooltip-auth-status {
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.tooltip-auth-status.primary {
+  color: #10b981;
+}
+
+.tooltip-auth-status.fallback {
+  color: #fbbf24;
+}
+
+.tooltip-context-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-context-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.tooltip-context-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.tooltip-context-fill.low {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.tooltip-context-fill.medium {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.tooltip-context-fill.high {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+/* Subagents section in tooltip */
+.tooltip-subagents-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-subagents-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.tooltip-subagent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.tooltip-subagent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tooltip-subagent-dot.status-working {
+  background: #10b981;
+  box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+}
+
+.tooltip-subagent-dot.status-idle {
+  background: #6b7280;
+}
+
+.tooltip-subagent-dot.status-unknown {
+  background: #f59e0b;
+}
+
+.tooltip-subagent-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  flex: 1;
+}
+
+.tooltip-subagent-model {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+}
+
+.tooltip-subagent-tokens {
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Usage stats section */
+.tooltip-usage-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-usage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.tooltip-usage-stale {
+  font-size: 10px;
+  color: #f59e0b;
+  font-style: italic;
+}
+
+.tooltip-usage-time {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+}
+
+/* Usage bars moved to Sidebar — tooltip shows text summary only */
+
+/* Freshness indicator */
+.tooltip-freshness {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: right;
+}
+
+/* Loading state */
+.model-status-loading {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* Compact mode for collapsed sidebar */
+.model-status-badge.model-status-compact {
+  width: 100%;
+  max-width: 48px;
+  cursor: help;
+}
+
+.model-status-compact .context-bar-container {
+  max-width: 100%;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.model-status-compact .context-bar-container.compact {
+  max-width: 48px;
+}
+
+/* Model Switching State */
+.model-status-badge.model-switching {
+  position: relative;
+}
+
+.switching-text {
+  color: #60a5fa !important;
+  font-weight: 600;
+  animation: text-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes text-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Switching indicator dot */
+.model-status-indicator.status-switching .status-dot-pulse {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.6);
+  animation: switching-pulse 1s ease-in-out infinite;
+}
+
+@keyframes switching-pulse {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.6);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(0.8);
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.8);
+  }
+}
+
+/* Pulsing progress bar during switch */
+.context-bar-container.switching-pulse {
+  background: rgba(96, 165, 250, 0.15);
+}
+
+.context-bar-fill.switching {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6);
+  background-size: 200% 100%;
+  animation: bar-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes bar-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Compact mode switching */
+.model-status-compact .context-bar-container.switching-pulse {
+  background: rgba(96, 165, 250, 0.2);
+}

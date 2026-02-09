@@ -1,0 +1,156 @@
+/* HeroCard - Main Dashboard Welcome Section */
+@import '../../styles/variables.css';
+@import '../../styles/animations.css';
+
+.hero-card {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.15) 0%,
+    rgba(168, 85, 247, 0.1) 50%,
+    rgba(249, 115, 22, 0.15) 100%
+  );
+  border: 2px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  padding: var(--space-12);
+  margin-bottom: var(--space-6);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-smooth);
+  backdrop-filter: blur(16px);
+}
+
+.hero-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 
+    var(--shadow-lg),
+    0 0 40px rgba(59, 130, 246, 0.2);
+}
+
+.hero-card-bg-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    var(--blue-600) 0%,
+    var(--purple-600) 50%,
+    var(--orange-600) 100%
+  );
+  opacity: 0.05;
+  animation: breathing 6s ease-in-out infinite;
+  z-index: 0;
+}
+
+@keyframes breathing {
+  0%, 100% {
+    opacity: 0.05;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.08;
+    transform: scale(1.02);
+  }
+}
+
+.hero-card-content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+}
+
+.hero-greeting {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-3) 0;
+  line-height: var(--leading-tight);
+  background: linear-gradient(
+    135deg,
+    var(--blue-300) 0%,
+    var(--purple-300) 50%,
+    var(--orange-300) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-text 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+@keyframes gradient-text {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.hero-tagline {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-8) 0;
+  line-height: var(--leading-normal);
+}
+
+.hero-quick-actions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.hero-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  transition: all var(--transition-smooth);
+  box-shadow: var(--shadow-sm);
+}
+
+.hero-action-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-bright);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    var(--shadow-md),
+    0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.hero-action-btn:active {
+  transform: translateY(-2px) scale(1);
+}
+
+.hero-action-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .hero-card {
+    padding: var(--space-8);
+  }
+
+  .hero-greeting {
+    font-size: var(--text-2xl);
+  }
+
+  .hero-tagline {
+    font-size: var(--text-sm);
+  }
+
+  .hero-quick-actions {
+    flex-direction: column;
+  }
+
+  .hero-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,202 @@
+/* StatsCard - Dashboard Statistics Cards */
+@import '../../styles/variables.css';
+@import '../../styles/animations.css';
+
+.stats-card {
+  position: relative;
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  transition: all var(--transition-smooth);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  padding: 2px;
+  background: linear-gradient(135deg, transparent, transparent);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--transition-smooth);
+}
+
+.stats-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-muted);
+}
+
+.stats-card:hover::before {
+  opacity: 1;
+}
+
+/* Color Variants */
+.stats-card-blue:hover {
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.stats-card-blue::before {
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+}
+
+.stats-card-orange:hover {
+  box-shadow: var(--shadow-glow-orange);
+}
+
+.stats-card-orange::before {
+  background: linear-gradient(135deg, var(--orange-500), var(--orange-600));
+}
+
+.stats-card-green:hover {
+  box-shadow: 0 8px 32px rgba(74, 222, 128, 0.25);
+}
+
+.stats-card-green::before {
+  background: linear-gradient(135deg, var(--green-500), var(--green-600));
+}
+
+.stats-card-purple:hover {
+  box-shadow: var(--shadow-glow-purple);
+}
+
+.stats-card-purple::before {
+  background: linear-gradient(135deg, var(--purple-500), var(--purple-600));
+}
+
+.stats-card-red:hover {
+  box-shadow: 0 8px 32px var(--red-glow);
+}
+
+.stats-card-red::before {
+  background: linear-gradient(135deg, var(--red-500), #dc2626);
+}
+
+.stats-card-gray:hover {
+  box-shadow: 0 8px 32px rgba(156, 163, 175, 0.15);
+}
+
+.stats-card-gray::before {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+/* Pulse Animation for Active Items */
+.stats-card-pulse .stats-card-icon {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* Icon */
+.stats-card-icon {
+  font-size: 48px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: transform var(--transition-fast);
+}
+
+.stats-card:hover .stats-card-icon {
+  transform: scale(1.1);
+}
+
+/* Content */
+.stats-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.stats-card-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats-card-value {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+  font-family: var(--font-mono);
+}
+
+/* Animate number changes */
+.stats-card-value {
+  animation: count-up 0.5s ease-out;
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stats-card-trend {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--text-tertiary);
+}
+
+.stats-card-description {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Color-specific value colors */
+.stats-card-blue .stats-card-value {
+  color: var(--blue-300);
+}
+
+.stats-card-orange .stats-card-value {
+  color: var(--orange-300);
+}
+
+.stats-card-green .stats-card-value {
+  color: var(--green-300);
+}
+
+.stats-card-purple .stats-card-value {
+  color: var(--purple-300);
+}
+
+.stats-card-red .stats-card-value {
+  color: var(--red-400);
+}
+
+.stats-card-gray .stats-card-value {
+  color: var(--text-tertiary);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .stats-card {
+    padding: var(--space-4);
+  }
+
+  .stats-card-icon {
+    font-size: 36px;
+  }
+
+  .stats-card-value {
+    font-size: var(--text-2xl);
+  }
+}

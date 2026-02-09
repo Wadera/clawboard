@@ -1,0 +1,211 @@
+/* Stop Button Styles */
+
+.stop-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stop-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Main session stop */
+.stop-button.main {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.stop-button.main:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.stop-button.main:active:not(:disabled) {
+  background: rgba(239, 68, 68, 0.35);
+  transform: scale(0.98);
+}
+
+/* Active state — pulsing glow when bot is working */
+.stop-button.main.active {
+  animation: stop-pulse 2s ease-in-out infinite;
+}
+
+@keyframes stop-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+  }
+}
+
+/* Agent stop (tiny inline button) */
+.stop-button.agent {
+  padding: 2px 6px;
+  background: transparent;
+  color: rgba(239, 68, 68, 0.6);
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.stop-button.agent:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Emergency stop */
+.stop-button.emergency {
+  padding: 8px 16px;
+  background: #ef4444;
+  color: white;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stop-button.emergency:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.4);
+}
+
+.stop-button.emergency:active:not(:disabled) {
+  background: #b91c1c;
+  transform: scale(0.98);
+}
+
+/* Stopping trigger pulse — brief flash when stop is clicked */
+.stop-button.stopping {
+  animation: stop-trigger-pulse 0.3s ease;
+}
+
+@keyframes stop-trigger-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  50% { transform: scale(1.05); box-shadow: 0 0 20px 4px rgba(239, 68, 68, 0.4); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Loading spinner */
+.stop-button .stop-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: stop-spin 0.6s linear infinite;
+}
+
+@keyframes stop-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Success/Error feedback */
+.stop-button .stop-feedback {
+  font-size: 14px;
+}
+
+/* Hidden when idle (main variant) */
+.stop-button.main.hidden {
+  display: none;
+}
+
+/* Confirmation overlay */
+.stop-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+  animation: overlay-fade-in 0.15s ease-out;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stop-confirm-dialog {
+  background: #1e293b;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.stop-confirm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ef4444;
+  margin: 0 0 8px 0;
+}
+
+.stop-confirm-message {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.stop-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.stop-confirm-cancel {
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stop-confirm-cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.stop-confirm-confirm {
+  padding: 8px 20px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stop-confirm-confirm:hover {
+  background: #dc2626;
+}
+
+/* Responsive: collapsed sidebar */
+@media (max-width: 1023px) {
+  .stop-button.main {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
