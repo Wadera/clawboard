@@ -55,10 +55,12 @@ services:
       OPENCLAW_TRANSCRIPTS_DIR: /openclaw/sessions
       OPENCLAW_CONFIG_PATH: /openclaw/config/openclaw.json
       OPENCLAW_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:3120}
+      WORKSPACE_PATH: /workspace
     volumes:
       # OpenClaw mounts (read-only)
       - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/openclaw/sessions:ro
       - ${OPENCLAW_DIR:-~/.openclaw}:/openclaw/config:ro
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
       
       # Data directory (read-write)
       - ${DATA_DIR:-./data}:/data:rw

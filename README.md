@@ -71,6 +71,77 @@ open http://localhost:8080/dashboard/
 - Configures OpenClaw integration paths
 - Creates data and backup directories
 
+## 🧠 OpenClaw Workspace Integration
+
+ClawBoard automatically reads and displays your bot's workspace files, giving you direct visibility into your agent's personality, memory, and configuration.
+
+### What Gets Loaded
+
+The following files from your OpenClaw workspace are accessible in the dashboard:
+
+- **SOUL.md** — Your bot's personality, identity, and core values
+- **HEARTBEAT.md** — Heartbeat monitoring configuration and tasks
+- **AGENTS.md** — Agent behavior, memory rules, and conventions
+- **USER.md** — Information about the human the bot serves
+- **memory/YYYY-MM-DD.md** — Daily memory logs
+- **memory/*.md** — Additional memory files
+
+### How It Works
+
+The workspace is mounted **read-only** into the ClawBoard backend container:
+
+```yaml
+volumes:
+  - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
+```
+
+Configuration in `.env`:
+
+```bash
+# Path to your bot's workspace directory
+OPENCLAW_WORKSPACE=~/.openclaw/workspace
+```
+
+### Dashboard Features
+
+When workspace files are loaded, you'll see:
+
+- **Workspace Files Widget** — Browse and view workspace files directly in the dashboard
+- **Bot Personality Card** — Displays bot name and identity from SOUL.md
+- **Memory Timeline** — Navigate through daily memory logs
+- **Quick File Access** — Jump to any workspace file with one click
+
+### Verification
+
+To verify the workspace integration is working:
+
+1. Log into the dashboard at `http://localhost:8080/dashboard/`
+2. Look for the "Workspace Files" widget on the main dashboard
+3. Click on any file (e.g., SOUL.md) to view its contents
+4. If files don't appear, check:
+   - `.env` has correct `OPENCLAW_WORKSPACE` path
+   - The path exists and contains the expected files
+   - Docker container has been restarted after .env changes
+
+### Troubleshooting
+
+**Files not showing up?**
+
+```bash
+# Check if workspace path is correct
+ls -la ~/.openclaw/workspace
+
+# Verify .env configuration
+grep OPENCLAW_WORKSPACE .env
+
+# Restart containers to pick up changes
+docker compose restart clawboard-backend
+```
+
+**Permission issues?**
+
+The workspace is mounted read-only, so ClawBoard cannot modify your files. If you need to edit them, use your preferred editor on the host system.
+
 ## 📚 Documentation
 
 Documentation lives in [`docs/`](docs/):

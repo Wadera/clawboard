@@ -12,6 +12,7 @@ import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { LoginPage } from './pages/LoginPage';
+import { DevEnvironmentPlaceholder } from './components/DevEnvironmentPlaceholder';
 import { FileViewerProvider } from './contexts/FileViewerContext';
 import { ModelSwitchProvider } from './contexts/ModelSwitchContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -40,6 +41,7 @@ function App() {
 function AuthenticatedApp() {
   const { config } = useClawBoardConfig();
   const { status: realtimeStatus, connected: wsConnected, error: wsError } = useRealtimeStatus();
+  const isDevEnvironment = window.location.pathname.startsWith('/dashboard-dev');
 
   // Global keyboard shortcut: Ctrl+Shift+X to stop
   useEffect(() => {
@@ -98,17 +100,21 @@ function AuthenticatedApp() {
           </header>
 
           <main className="main-content">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              {config.features.taskBoard && <Route path="/tasks" element={<TasksPage />} />}
-              {config.features.projects && <Route path="/projects" element={<ProjectsPage />} />}
-              {config.features.imageGeneration && <Route path="/images" element={<ImageGenerationPage />} />}
-              {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
-              {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
-              {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
-              {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
-              {/* Plugin routes are handled via proxy — /plugins/* routes go to plugin containers */}
-            </Routes>
+            {isDevEnvironment ? (
+              <DevEnvironmentPlaceholder />
+            ) : (
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                {config.features.taskBoard && <Route path="/tasks" element={<TasksPage />} />}
+                {config.features.projects && <Route path="/projects" element={<ProjectsPage />} />}
+                {config.features.imageGeneration && <Route path="/images" element={<ImageGenerationPage />} />}
+                {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
+                {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
+                {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
+                {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
+                {/* Plugin routes are handled via proxy — /plugins/* routes go to plugin containers */}
+              </Routes>
+            )}
           </main>
         </div>
       </div>
