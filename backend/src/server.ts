@@ -17,6 +17,7 @@ import { taskAnalyzer } from './services/taskAnalyzer';
 import { autoArchive } from './services/autoArchive';
 import { subAgentTaskUpdater } from './services/SubAgentTaskUpdater';
 import { GatewayConnector } from './services/GatewayConnector';
+import { PluginLoader } from './services/PluginLoader';
 
 // Load environment variables
 dotenv.config();
@@ -59,10 +60,10 @@ const wsService = new WebSocketService(server, '/ws');
 
 // Initialize Session Monitor
 // In Docker: /clawdbot/sessions is mounted from host ~/.clawdbot/agents/main/sessions
-const SESSIONS_PATH = process.env.CLAWDBOT_SESSIONS_PATH || '/clawdbot/sessions/sessions.json';
-const TRANSCRIPTS_DIR = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
+const SESSIONS_PATH = process.env.OPENCLAW_SESSIONS_PATH || '/clawdbot/sessions/sessions.json';
+const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/clawdbot/sessions';
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH || '/workspace';
-const CONFIG_PATH = process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
+const CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
 const sessionMonitor = new SessionMonitor(SESSIONS_PATH, TRANSCRIPTS_DIR, wsService);
 
 // Initialize new Phase 3 services
@@ -72,6 +73,10 @@ const controlService = new ControlService(SESSIONS_PATH, CONFIG_PATH);
 
 // Initialize Gateway Connector for message queue monitoring
 const gatewayConnector = new GatewayConnector(wsService);
+
+// Initialize Plugin Loader
+const PLUGINS_CONFIG = process.env.CLAWBOARD_PLUGINS_CONFIG || './clawboard.plugins.json';
+const pluginLoader = new PluginLoader(PLUGINS_CONFIG);
 
 // Initialize Phase 4 Work Monitor
 const workMonitor = new WorkMonitor({
@@ -135,7 +140,7 @@ app.get('/health', async (_req: Request, res: Response) => {
 app.get('/', (_req: Request, res: Response) => {
   res.json({
     name: 'ClawBoard API',
-    version: '1.0.0',
+    version: '2.0.0',
     environment: NODE_ENV,
     status: 'running'
   });
@@ -161,7 +166,9 @@ import toolsRoutes from './routes/tools';
 import gatewayRoutes, { setGatewayConnector } from './routes/gateway';
 import dashboardRoutes from './routes/dashboard';
 import modelsRoutes, { setModelsGatewayConnector } from './routes/models';
+import pluginsRoutes, { setPluginLoader } from './routes/plugins';
 import { authMiddleware } from './middleware/auth';
+import { createPluginProxy } from './middleware/pluginProxy';
 
 // Wire up Phase 3 route dependencies
 setWorkspaceWatcher(workspaceWatcher);
@@ -169,10 +176,17 @@ setControlService(controlService);
 setModelStatusService(modelStatusService);
 setGatewayConnector(gatewayConnector);
 setModelsGatewayConnector(gatewayConnector);
+setPluginLoader(pluginLoader);
 
 // Public routes (no auth required)
 app.use('/auth', authRoutes);
 app.use('/config', configRoutes);
+
+// Plugin routes (auth required) — registry + theme
+app.use('/plugins', authMiddleware, pluginsRoutes);
+
+// Plugin proxy middleware — routes /api/plugins/{name}/* to plugin containers
+app.use(authMiddleware, createPluginProxy(pluginLoader));
 
 // Public static file routes (no auth - for <img> tags that can't send headers)
 // These serve the actual image files without requiring authentication
@@ -265,8 +279,13 @@ server.listen(PORT, async () => {
   `);
   
   // Start session monitoring
-  sessionMonitor.start();
-  console.log('✅ Session monitor started');
+  try {
+    sessionMonitor.start();
+    console.log('✅ Session monitor started');
+  } catch (err) {
+    console.warn('⚠️  Session monitor failed to start:', (err as Error).message);
+    console.warn('   Dashboard will work but session tracking unavailable');
+  }
   
   // Start Phase 3 services
   await workspaceWatcher.start();
@@ -294,6 +313,15 @@ server.listen(PORT, async () => {
   
   gatewayConnector.start();
   console.log('✅ Gateway connector started (message queue monitoring)');
+  
+  // Initialize plugin system
+  await pluginLoader.initialize();
+  const pluginCount = pluginLoader.getAllPlugins().length;
+  if (pluginCount > 0) {
+    console.log(`✅ Plugin system initialized (${pluginCount} plugins loaded)`);
+  } else {
+    console.log('ℹ️  Plugin system initialized (no plugins configured — core-only mode)');
+  }
   
   // Wire up task manager events to WebSocket
   taskManager.on('tasks:updated', (tasks) => {
@@ -335,6 +363,9 @@ process.on('SIGTERM', async () => {
   autoArchive.stop();
   subAgentTaskUpdater.stop();
   gatewayConnector.stop();
+  
+  // Stop plugin loader
+  pluginLoader.stop();
   
   // Stop task manager
   await taskManager.shutdown();

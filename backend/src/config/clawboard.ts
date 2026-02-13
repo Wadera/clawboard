@@ -55,6 +55,15 @@ export interface DeploymentConfig {
   corsOrigin: string;
 }
 
+export interface PluginsConfig {
+  /** Path to clawboard.plugins.json (relative to project root) */
+  configFile: string;
+  /** Enable/disable the plugin system entirely */
+  enabled: boolean;
+  /** Health check interval in milliseconds */
+  healthCheckIntervalMs: number;
+}
+
 export interface ClawBoardConfig {
   bot: BotConfig;
   branding: BrandingConfig;
@@ -62,6 +71,7 @@ export interface ClawBoardConfig {
   paths: PathsConfig;
   services: ServicesConfig;
   deployment: DeploymentConfig;
+  plugins: PluginsConfig;
 }
 
 /**
@@ -115,6 +125,11 @@ const DEFAULT_CONFIG: ClawBoardConfig = {
     port: 8082,
     useHttps: false,
     corsOrigin: 'http://localhost:8082',
+  },
+  plugins: {
+    configFile: './clawboard.plugins.json',
+    enabled: true,
+    healthCheckIntervalMs: 60000,
   },
 };
 

@@ -404,6 +404,10 @@ export const TasksPage: React.FC = () => {
     return tasks
       .filter(t => t.status === column && matchesFilters(t))
       .sort((a, b) => {
+        // Blocked tasks sink to bottom
+        if (a.blocked && !b.blocked) return 1;
+        if (!a.blocked && b.blocked) return -1;
+        // Within same blocked group: sort by priority then date
         const pa = PRIORITY_ORDER[a.priority] ?? 99;
         const pb = PRIORITY_ORDER[b.priority] ?? 99;
         if (pa !== pb) return pa - pb;
@@ -412,9 +416,17 @@ export const TasksPage: React.FC = () => {
       });
   };
 
-  // Mobile swipe gesture support
+  // Mobile swipe gesture support — only triggers from screen edges (40px)
+  // so tapping task cards in the middle of the screen works normally
+  const swipeEdgeZone = 40; // px from screen edge to start a swipe
+  const swipeFromEdge = useRef(false);
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const x = e.touches[0].clientX;
+    const screenW = window.innerWidth;
+    swipeFromEdge.current = x < swipeEdgeZone || x > screenW - swipeEdgeZone;
+    touchStartX.current = x;
+    touchEndX.current = x;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -422,6 +434,7 @@ export const TasksPage: React.FC = () => {
   };
 
   const handleTouchEnd = () => {
+    if (!swipeFromEdge.current) return;
     const diff = touchStartX.current - touchEndX.current;
     const threshold = 50;
     if (Math.abs(diff) < threshold) return;

@@ -5,8 +5,8 @@ import { execSync } from 'child_process';
 import { agentHistoryService } from '../services/AgentHistoryService';
 
 const router = Router();
-const SESSIONS_PATH = process.env.CLAWDBOT_SESSIONS_PATH || '/clawdbot/sessions.json';
-const TRANSCRIPTS_DIR = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
+const SESSIONS_PATH = process.env.OPENCLAW_SESSIONS_PATH || '/clawdbot/sessions.json';
+const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/clawdbot/sessions';
 
 interface AgentDetail {
   key: string;

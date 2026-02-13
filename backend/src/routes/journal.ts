@@ -45,6 +45,22 @@ router.get('/latest', async (_req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * GET /api/journal/:id/navigation — get previous/next entry IDs
+ */
+router.get('/:id/navigation', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const navigation = await journalService.getNavigation(req.params.id);
+    res.json({ success: true, navigation });
+  } catch (err) {
+    console.error('[Journal API] Error getting navigation:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * GET /api/journal/:id — single entry
  */
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
@@ -102,6 +118,38 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         error: err instanceof Error ? err.message : 'Unknown error'
       });
     }
+  }
+});
+
+/**
+ * PUT /api/journal/:id — update entry
+ */
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const entry = await journalService.update(req.params.id, req.body);
+    res.json({ success: true, entry });
+  } catch (err) {
+    console.error('Failed to update journal entry:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * DELETE /api/journal/:id — delete entry
+ */
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    await journalService.delete(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to delete journal entry:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error'
+    });
   }
 });
 

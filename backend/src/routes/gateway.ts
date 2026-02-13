@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 
 const router = Router();
-const TRANSCRIPTS_DIR = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
+const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/clawdbot/sessions';
 const MEDIA_BASE_DIR = '/clawdbot/media';
 
 let gatewayConnector: GatewayConnector | null = null;

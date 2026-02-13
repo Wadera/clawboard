@@ -2,6 +2,94 @@
 
 All notable changes to the ClawBoard project.
 
+## [v2.0.0] - 2026-02-13
+
+### 🎉 Major Release: Plugin System
+
+**ClawBoard V2 introduces a comprehensive plugin architecture for extending the dashboard.**
+
+### 🚀 New Features
+
+- **🧩 Plugin System**
+  - Docker-based plugin architecture
+  - Language-agnostic (Node.js, Python, Go, Rust, etc.)
+  - Plugin discovery from `clawboard.plugins.json`
+  - Plugin manifest validation (`plugin.json` schema)
+  - Health check monitoring (60s interval)
+  - Dynamic sidebar integration
+  - API proxy routing (`/api/plugins/{name}/*`)
+  - UI proxy routing (`/plugins/{name}/*`)
+  - Configuration overrides and defaults
+  - Network isolation via Docker
+
+- **📋 Plugin Loader Service**
+  - Automatic plugin discovery on startup
+  - Manifest validation (required fields, port conflicts)
+  - In-memory plugin registry
+  - Health check polling
+  - Plugin registry API (`GET /api/plugins`)
+
+- **🔌 Plugin Proxy Middleware**
+  - HTTP request proxying to plugin containers
+  - Authentication header forwarding
+  - Error handling for unreachable plugins
+  - Support for both API and UI routes
+
+### 🎨 UI/UX Improvements
+
+- **Blocked Task Sorting** — Blocked tasks now appear below unblocked tasks in kanban columns (while maintaining priority order within each group)
+- Improved visual clarity of actionable vs blocked tasks
+
+### 📚 Documentation
+
+- **New Wiki Pages:**
+  - Plugin Development Guide (complete tutorial)
+  - Plugin Manifest Reference (full schema docs)
+  - Plugin Architecture (design deep dive)
+- **FORK.md** — Comprehensive guide for forking ClawBoard and tracking upstream
+- **TEST-PLAN-V2.md** — Testing checklist for V2.0.0 release
+
+### 🔧 Configuration
+
+- Added `plugins` section to `clawboard.config.json`
+  - `configFile` — Path to plugin config
+  - `enabled` — Toggle plugin system
+  - `healthCheckIntervalMs` — Health check frequency
+- Added `clawboard.plugins.json` for plugin configuration
+- Added `clawboard.plugins.example.json` template
+
+### 📁 Repository Structure
+
+- `backend/src/services/PluginLoader.ts` — Plugin discovery and management
+- `backend/src/middleware/pluginProxy.ts` — HTTP proxy for plugins
+- `backend/src/routes/plugins.ts` — Plugin registry API
+- `clawboard.plugins.json` — Empty plugin array (clean install)
+- `clawboard.plugins.example.json` — Configuration template
+
+### 🚀 Migration Guide
+
+ClawBoard V2 is **backward compatible**. To upgrade:
+
+1. Pull latest code: `git pull upstream main` (or `git fetch upstream && git merge v2.0.0`)
+2. Version already bumped to 2.0.0 in package.json files
+3. Plugin system is opt-in — no plugins = no changes to behavior
+4. To add plugins, create `clawboard.plugins.json` and list your plugins
+5. See [FORK.md](FORK.md) for deployment patterns
+
+### 🔒 Breaking Changes
+
+**None** — V2.0.0 is fully backward compatible with V1.x deployments.
+
+### 📊 Audit Summary
+
+- Plugin system: **100% implemented**
+- UI improvements merged: **1 commit** (blocked task sorting)
+- Documentation: **7 new pages** (wiki + guides)
+- Test coverage: **Comprehensive test plan** created
+- Deployment guides: **FORK.md** for upstream/downstream workflows
+
+---
+
 ## [v1.5.0] - 2026-01-31
 
 ### 🚀 New Features

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { readFile } from 'fs/promises';
 
 const router = Router();
-const SESSIONS_PATH = process.env.CLAWDBOT_SESSIONS_PATH || '/clawdbot/sessions.json';
+const SESSIONS_PATH = process.env.OPENCLAW_SESSIONS_PATH || '/clawdbot/sessions.json';
 const ACTIVE_MINUTES = 5;
 
 interface SessionData {

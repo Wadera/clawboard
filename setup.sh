@@ -124,8 +124,42 @@ fi
 sed -i.bak "s|OPENCLAW_DIR=.*|OPENCLAW_DIR=$OPENCLAW_DIR|" .env
 echo ""
 
+# Workspace directory
+echo -e "${PURPLE}2. Workspace Directory${NC}"
+echo "   Path to your bot's workspace (where SOUL.md, HEARTBEAT.md live)"
+read -p "   Path [${OPENCLAW_DIR}/workspace]: " WORKSPACE_DIR
+WORKSPACE_DIR=${WORKSPACE_DIR:-${OPENCLAW_DIR}/workspace}
+
+# Expand tilde
+WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+
+# Validate workspace directory
+if [ ! -d "$WORKSPACE_DIR" ]; then
+    echo -e "${YELLOW}   ⚠️  Warning: Workspace directory does not exist: $WORKSPACE_DIR${NC}"
+    read -p "   Continue anyway? (yes/no) [yes]: " CONTINUE_WS
+    CONTINUE_WS=${CONTINUE_WS:-yes}
+    if [ "$CONTINUE_WS" != "yes" ]; then
+        echo -e "${RED}❌ Setup cancelled${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}   ✅ Workspace directory found${NC}"
+fi
+
+sed -i.bak "s|OPENCLAW_WORKSPACE=.*|OPENCLAW_WORKSPACE=$WORKSPACE_DIR|" .env
+echo ""
+
+# Gateway WebSocket port
+echo -e "${PURPLE}3. OpenClaw Gateway Port${NC}"
+echo "   WebSocket port for OpenClaw Gateway (check ~/.openclaw/openclaw.json)"
+read -p "   Port [18789]: " GATEWAY_PORT
+GATEWAY_PORT=${GATEWAY_PORT:-18789}
+sed -i.bak "s|OPENCLAW_GATEWAY_URL=.*|OPENCLAW_GATEWAY_URL=ws://host.docker.internal:$GATEWAY_PORT|" .env
+echo -e "${GREEN}   ✅ Gateway URL set to: ws://host.docker.internal:$GATEWAY_PORT${NC}"
+echo ""
+
 # Domain
-echo -e "${PURPLE}2. Domain${NC}"
+echo -e "${PURPLE}4. Domain${NC}"
 echo "   Domain name for the dashboard (use 'localhost' for local development)"
 read -p "   Domain [localhost]: " DOMAIN
 DOMAIN=${DOMAIN:-localhost}
@@ -134,7 +168,7 @@ echo -e "${GREEN}   ✅ Domain set to: $DOMAIN${NC}"
 echo ""
 
 # Database password
-echo -e "${PURPLE}3. Database Password${NC}"
+echo -e "${PURPLE}5. Database Password${NC}"
 echo "   Secure password for PostgreSQL database"
 read -p "   Generate random password? (yes/no) [yes]: " GENERATE_DB_PASS
 GENERATE_DB_PASS=${GENERATE_DB_PASS:-yes}
@@ -155,7 +189,7 @@ sed -i.bak "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$DB_PASSWORD|" .env
 echo ""
 
 # JWT secret
-echo -e "${PURPLE}4. JWT Secret${NC}"
+echo -e "${PURPLE}6. JWT Secret${NC}"
 echo "   Secret key for authentication tokens"
 
 if command -v openssl >/dev/null 2>&1; then
@@ -169,20 +203,34 @@ fi
 echo ""
 
 # Login password
-echo -e "${PURPLE}5. Dashboard Login Password${NC}"
+echo -e "${PURPLE}7. Dashboard Login Password${NC}"
 echo "   Password to access the dashboard UI"
 read -sp "   Enter password [changeme]: " LOGIN_PASS
 echo ""
 LOGIN_PASS=${LOGIN_PASS:-changeme}
-sed -i.bak "s|LOGIN_PASSWORD=.*|LOGIN_PASSWORD=$LOGIN_PASS|" .env
-echo -e "${GREEN}   ✅ Login password set${NC}"
+
+# Generate bcrypt hash
+echo -e "${BLUE}   Generating password hash...${NC}"
+PASSWORD_HASH=$(docker run --rm node:18-alpine sh -c "npm install --no-save bcryptjs 2>/dev/null && node -e \"const b=require('bcryptjs');b.hash('${LOGIN_PASS}',10).then(h=>console.log(h))\"" 2>/dev/null)
+
+if [ $? -eq 0 ] && [ ! -z "$PASSWORD_HASH" ]; then
+    # Escape $ for Docker Compose ($ -> $$)
+    ESCAPED_HASH=$(echo "$PASSWORD_HASH" | sed 's/\$/\$\$/g')
+    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$ESCAPED_HASH|" .env
+    echo -e "${GREEN}   ✅ Login password hash generated${NC}"
+else
+    echo -e "${RED}   ❌ Failed to generate password hash${NC}"
+    echo -e "${YELLOW}   You can generate it manually: node scripts/hash-password.js${NC}"
+    echo -e "${YELLOW}   Then update DASHBOARD_PASSWORD_HASH in .env (escape \$ as \$\$)${NC}"
+    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$LOGIN_PASS|" .env
+fi
 echo ""
 
 # Frontend port
-echo -e "${PURPLE}6. Frontend Port${NC}"
+echo -e "${PURPLE}8. Frontend Port${NC}"
 echo "   Port for accessing the dashboard"
-read -p "   Port [8082]: " FRONTEND_PORT
-FRONTEND_PORT=${FRONTEND_PORT:-8082}
+read -p "   Port [8080]: " FRONTEND_PORT
+FRONTEND_PORT=${FRONTEND_PORT:-8080}
 sed -i.bak "s|FRONTEND_PORT=.*|FRONTEND_PORT=$FRONTEND_PORT|" .env
 echo -e "${GREEN}   ✅ Frontend port set to: $FRONTEND_PORT${NC}"
 echo ""

@@ -4,6 +4,7 @@ import { pool } from '../db/connection';
 export interface JournalEntry {
   id: string;
   date: string;
+  sequence: number;
   mood: string | null;
   reflection_text: string;
   image_path: string | null;
@@ -13,6 +14,7 @@ export interface JournalEntry {
 
 export interface CreateJournalEntryInput {
   date: string;
+  sequence?: number; // Auto-calculated if not provided
   mood?: string;
   reflection_text: string;
   image_path?: string;
@@ -28,7 +30,7 @@ export class JournalService {
     const total = parseInt(countResult.rows[0].count, 10);
 
     const result = await pool.query(
-      'SELECT * FROM journal_entries ORDER BY date DESC LIMIT $1 OFFSET $2',
+      'SELECT * FROM journal_entries ORDER BY date DESC, sequence DESC LIMIT $1 OFFSET $2',
       [limit, offset]
     );
 
@@ -51,7 +53,7 @@ export class JournalService {
    */
   async getLatest(): Promise<JournalEntry | null> {
     const result = await pool.query(
-      'SELECT * FROM journal_entries ORDER BY date DESC LIMIT 1'
+      'SELECT * FROM journal_entries ORDER BY date DESC, sequence DESC LIMIT 1'
     );
     return result.rows[0] || null;
   }
@@ -62,11 +64,21 @@ export class JournalService {
   async create(input: CreateJournalEntryInput): Promise<JournalEntry> {
     const { date, mood, reflection_text, image_path, highlights } = input;
 
+    // Auto-calculate sequence if not provided
+    let sequence = input.sequence;
+    if (!sequence) {
+      const maxSeqResult = await pool.query(
+        'SELECT COALESCE(MAX(sequence), 0) as max_seq FROM journal_entries WHERE date = $1',
+        [date]
+      );
+      sequence = maxSeqResult.rows[0].max_seq + 1;
+    }
+
     const result = await pool.query(
-      `INSERT INTO journal_entries (date, mood, reflection_text, image_path, highlights)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO journal_entries (date, sequence, mood, reflection_text, image_path, highlights)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [date, mood || null, reflection_text, image_path || null, highlights || null]
+      [date, sequence, mood || null, reflection_text, image_path || null, highlights || null]
     );
 
     return result.rows[0];
@@ -116,6 +128,47 @@ export class JournalService {
     }
 
     return result.rows[0];
+  }
+
+  /**
+   * Delete a journal entry
+   */
+  async delete(id: string): Promise<void> {
+    const result = await pool.query('DELETE FROM journal_entries WHERE id = $1', [id]);
+    if (result.rowCount === 0) {
+      throw new Error(`Journal entry not found: ${id}`);
+    }
+  }
+
+  /**
+   * Get navigation info for an entry (previous/next IDs)
+   */
+  async getNavigation(id: string): Promise<{ previousId: string | null; nextId: string | null }> {
+    // First, get the entry to know its date and sequence
+    const entry = await this.getById(id);
+
+    // Get previous entry (earlier in timeline)
+    const prevResult = await pool.query(
+      `SELECT id FROM journal_entries
+       WHERE (date = $1 AND sequence < $2) OR (date < $1)
+       ORDER BY date DESC, sequence DESC
+       LIMIT 1`,
+      [entry.date, entry.sequence]
+    );
+
+    // Get next entry (later in timeline)
+    const nextResult = await pool.query(
+      `SELECT id FROM journal_entries
+       WHERE (date = $1 AND sequence > $2) OR (date > $1)
+       ORDER BY date ASC, sequence ASC
+       LIMIT 1`,
+      [entry.date, entry.sequence]
+    );
+
+    return {
+      previousId: prevResult.rows[0]?.id || null,
+      nextId: nextResult.rows[0]?.id || null,
+    };
   }
 }
 
