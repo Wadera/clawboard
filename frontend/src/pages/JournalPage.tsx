@@ -170,7 +170,7 @@ export function JournalPage() {
         </div>
       </div>
 
-      {/* Status Card with NimOrb */}
+      {/* Status Card */}
       <div className="journal-status-card">
         <div className="journal-status-content">
           {/* State row */}

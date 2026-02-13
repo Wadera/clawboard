@@ -74,28 +74,36 @@ export class SessionMonitor {
     console.log(`   Sessions file: ${this.sessionsPath}`);
     console.log(`   Transcripts dir: ${this.transcriptsDir}`);
 
+    // Debounced update — prevents rapid-fire events from causing OOM
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedUpdate = () => {
+      if (debounceTimer) return; // Already scheduled
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        this.updateAndBroadcast();
+      }, 500); // 500ms debounce
+    };
+
     // Watch sessions.json
     this.sessionWatcher = watch(this.sessionsPath, { persistent: true }, () => {
-      console.log('📝 Sessions file changed');
-      this.updateAndBroadcast();
+      debouncedUpdate();
     });
 
-    // Watch transcripts directory (for lock files and .jsonl changes)
+    // Watch transcripts directory (only .jsonl changes, ignore .lock spam)
     this.transcriptWatcher = watch(
       this.transcriptsDir,
       { persistent: true, recursive: false },
       (_eventType, filename) => {
-        if (filename && (filename.endsWith('.lock') || filename.endsWith('.jsonl'))) {
-          console.log(`📄 Transcript activity: ${filename}`);
-          this.updateAndBroadcast();
+        if (filename && filename.endsWith('.jsonl') && !filename.endsWith('.lock')) {
+          debouncedUpdate();
         }
       }
     );
 
-    // Poll every 1000ms for status updates
+    // Poll every 5s as fallback (reduced from 1s)
     this.pollInterval = setInterval(() => {
       this.updateAndBroadcast();
-    }, 1000);
+    }, 5000);
 
     // Initial update
     this.updateAndBroadcast();
@@ -240,7 +248,7 @@ export class SessionMonitor {
 
       if (hasLock) {
         // Lock exists = currently processing!
-        console.log('🔒 Lock file detected - AI is actively working!');
+        // Lock file = active inference
         
         // Parse transcript to determine WHAT we're doing
         const state = await this.parseTranscript(transcriptPath);

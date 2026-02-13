@@ -25,7 +25,7 @@
     "auditLog": true,
     "stats": true,
     "botStatus": true,
-    "avatarPage": true
+    "avatarPage": false
   },
   "paths": {
     "dataDir": "/data",
@@ -45,5 +45,10 @@
     "port": 8082,
     "useHttps": false,
     "corsOrigin": "http://localhost:8082"
+  },
+  "plugins": {
+    "configFile": "./clawboard.plugins.json",
+    "enabled": true,
+    "healthCheckIntervalMs": 60000
   }
 }

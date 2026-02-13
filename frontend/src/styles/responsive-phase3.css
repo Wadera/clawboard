@@ -422,6 +422,18 @@
 }
 
 /* ========================================
+   8b. MODAL Z-INDEX + PROJECT DETAIL MOBILE
+   ======================================== */
+@media (max-width: 767px) {
+  .modal-overlay {
+    z-index: 10000 !important; /* Above fixed header (z-50) on all mobile browsers */
+  }
+  .project-detail-header {
+    padding-top: calc(var(--space-6) + 12px); /* Extra breathing room on mobile */
+  }
+}
+
+/* ========================================
    9. TOUCH TARGETS — min 44px on mobile
    ======================================== */
 @media (max-width: 767px) {
