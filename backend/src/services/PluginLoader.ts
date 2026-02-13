@@ -282,7 +282,7 @@ export class PluginLoader {
    * Check health of all registered plugins
    */
   async checkAllHealth(): Promise<void> {
-    const promises = Array.from(this.plugins.entries()).map(async ([name, plugin]) => {
+    const promises = Array.from(this.plugins.entries()).map(async ([_name, plugin]) => {
       if (!plugin.manifest) return;
 
       try {

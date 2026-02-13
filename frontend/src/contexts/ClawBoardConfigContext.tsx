@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ClawBoardPublicConfig, DEFAULT_CONFIG, fetchConfig } from '../config/clawboard';
 
 interface ClawBoardConfigContextType {
