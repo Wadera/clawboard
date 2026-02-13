@@ -46,23 +46,30 @@ Get ClawBoard running in **5 minutes**:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/clawboard.git
-cd clawboard
+git clone ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git
+cd ClawBoard
 
-# 2. Run setup script
+# 2. Run setup script (generates .env with password hash)
 ./setup.sh
 
 # 3. Start services
 docker compose up -d
 
 # 4. Access dashboard
-open http://localhost:8082
+open http://localhost:8080/dashboard/
 ```
 
 **Prerequisites:**
 - Docker & Docker Compose
 - OpenClaw installed and running
 - 2GB RAM, 1 CPU core
+
+**What the setup script does:**
+- Creates `.env` from `.env.example`
+- Generates bcrypt password hash for dashboard login
+- Sets up database credentials and JWT secret
+- Configures OpenClaw integration paths
+- Creates data and backup directories
 
 ## 📚 Documentation
 
@@ -310,6 +317,39 @@ docker compose up -d
 # 5. Verify
 docker compose ps
 ```
+
+## ✅ Functional Tests
+
+After deployment, verify that everything works:
+
+```bash
+# 1. Check all containers are healthy
+docker compose ps
+
+# Expected: All containers show "healthy" or "Up"
+
+# 2. Test API health endpoint
+curl http://localhost:8080/api/health
+
+# Expected: {"status":"ok","timestamp":"..."}
+
+# 3. Test login
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"your-password"}'
+
+# Expected: {"token":"...","user":{...}}
+
+# 4. Access dashboard in browser
+open http://localhost:8080/dashboard/
+
+# Expected: Login page loads, successful login redirects to dashboard
+```
+
+**Troubleshooting:**
+- **API 502 Bad Gateway:** Backend container not healthy. Check: `docker compose logs clawboard-backend`
+- **Login fails:** Password hash mismatch. Regenerate: `./setup.sh` (reconfigure)
+- **Dashboard blank:** Check browser console for API errors. Verify `/api/` proxy in nginx
 
 ## 🐛 Troubleshooting
 

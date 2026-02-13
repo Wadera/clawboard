@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+/**
+ * Password hash generator for ClawBoard setup
+ * Uses bcrypt to generate a hash that can be stored in .env
+ */
+
+const bcrypt = require('bcrypt');
+
+const password = process.argv[2];
+
+if (!password) {
+  console.error('Usage: node hash-password.js <password>');
+  process.exit(1);
+}
+
+bcrypt.hash(password, 10)
+  .then(hash => {
+    console.log(hash);
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('Error generating hash:', err.message);
+    process.exit(1);
+  });
