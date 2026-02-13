@@ -175,17 +175,19 @@ read -sp "   Enter password [changeme]: " LOGIN_PASS
 echo ""
 LOGIN_PASS=${LOGIN_PASS:-changeme}
 
-# Generate bcrypt hash using the backend container
+# Generate bcrypt hash
 echo -e "${BLUE}   Generating password hash...${NC}"
-HASH_SCRIPT="const bcrypt = require('bcrypt'); bcrypt.hash('$LOGIN_PASS', 10).then(h => console.log(h)).catch(e => { console.error(e); process.exit(1); });"
-PASSWORD_HASH=$(docker run --rm -i node:18-alpine sh -c "npm install -g bcrypt >/dev/null 2>&1 && node -e \"$HASH_SCRIPT\"")
+PASSWORD_HASH=$(docker run --rm node:18-alpine sh -c "npm install --no-save bcryptjs 2>/dev/null && node -e \"const b=require('bcryptjs');b.hash('${LOGIN_PASS}',10).then(h=>console.log(h))\"" 2>/dev/null)
 
 if [ $? -eq 0 ] && [ ! -z "$PASSWORD_HASH" ]; then
-    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$PASSWORD_HASH|" .env
+    # Escape $ for Docker Compose ($ -> $$)
+    ESCAPED_HASH=$(echo "$PASSWORD_HASH" | sed 's/\$/\$\$/g')
+    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$ESCAPED_HASH|" .env
     echo -e "${GREEN}   ✅ Login password hash generated${NC}"
 else
-    echo -e "${YELLOW}   ⚠️  Failed to generate hash, storing plain password${NC}"
-    echo -e "${YELLOW}   The backend will hash it on first use${NC}"
+    echo -e "${RED}   ❌ Failed to generate password hash${NC}"
+    echo -e "${YELLOW}   You can generate it manually: node scripts/hash-password.js${NC}"
+    echo -e "${YELLOW}   Then update DASHBOARD_PASSWORD_HASH in .env (escape \$ as \$\$)${NC}"
     sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$LOGIN_PASS|" .env
 fi
 echo ""
@@ -193,8 +195,8 @@ echo ""
 # Frontend port
 echo -e "${PURPLE}6. Frontend Port${NC}"
 echo "   Port for accessing the dashboard"
-read -p "   Port [8082]: " FRONTEND_PORT
-FRONTEND_PORT=${FRONTEND_PORT:-8082}
+read -p "   Port [8080]: " FRONTEND_PORT
+FRONTEND_PORT=${FRONTEND_PORT:-8080}
 sed -i.bak "s|FRONTEND_PORT=.*|FRONTEND_PORT=$FRONTEND_PORT|" .env
 echo -e "${GREEN}   ✅ Frontend port set to: $FRONTEND_PORT${NC}"
 echo ""

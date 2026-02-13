@@ -4,7 +4,9 @@
  * Uses bcrypt to generate a hash that can be stored in .env
  */
 
-const bcrypt = require('bcrypt');
+// Try bcryptjs first (pure JS, works everywhere), fall back to bcrypt (native)
+let bcrypt;
+try { bcrypt = require('bcryptjs'); } catch { bcrypt = require('bcrypt'); }
 
 const password = process.argv[2];
 
