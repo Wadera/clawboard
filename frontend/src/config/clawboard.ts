@@ -23,6 +23,7 @@ export interface FeaturesConfig {
   taskBoard: boolean;
   projects: boolean;
   tools: boolean;
+  sessions: boolean;
   auditLog: boolean;
   stats: boolean;
   botStatus: boolean;
@@ -62,6 +63,7 @@ export const DEFAULT_CONFIG: ClawBoardPublicConfig = {
     taskBoard: true,
     projects: true,
     tools: true,
+    sessions: true,
     auditLog: true,
     stats: true,
     botStatus: true,

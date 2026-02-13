@@ -7,6 +7,7 @@ import {
   Activity, 
   BarChart3,
   Wrench,
+  Radio,
   LucideIcon
 } from 'lucide-react';
 
@@ -95,13 +96,22 @@ export const navigationItems: NavItem[] = [
     order: 5,
   },
   {
+    id: 'sessions',
+    path: '/sessions',
+    label: 'Sessions',
+    icon: Radio,
+    showInSidebar: true,
+    showInHero: true,
+    order: 6,
+  },
+  {
     id: 'audit',
     path: '/audit',
     label: 'Audit Log',
     icon: Activity,
     showInSidebar: true,
     showInHero: true,
-    order: 6,
+    order: 7,
   },
   {
     id: 'stats',
@@ -110,7 +120,7 @@ export const navigationItems: NavItem[] = [
     icon: BarChart3,
     showInSidebar: true,
     showInHero: true,
-    order: 7,
+    order: 8,
   },
 ];
 

@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { AuditPage } from './pages/AuditPage';
+import { SessionsPage } from './pages/SessionsPage';
 import { StatsPage } from './pages/StatsPage';
 import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
@@ -108,6 +109,7 @@ function AuthenticatedApp() {
                 {config.features.taskBoard && <Route path="/tasks" element={<TasksPage />} />}
                 {config.features.projects && <Route path="/projects" element={<ProjectsPage />} />}
                 {config.features.imageGeneration && <Route path="/images" element={<ImageGenerationPage />} />}
+                {config.features.sessions && <Route path="/sessions" element={<SessionsPage />} />}
                 {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
                 {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
                 {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
