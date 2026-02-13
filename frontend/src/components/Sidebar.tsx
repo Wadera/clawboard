@@ -9,7 +9,7 @@ import { WorkspaceFiles } from './WorkspaceFiles';
 import { AgentDetailCard } from './AgentDetailCard';
 import { useBotStatus } from '../hooks/useBotStatus';
 import { auth, authenticatedFetch } from '../utils/auth';
-import { NimOrbWebGL } from './NimOrbWebGL';
+import { StatusOrb } from './StatusOrb';
 // NotificationBadge removed — not needed
 
 interface UsageStats {
@@ -167,21 +167,12 @@ export function Sidebar({ status, connected }: SidebarProps) {
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
 
-        {/* 1. Avatar Section - Always at top */}
+        {/* 1. Status Orb Section - Always at top */}
         <div className="sidebar-avatar-section">
-          <div 
-            className="avatar-container avatar-container--clickable"
-            onClick={() => navigate('/avatar-webgl')}
-            role="button"
-            tabIndex={0}
-            aria-label="View full-screen avatar"
-            onKeyDown={(e) => e.key === 'Enter' && navigate('/avatar-webgl')}
-          >
-            <NimOrbWebGL
+          <div className="avatar-container">
+            <StatusOrb
               state={status?.main.state || 'idle'}
-              size={collapsed ? 56 : 180}
-              particleCount={collapsed ? 5000 : 15000}
-              enableTentacles={!collapsed}
+              size={collapsed ? 56 : 120}
             />
           </div>
         </div>

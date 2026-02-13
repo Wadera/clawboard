@@ -27,7 +27,6 @@ export interface FeaturesConfig {
   auditLog: boolean;
   stats: boolean;
   botStatus: boolean;
-  avatarPage: boolean;
 }
 
 export interface ClawBoardPublicConfig {
@@ -67,7 +66,6 @@ export const DEFAULT_CONFIG: ClawBoardPublicConfig = {
     auditLog: true,
     stats: true,
     botStatus: true,
-    avatarPage: true,
   },
 };
 

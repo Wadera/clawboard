@@ -3,7 +3,7 @@ import { HeroCard } from '../components/dashboard/HeroCard';
 import { StatsCard } from '../components/dashboard/StatsCard';
 import { ActiveWorkPreview } from '../components/dashboard/ActiveWorkPreview';
 import { ModelStatusCard } from '../components/ModelStatusCard';
-import { MessageQueueWidget } from '../components/widgets/MessageQueueWidget';
+import { MessageQueueCard } from '../components/widgets/MessageQueueCard';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { ProjectOverview } from '../components/dashboard/ProjectOverview';
 import { SystemStatus } from '../components/dashboard/SystemStatus';
@@ -162,8 +162,8 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Message Queue - Prominent position for time-sensitive messages */}
-      <MessageQueueWidget />
+      {/* Message Queue - Compact card linking to Sessions page */}
+      <MessageQueueCard />
 
       {/* Currently Working On - All in-progress tasks */}
       <ActiveWorkPreview />

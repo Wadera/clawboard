@@ -1,6 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import { auth } from '../utils/auth';
-import { NimOrbWebGL } from '../components/NimOrbWebGL';
+import { StatusOrb } from '../components/StatusOrb';
 import { useClawBoardConfig } from '../contexts/ClawBoardConfigContext';
 import './LoginPage.css';
 
@@ -38,11 +38,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     <div className="login-page">
       <div className={`login-container ${shake ? 'shake' : ''}`}>
         <div className="login-logo">
-          <NimOrbWebGL 
-            state="idle" 
-            size={100} 
-            particleCount={8000}
-          />
+          <StatusOrb state="idle" size={100} />
         </div>
         
         <h1 className="login-title">{config.branding.loginTitle}</h1>

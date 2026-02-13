@@ -13,13 +13,6 @@ import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { LoginPage } from './pages/LoginPage';
-import { AvatarPage } from './pages/AvatarPage';
-import { AvatarPageWebGL } from './pages/AvatarPageWebGL';
-import { WebGLTest } from './pages/WebGLTest';
-import { WebGLSimple } from './pages/WebGLSimple';
-import { OrbSimpleTest } from './pages/OrbSimpleTest';
-import { WebGLStatesPage } from './pages/WebGLStatesPage';
-import { TentacleDebug } from './pages/TentacleDebug';
 import { FileViewerProvider } from './contexts/FileViewerContext';
 import { ModelSwitchProvider } from './contexts/ModelSwitchContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -85,20 +78,11 @@ function AuthenticatedApp() {
 
   const basename = import.meta.env.BASE_URL || '/dashboard/';
   
-  // Check if we're on a standalone debug page (no sidebar)
-  const isStandalonePage = window.location.pathname.includes('/tentacle-debug');
-  
   return (
     <Router basename={basename}>
       <ToastProvider>
       <ModelSwitchProvider>
       <FileViewerProvider>
-      {/* Standalone pages without sidebar */}
-      {isStandalonePage ? (
-        <Routes>
-          <Route path="/tentacle-debug" element={<TentacleDebug />} />
-        </Routes>
-      ) : (
       <div className={`app-container ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
         <Sidebar status={realtimeStatus} connected={wsConnected} />
 
@@ -146,14 +130,6 @@ function AuthenticatedApp() {
               {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
               {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
               {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
-              {config.features.avatarPage && <Route path="/avatar" element={<AvatarPage />} />}
-              {config.features.avatarPage && <Route path="/avatar-webgl" element={<AvatarPageWebGL />} />}
-              {/* Debug routes - always available */}
-              <Route path="/webgl-test" element={<WebGLTest />} />
-              <Route path="/webgl-simple" element={<WebGLSimple />} />
-              <Route path="/orb-simple" element={<OrbSimpleTest />} />
-              <Route path="/webgl-states" element={<WebGLStatesPage />} />
-              <Route path="/tentacle-debug" element={<TentacleDebug />} />
             </Routes>
           </main>
 
@@ -162,7 +138,6 @@ function AuthenticatedApp() {
           </footer>
         </div>
       </div>
-      )}
     </FileViewerProvider>
       </ModelSwitchProvider>
       </ToastProvider>
