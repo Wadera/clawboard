@@ -1,6 +1,5 @@
 import React, { useState, FormEvent } from 'react';
 import { auth } from '../utils/auth';
-import { NimOrbWebGL } from '../components/NimOrbWebGL';
 import { useClawBoardConfig } from '../contexts/ClawBoardConfigContext';
 import './LoginPage.css';
 
@@ -38,11 +37,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     <div className="login-page">
       <div className={`login-container ${shake ? 'shake' : ''}`}>
         <div className="login-logo">
-          <NimOrbWebGL 
-            state="idle" 
-            size={100} 
-            particleCount={8000}
-          />
+          <span className="login-emoji">{config.bot.emoji}</span>
         </div>
         
         <h1 className="login-title">{config.branding.loginTitle}</h1>
@@ -85,7 +80,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </form>
 
         <div className="login-footer">
-          <span className="login-version">Dashboard v1.2.0</span>
+          <span className="login-version">ClawBoard v2.0.0</span>
         </div>
       </div>
     </div>

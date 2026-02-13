@@ -12,13 +12,6 @@ import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { LoginPage } from './pages/LoginPage';
-import { AvatarPage } from './pages/AvatarPage';
-import { AvatarPageWebGL } from './pages/AvatarPageWebGL';
-import { WebGLTest } from './pages/WebGLTest';
-import { WebGLSimple } from './pages/WebGLSimple';
-import { OrbSimpleTest } from './pages/OrbSimpleTest';
-import { WebGLStatesPage } from './pages/WebGLStatesPage';
-import { TentacleDebug } from './pages/TentacleDebug';
 import { FileViewerProvider } from './contexts/FileViewerContext';
 import { ModelSwitchProvider } from './contexts/ModelSwitchContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -47,33 +40,12 @@ function App() {
 function AuthenticatedApp() {
   const { config } = useClawBoardConfig();
   const { status: realtimeStatus, connected: wsConnected, error: wsError } = useRealtimeStatus();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('sidebar-collapsed') === 'true';
-  });
-
-  // Listen for sidebar collapse changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setSidebarCollapsed(localStorage.getItem('sidebar-collapsed') === 'true');
-    };
-    
-    // Custom event for same-tab updates
-    window.addEventListener('sidebar-collapse-change', handleStorageChange);
-    // Storage event for cross-tab sync
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('sidebar-collapse-change', handleStorageChange);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
 
   // Global keyboard shortcut: Ctrl+Shift+X to stop
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'X') {
         e.preventDefault();
-        // Trigger stop via API directly
         const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
         authenticatedFetch(`${API_BASE}/control/stop-main`, { method: 'POST' });
       }
@@ -84,28 +56,19 @@ function AuthenticatedApp() {
 
   const basename = import.meta.env.BASE_URL || '/dashboard/';
   
-  // Check if we're on a standalone debug page (no sidebar)
-  const isStandalonePage = window.location.pathname.includes('/tentacle-debug');
-  
   return (
     <Router basename={basename}>
       <ToastProvider>
       <ModelSwitchProvider>
       <FileViewerProvider>
-      {/* Standalone pages without sidebar */}
-      {isStandalonePage ? (
-        <Routes>
-          <Route path="/tentacle-debug" element={<TentacleDebug />} />
-        </Routes>
-      ) : (
-      <div className={`app-container ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
+      <div className="app-container">
         <Sidebar status={realtimeStatus} connected={wsConnected} />
 
         <div className="app">
           <header className="header">
             <div className="logo">
               <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-                <h1>ClawBoard</h1>
+                <h1>{config.branding.sidebarTitle}</h1>
               </Link>
             </div>
             <div className="header-center">
@@ -144,23 +107,11 @@ function AuthenticatedApp() {
               {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
               {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
               {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
-              {config.features.avatarPage && <Route path="/avatar" element={<AvatarPage />} />}
-              {config.features.avatarPage && <Route path="/avatar-webgl" element={<AvatarPageWebGL />} />}
-              {/* Debug routes - always available */}
-              <Route path="/webgl-test" element={<WebGLTest />} />
-              <Route path="/webgl-simple" element={<WebGLSimple />} />
-              <Route path="/orb-simple" element={<OrbSimpleTest />} />
-              <Route path="/webgl-states" element={<WebGLStatesPage />} />
-              <Route path="/tentacle-debug" element={<TentacleDebug />} />
+              {/* Plugin routes are handled via proxy — /plugins/* routes go to plugin containers */}
             </Routes>
           </main>
-
-          <footer className="footer">
-            <p>ClawBoard v1.2.0 | {new Date().getFullYear()}</p>
-          </footer>
         </div>
       </div>
-      )}
     </FileViewerProvider>
       </ModelSwitchProvider>
       </ToastProvider>

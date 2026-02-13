@@ -25,7 +25,7 @@
     "auditLog": true,
     "stats": true,
     "botStatus": true,
-    "avatarPage": true
+    "avatarPage": false
   },
   "paths": {
     "dataDir": "/data",
@@ -45,6 +45,11 @@
     "port": 8082,
     "useHttps": false,
     "corsOrigin": "http://localhost:8082"
+  },
+  "plugins": {
+    "configFile": "./clawboard.plugins.json",
+    "enabled": true,
+    "healthCheckIntervalMs": 60000
   },
   "_comments": {
     "bot.name": "Internal name for your bot (used in code)",
@@ -73,6 +78,9 @@
     "deployment.domain": "Deployment domain",
     "deployment.port": "Frontend server port",
     "deployment.useHttps": "Use HTTPS (true/false)",
-    "deployment.corsOrigin": "CORS allowed origin"
+    "deployment.corsOrigin": "CORS allowed origin",
+    "plugins.configFile": "Path to clawboard.plugins.json (plugin registry)",
+    "plugins.enabled": "Enable/disable the plugin system (default: true)",
+    "plugins.healthCheckIntervalMs": "Plugin health check interval in ms (default: 60000)"
   }
 }

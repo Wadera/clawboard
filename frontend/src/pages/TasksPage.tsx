@@ -412,9 +412,17 @@ export const TasksPage: React.FC = () => {
       });
   };
 
-  // Mobile swipe gesture support
+  // Mobile swipe gesture support — only triggers from screen edges (40px)
+  // so tapping task cards in the middle of the screen works normally
+  const swipeEdgeZone = 40; // px from screen edge to start a swipe
+  const swipeFromEdge = useRef(false);
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const x = e.touches[0].clientX;
+    const screenW = window.innerWidth;
+    swipeFromEdge.current = x < swipeEdgeZone || x > screenW - swipeEdgeZone;
+    touchStartX.current = x;
+    touchEndX.current = x;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -422,6 +430,7 @@ export const TasksPage: React.FC = () => {
   };
 
   const handleTouchEnd = () => {
+    if (!swipeFromEdge.current) return;
     const diff = touchStartX.current - touchEndX.current;
     const threshold = 50;
     if (Math.abs(diff) < threshold) return;

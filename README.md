@@ -12,10 +12,11 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 
 - **📋 Task Board** — Kanban-style task management with drag-and-drop, subtasks, priorities, and dependencies
 - **🗂️ Project Management** — Organize tasks into projects with links, notebooks, environments, and resources
-- **📝 Journal** — Daily journal entries with mood tracking and searchable history
+- **📝 Journal** — Daily journal entries with mood tracking, multi-entry per day, and navigation
 - **💬 Sessions** — Browse and search through all agent conversation transcripts
 - **🤖 Real-time Agent Status** — Monitor your OpenClaw agent's activity, connections, and health
 - **📊 Statistics** — Visual insights into task completion, project progress, and agent activity
+- **🔌 Plugin System** — Extend your dashboard with Docker-based plugins (journals, monitors, blogs, etc.)
 - **🎨 Fully Customizable** — Theme colors, branding, feature toggles, custom avatars
 - **🔐 Secure** — Password-protected with JWT authentication
 - **🐳 Docker-Ready** — Complete Docker Compose setup with health checks
@@ -93,31 +94,31 @@ Complete documentation available in the [Wiki](https://git.skyday.eu/Homelab/Cla
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│         ClawBoard Frontend              │
-│      React + TypeScript + Vite          │
-│         Port: 8082 → 80                 │
-└────────────┬────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────┐
-│         ClawBoard Backend               │
-│      Node.js + Express + TypeScript     │
-│         Port: 3001 (internal)           │
-└──────┬──────────────────────────────────┘
-       │
-       ├──────────► OpenClaw Gateway
-       │            (WebSocket: ws://localhost:3120)
-       │
-       └──────────► PostgreSQL 16
-                    (Internal only)
+┌─────────────────────────────────────────────────────────────┐
+│                     ClawBoard Core                          │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
+│  │  Auth &   │  │  Tasks & │  │  Agent   │  │  Plugin   │  │
+│  │  Users    │  │ Projects │  │ Sessions │  │  Loader   │  │
+│  └──────────┘  └──────────┘  └──────────┘  └─────┬─────┘  │
+│                                                   │        │
+└───────────────────────────────────────────────────┼────────┘
+                                                    │
+          ┌─────────────────────────────────────────┤
+          │              │              │            │
+    ┌─────▼─────┐  ┌────▼──────┐  ┌───▼────┐  ┌───▼────────┐
+    │   claw-   │  │   claw-   │  │  claw- │  │  your-own  │
+    │  journal  │  │  monitor  │  │  blog  │  │  plugin    │
+    │ (Docker)  │  │ (Docker)  │  │(Docker)│  │  (Docker)  │
+    └───────────┘  └───────────┘  └────────┘  └────────────┘
 ```
 
 **Components:**
 - **Frontend:** Static React app served by nginx
-- **Backend:** REST API + WebSocket gateway
+- **Backend:** REST API + WebSocket gateway + Plugin proxy
 - **Database:** PostgreSQL for persistent storage
 - **OpenClaw:** Read-only integration for session data
+- **Plugins:** Docker containers loaded on startup (optional)
 
 ## 🛠️ Tech Stack
 
@@ -236,6 +237,35 @@ DOMAIN=localhost
 
 See [Configuration Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Configuration) for complete reference.
 
+## 🔌 Plugins
+
+ClawBoard V2 supports a plugin system where each plugin runs as its own Docker container. Plugins can add sidebar items, API endpoints, and full UI pages to your dashboard.
+
+### Quick Plugin Setup
+
+```bash
+# 1. Create clawboard.plugins.json (or copy the example)
+cp clawboard.plugins.example.json clawboard.plugins.json
+
+# 2. Add your plugin entries
+# 3. Start with plugins
+docker compose up -d
+```
+
+### Creating a Plugin
+
+See the full [Plugin Development Guide](docs/plugin-development.md).
+
+Every plugin needs:
+1. A `plugin.json` manifest at its root
+2. A `/health` endpoint
+3. A Dockerfile
+4. An entry in `clawboard.plugins.json`
+
+### No Plugins? No Problem
+
+ClawBoard works perfectly without any plugins. The plugin system is completely optional — if `clawboard.plugins.json` is empty or missing, ClawBoard runs in core-only mode.
+
 ## 🔐 Security
 
 ClawBoard follows security best practices:
@@ -340,6 +370,8 @@ See [Troubleshooting Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Trouble
 
 Contributions are welcome! Please see [Contributing Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing).
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, including how to maintain a private fork (upstream/downstream workflow).
+
 **Ways to contribute:**
 - 🐛 Report bugs
 - ✨ Suggest features
@@ -386,14 +418,21 @@ Special thanks to the open-source community!
 
 ## 🗺️ Roadmap
 
-Planned features:
+**V2.0.0 (Current):**
+- ✅ Plugin system (Docker-based, config-driven)
+- ✅ Multi-entry journal (multiple entries per day)
+- ✅ Mobile UX improvements
+- ✅ Backend stability (OOM fixes, debounced watchers)
+- ✅ Upstream/downstream fork workflow
+
+**Planned:**
 - 🌍 Multi-language support
 - 🔔 Notification system
 - 👥 Multi-user collaboration
 - 📱 Mobile app
-- 🔌 Webhook integrations
 - 📊 Advanced analytics
 - 🎨 Theme marketplace
+- 🔌 Plugin marketplace & registry
 
 ---
 
