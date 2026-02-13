@@ -150,7 +150,7 @@ clawboard --help                  # Full command reference
 └──────┬──────────────────────────────────┘
        │
        ├──────────► OpenClaw Gateway
-       │            (WebSocket: ws://localhost:3120)
+       │            (WebSocket: ws://host.docker.internal:18789)
        │
        └──────────► PostgreSQL 16
                     (Internal only)
@@ -246,7 +246,7 @@ LOGIN_PASSWORD=your-dashboard-password
 
 # OpenClaw Integration
 OPENCLAW_DIR=~/.openclaw
-OPENCLAW_GATEWAY_URL=ws://localhost:3120
+OPENCLAW_GATEWAY_URL=ws://host.docker.internal:18789
 
 # Deployment
 FRONTEND_PORT=8082
@@ -339,7 +339,78 @@ docker compose up -d
 docker compose ps
 ```
 
+## 🔌 OpenClaw Gateway Connection
+
+ClawBoard connects to your OpenClaw agent via the **Gateway WebSocket**. This is how it reads sessions, monitors agent status, and sends control commands.
+
+### How It Works
+
+1. **OpenClaw Gateway** runs on your host machine (default port: `18789`)
+2. **ClawBoard backend** (inside Docker) connects to it via WebSocket
+3. The `extra_hosts` Docker setting maps `host.docker.internal` → your host machine
+4. Session data and config files are mounted read-only into the container
+
+### Required Mounts
+
+The backend container needs access to these OpenClaw files:
+
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| `~/.openclaw/agents/main/sessions/` | `/clawdbot/sessions/` | Session transcripts & sessions.json |
+| `~/.openclaw/openclaw.json` | `/clawdbot/clawdbot.json` | OpenClaw configuration |
+
+### Required Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPENCLAW_DIR` | `~/.openclaw` | Host path to OpenClaw data directory |
+| `OPENCLAW_GATEWAY_URL` | `ws://host.docker.internal:18789` | Gateway WebSocket URL |
+
+> **Note:** Inside the container, these are mapped to `CLAWDBOT_*` env vars that the backend reads. The `docker-compose.yml` handles this mapping automatically.
+
+### Verifying the Connection
+
+```bash
+# 1. Check OpenClaw gateway is running
+openclaw gateway status
+
+# 2. Check the backend can reach it
+docker compose logs clawboard-backend | grep -i gateway
+
+# 3. Look for "Gateway connected" in logs
+docker compose logs clawboard-backend | grep -i "connected"
+```
+
 ## 🐛 Troubleshooting
+
+### "Gateway Disconnected" in Dashboard
+
+This means the backend can't reach the OpenClaw gateway. Check:
+
+```bash
+# 1. Is OpenClaw gateway running?
+openclaw gateway status
+# If not: openclaw gateway start
+
+# 2. Is the WebSocket URL correct in .env?
+grep OPENCLAW_GATEWAY_URL .env
+# Should be: ws://host.docker.internal:18789
+
+# 3. Can the container reach the host?
+docker compose exec clawboard-backend sh -c "wget -qO- http://host.docker.internal:18789 || echo 'Cannot reach gateway'"
+
+# 4. Check backend logs for connection errors
+docker compose logs clawboard-backend | grep -i "gateway\|websocket\|error"
+
+# 5. Restart the backend
+docker compose restart clawboard-backend
+```
+
+**Common causes:**
+- OpenClaw gateway not running → `openclaw gateway start`
+- Wrong port in `.env` → default is `18789`
+- Docker networking issue → ensure `extra_hosts` is in docker-compose.yml
+- Firewall blocking localhost connections → check iptables/firewalld rules
 
 ### Dashboard Won't Load
 
@@ -354,17 +425,15 @@ docker compose logs -f
 docker compose restart
 ```
 
-### OpenClaw Connection Failed
+### Blank Pages or Missing Features
 
 ```bash
-# Verify OpenClaw is running
-openclaw status
+# Rebuild frontend with latest config
+docker compose build clawboard-frontend
+docker compose up -d clawboard-frontend
 
-# Check gateway URL
-grep OPENCLAW_GATEWAY_URL .env
-
-# Restart backend
-docker compose restart clawboard-backend
+# Check clawboard.config.json has features enabled
+cat clawboard.config.json | grep -A 20 '"features"'
 ```
 
 ### Database Issues
