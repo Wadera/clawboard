@@ -18,7 +18,7 @@ export class ControlService {
 
   constructor(sessionsPath: string, configPath?: string) {
     this.sessionsPath = sessionsPath;
-    this.configPath = configPath || process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
+    this.configPath = configPath || process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
   }
 
   /**
@@ -162,7 +162,7 @@ export class ControlService {
    * Connects, authenticates, sends chat.abort, then disconnects.
    */
   private async abortSession(sessionKey: string): Promise<boolean> {
-    const gatewayUrl = process.env.CLAWDBOT_GATEWAY_WS_URL || 'ws://host.docker.internal:18789';
+    const gatewayUrl = process.env.OPENCLAW_GATEWAY_WS_URL || 'ws://host.docker.internal:18789';
     const auth = await this.getGatewayAuth();
 
     return new Promise<boolean>((resolve) => {

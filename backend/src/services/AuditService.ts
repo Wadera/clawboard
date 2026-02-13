@@ -82,7 +82,7 @@ export interface ModelStatsResponse {
   }>;
 }
 
-const TRANSCRIPTS_DIR = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/home/clawd/.clawdbot/agents/main/sessions';
+const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/home/clawd/.clawdbot/agents/main/sessions';
 
 function getRecentJsonlFiles(hoursBack: number = 48): string[] {
   try {

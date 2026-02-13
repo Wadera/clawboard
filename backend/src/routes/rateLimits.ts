@@ -30,8 +30,8 @@ let cachedResult: RateLimitStatus | null = null;
 let cacheTime = 0;
 const CACHE_TTL_MS = 60_000;
 
-const CLAWDBOT_CONFIG = process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
-const MODELS_CONFIG = process.env.CLAWDBOT_MODELS_PATH || '/clawdbot/models.json';
+const CLAWDBOT_CONFIG = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
+const MODELS_CONFIG = process.env.OPENCLAW_MODELS_PATH || '/clawdbot/models.json';
 
 async function readJsonFile(path: string): Promise<any> {
   const data = await readFile(path, 'utf-8');

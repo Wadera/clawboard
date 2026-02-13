@@ -289,5 +289,5 @@ export class SubAgentTaskUpdater extends EventEmitter {
 
 // Singleton instance
 export const subAgentTaskUpdater = new SubAgentTaskUpdater(
-  process.env.CLAWDBOT_SESSIONS_PATH || '/clawdbot/sessions/sessions.json'
+  process.env.OPENCLAW_SESSIONS_PATH || '/clawdbot/sessions/sessions.json'
 );

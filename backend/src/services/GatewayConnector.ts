@@ -93,13 +93,13 @@ export class GatewayConnector {
     this.wsService = wsService;
 
     // Read gateway config
-    this.gatewayUrl = process.env.CLAWDBOT_GATEWAY_WS_URL || 'ws://127.0.0.1:18789';
+    this.gatewayUrl = process.env.OPENCLAW_GATEWAY_WS_URL || 'ws://127.0.0.1:18789';
     this.gatewayPassword = process.env.OPENCLAW_GATEWAY_PASSWORD || '';
 
     // Try to read password from config file if not in env
     if (!this.gatewayPassword) {
       try {
-        const configPath = process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
+        const configPath = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
         const config = JSON.parse(readFileSync(configPath, 'utf-8'));
         this.gatewayPassword = config?.gateway?.auth?.password || '';
         if (this.gatewayPassword) {

@@ -8,14 +8,17 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.yml)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue)](https://www.postgresql.org/)
 
+> ****Repository:** [github.com/Wadera/clawboard](https://github.com/Wadera/clawboard)
+
 ## ✨ Features
 
 - **📋 Task Board** — Kanban-style task management with drag-and-drop, subtasks, priorities, and dependencies
 - **🗂️ Project Management** — Organize tasks into projects with links, notebooks, environments, and resources
-- **📝 Journal** — Daily journal entries with mood tracking and searchable history
+- **📝 Journal** — Daily journal entries with mood tracking, multi-entry per day, and navigation
 - **💬 Sessions** — Browse and search through all agent conversation transcripts
 - **🤖 Real-time Agent Status** — Monitor your OpenClaw agent's activity, connections, and health
 - **📊 Statistics** — Visual insights into task completion, project progress, and agent activity
+- **🔌 Plugin System** — Extend your dashboard with Docker-based plugins (journals, monitors, blogs, etc.)
 - **🎨 Fully Customizable** — Theme colors, branding, feature toggles, custom avatars
 - **🔐 Secure** — Password-protected with JWT authentication
 - **🐳 Docker-Ready** — Complete Docker Compose setup with health checks
@@ -43,17 +46,17 @@ Get ClawBoard running in **5 minutes**:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/clawboard.git
-cd clawboard
+git clone https://github.com/Wadera/clawboard.git
+cd ClawBoard
 
-# 2. Run setup script
+# 2. Run setup script (generates .env with password hash)
 ./setup.sh
 
 # 3. Start services
 docker compose up -d
 
 # 4. Access dashboard
-open http://localhost:8082
+open http://localhost:8080/dashboard/
 ```
 
 **Prerequisites:**
@@ -61,106 +64,124 @@ open http://localhost:8082
 - OpenClaw installed and running
 - 2GB RAM, 1 CPU core
 
+**What the setup script does:**
+- Creates `.env` from `.env.example`
+- Generates bcrypt password hash for dashboard login
+- Sets up database credentials and JWT secret
+- Configures OpenClaw integration paths
+- Creates data and backup directories
+
+## 🧠 OpenClaw Workspace Integration
+
+ClawBoard automatically reads and displays your bot's workspace files, giving you direct visibility into your agent's personality, memory, and configuration.
+
+### What Gets Loaded
+
+The following files from your OpenClaw workspace are accessible in the dashboard:
+
+- **SOUL.md** — Your bot's personality, identity, and core values
+- **HEARTBEAT.md** — Heartbeat monitoring configuration and tasks
+- **AGENTS.md** — Agent behavior, memory rules, and conventions
+- **USER.md** — Information about the human the bot serves
+- **memory/YYYY-MM-DD.md** — Daily memory logs
+- **memory/*.md** — Additional memory files
+
+### How It Works
+
+The workspace is mounted **read-only** into the ClawBoard backend container:
+
+```yaml
+volumes:
+  - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
+```
+
+Configuration in `.env`:
+
+```bash
+# Path to your bot's workspace directory
+OPENCLAW_WORKSPACE=~/.openclaw/workspace
+```
+
+### Dashboard Features
+
+When workspace files are loaded, you'll see:
+
+- **Workspace Files Widget** — Browse and view workspace files directly in the dashboard
+- **Bot Personality Card** — Displays bot name and identity from SOUL.md
+- **Memory Timeline** — Navigate through daily memory logs
+- **Quick File Access** — Jump to any workspace file with one click
+
+### Verification
+
+To verify the workspace integration is working:
+
+1. Log into the dashboard at `http://localhost:8080/dashboard/`
+2. Look for the "Workspace Files" widget on the main dashboard
+3. Click on any file (e.g., SOUL.md) to view its contents
+4. If files don't appear, check:
+   - `.env` has correct `OPENCLAW_WORKSPACE` path
+   - The path exists and contains the expected files
+   - Docker container has been restarted after .env changes
+
+### Troubleshooting
+
+**Files not showing up?**
+
+```bash
+# Check if workspace path is correct
+ls -la ~/.openclaw/workspace
+
+# Verify .env configuration
+grep OPENCLAW_WORKSPACE .env
+
+# Restart containers to pick up changes
+docker compose restart clawboard-backend
+```
+
+**Permission issues?**
+
+The workspace is mounted read-only, so ClawBoard cannot modify your files. If you need to edit them, use your preferred editor on the host system.
+
 ## 📚 Documentation
 
-Complete documentation available in the [Wiki](docs/.md):
+Documentation lives in [`docs/`](docs/):
 
-### Getting Started
-- **[Requirements](docs/Requirements.md)** — What you need to run ClawBoard
-- **[Getting Started](docs/Getting-Started.md)** — 5-minute quick start guide
-- **[Installation](docs/Installation.md)** — Detailed installation instructions
-
-### Configuration & Deployment
-- **[Configuration](docs/Configuration.md)** — Complete config reference
-- **[Deployment (Docker)](docs/Deployment-Docker.md)** — Production deployment
-- **[Deployment (Traefik)](docs/Deployment-Traefik.md)** — Auto-SSL with Traefik
-- **[Deployment (Nginx)](docs/Deployment-Nginx.md)** — Nginx reverse proxy
-
-### Integration & Usage
-- **[OpenClaw Integration](docs/OpenClaw-Integration.md)** — Connecting to OpenClaw
-- **[Features](docs/Features.md)** — Feature overview and usage
-- **[Customization](docs/Customization.md)** — Make it yours
-
-### Reference
-- **[CLI Reference](docs/CLI-Reference.md)** — Task management CLI
-- **[API Reference](docs/API-Reference.md)** — REST API documentation
-- **[Database](docs/Database.md)** — Database management
-
-### Help & Contributing
-- **[Troubleshooting](docs/Troubleshooting.md)** — Common issues and solutions
-- **[Contributing](docs/Contributing.md)** — How to contribute
-
-## 💻 CLI Tool
-
-ClawBoard includes a CLI for managing tasks, projects, tools, and journals from the command line.
-
-### Setup
-
-```bash
-# Add to PATH
-export PATH="/path/to/clawboard/cli:$PATH"
-
-# Or create symlink
-ln -s /path/to/clawboard/cli/clawboard /usr/local/bin/clawboard
-
-# Configure API URL (default: http://localhost:8080/api)
-export CLAWBOARD_API_URL="http://localhost:8080/api"
-
-# Authenticate (choose one)
-export CLAWBOARD_TOKEN="your-jwt-token"     # Environment variable
-clawboard login                              # Interactive login
-clawboard --token "your-token" list          # Per-command flag
-```
-
-### Quick Start
-
-```bash
-clawboard list                    # List tasks
-clawboard create "My task"        # Create task
-clawboard projects                # List projects
-clawboard tools list              # List tools
-clawboard journal list            # List journal entries
-clawboard --help                  # Full command reference
-```
-
-### Global Flags
-
-| Flag | Env Variable | Description |
-|------|-------------|-------------|
-| `--api URL` | `CLAWBOARD_API_URL` | API base URL (default: `http://localhost:8080/api`) |
-| `--token TOKEN` | `CLAWBOARD_TOKEN` | JWT auth token |
-| | `CLAWBOARD_PASSWORD` | Password for auto-login |
-
-**Requirements:** Python 3 (stdlib only, no external dependencies)
+- **[Getting Started](docs/getting-started.md)** — 5-minute quick start guide
+- **[Plugin Development](docs/plugin-development.md)** — Build your own plugins
+- **[Example Plugin](docs/example-plugin/)** — Minimal hello-world plugin to learn from
+- **[Project Overview](docs/PROJECT-OVERVIEW.md)** — Architecture deep dive
+- **[Deployment Guide](DEPLOYMENT.md)** — Production deployment (Traefik, Nginx, Docker)
+- **[Database Guide](database/README.md)** — Schema, backup, restore
+- **[Contributing](CONTRIBUTING.md)** — How to contribute
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│         ClawBoard Frontend              │
-│      React + TypeScript + Vite          │
-│         Port: 8082 → 80                 │
-└────────────┬────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────┐
-│         ClawBoard Backend               │
-│      Node.js + Express + TypeScript     │
-│         Port: 3001 (internal)           │
-└──────┬──────────────────────────────────┘
-       │
-       ├──────────► OpenClaw Gateway
-       │            (WebSocket: ws://localhost:3120)
-       │
-       └──────────► PostgreSQL 16
-                    (Internal only)
+┌─────────────────────────────────────────────────────────────┐
+│                     ClawBoard Core                          │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
+│  │  Auth &   │  │  Tasks & │  │  Agent   │  │  Plugin   │  │
+│  │  Users    │  │ Projects │  │ Sessions │  │  Loader   │  │
+│  └──────────┘  └──────────┘  └──────────┘  └─────┬─────┘  │
+│                                                   │        │
+└───────────────────────────────────────────────────┼────────┘
+                                                    │
+          ┌─────────────────────────────────────────┤
+          │              │              │            │
+    ┌─────▼─────┐  ┌────▼──────┐  ┌───▼────┐  ┌───▼────────┐
+    │   claw-   │  │   claw-   │  │  claw- │  │  your-own  │
+    │  journal  │  │  monitor  │  │  blog  │  │  plugin    │
+    │ (Docker)  │  │ (Docker)  │  │(Docker)│  │  (Docker)  │
+    └───────────┘  └───────────┘  └────────┘  └────────────┘
 ```
 
 **Components:**
 - **Frontend:** Static React app served by nginx
-- **Backend:** REST API + WebSocket gateway
+- **Backend:** REST API + WebSocket gateway + Plugin proxy
 - **Database:** PostgreSQL for persistent storage
 - **OpenClaw:** Read-only integration for session data
+- **Plugins:** Docker containers loaded on startup (optional)
 
 ## 🛠️ Tech Stack
 
@@ -277,7 +298,36 @@ DOMAIN=localhost
 }
 ```
 
-See [Configuration Guide](docs/Configuration.md) for complete reference.
+See [Getting Started](docs/getting-started.md) for complete reference.
+
+## 🔌 Plugins
+
+ClawBoard V2 supports a plugin system where each plugin runs as its own Docker container. Plugins can add sidebar items, API endpoints, and full UI pages to your dashboard.
+
+### Quick Plugin Setup
+
+```bash
+# 1. Create clawboard.plugins.json (or copy the example)
+cp clawboard.plugins.example.json clawboard.plugins.json
+
+# 2. Add your plugin entries
+# 3. Start with plugins
+docker compose up -d
+```
+
+### Creating a Plugin
+
+See the full [Plugin Development Guide](docs/plugin-development.md).
+
+Every plugin needs:
+1. A `plugin.json` manifest at its root
+2. A `/health` endpoint
+3. A Dockerfile
+4. An entry in `clawboard.plugins.json`
+
+### No Plugins? No Problem
+
+ClawBoard works perfectly without any plugins. The plugin system is completely optional — if `clawboard.plugins.json` is empty or missing, ClawBoard runs in core-only mode.
 
 ## 🔐 Security
 
@@ -318,7 +368,7 @@ docker compose exec clawboard-db psql -U clawboard -d clawboard
 - `bot_status` — Agent status updates
 - `audit_log` — Complete audit trail
 
-See [Database Guide](docs/Database.md) for schema and management.
+See [Database Guide](database/README.md) for schema and management.
 
 ## 🔄 Updates
 
@@ -338,6 +388,39 @@ docker compose up -d
 # 5. Verify
 docker compose ps
 ```
+
+## ✅ Functional Tests
+
+After deployment, verify that everything works:
+
+```bash
+# 1. Check all containers are healthy
+docker compose ps
+
+# Expected: All containers show "healthy" or "Up"
+
+# 2. Test API health endpoint
+curl http://localhost:8080/api/health
+
+# Expected: {"status":"ok","timestamp":"..."}
+
+# 3. Test login
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"your-password"}'
+
+# Expected: {"token":"...","user":{...}}
+
+# 4. Access dashboard in browser
+open http://localhost:8080/dashboard/
+
+# Expected: Login page loads, successful login redirects to dashboard
+```
+
+**Troubleshooting:**
+- **API 502 Bad Gateway:** Backend container not healthy. Check: `docker compose logs clawboard-backend`
+- **Login fails:** Password hash mismatch. Regenerate: `./setup.sh` (reconfigure)
+- **Dashboard blank:** Check browser console for API errors. Verify `/api/` proxy in nginx
 
 ## 🐛 Troubleshooting
 
@@ -377,11 +460,13 @@ docker compose logs clawboard-db
 docker compose restart clawboard-db
 ```
 
-See [Troubleshooting Guide](docs/Troubleshooting.md) for more solutions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for more deployment and troubleshooting guidance.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [Contributing Guide](docs/Contributing.md).
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, including how to maintain a private fork (upstream/downstream workflow).
 
 **Ways to contribute:**
 - 🐛 Report bugs
@@ -401,8 +486,8 @@ docker compose -f docker-compose.dev.yml up
 
 | Who | Role | Contact |
 |-----|------|---------|
-| **Paulina Stopa** (Wadera) | Creator & Architect | your@email.com |
-| **AI Assistant** 🤖 | AI Co-Creator | ai@email.com |
+| **Paulina Stopa** | Creator & Architect | pstopa@skyday.eu |
+| **Nim** 🌀 | AI Co-Creator & Lead Engineer | nim@skyday.eu |
 
 *Yes, an AI co-wrote this dashboard. The future is collaborative.* ✨
 
@@ -423,23 +508,30 @@ Special thanks to the open-source community!
 
 ## 📧 Contact
 
-- **Email:** your@email.com
-- **Repository:** [ClawBoard on Gitea](https://github.com/yourusername/clawboard)
-- **Wiki:** [Documentation](docs/.md)
+- **Email:** pstopa@skyday.eu
+- **Repository:** [ClawBoard on GitHub](https://github.com/Wadera/clawboard)
+- **Wiki:** [Documentation](https://github.com/Wadera/clawboard/wiki/)
 
 ## 🗺️ Roadmap
 
-Planned features:
+**V2.0.0 (Current):**
+- ✅ Plugin system (Docker-based, config-driven)
+- ✅ Multi-entry journal (multiple entries per day)
+- ✅ Mobile UX improvements
+- ✅ Backend stability (OOM fixes, debounced watchers)
+- ✅ Upstream/downstream fork workflow
+
+**Planned:**
 - 🌍 Multi-language support
 - 🔔 Notification system
 - 👥 Multi-user collaboration
 - 📱 Mobile app
-- 🔌 Webhook integrations
 - 📊 Advanced analytics
 - 🎨 Theme marketplace
+- 🔌 Plugin marketplace & registry
 
 ---
 
 **Built with ❤️ for the OpenClaw community**
 
-[Get Started](docs/Getting-Started.md) | [Documentation](docs/.md) | [Contributing](docs/Contributing.md)
+[Get Started](docs/getting-started.md) | [Documentation](docs/) | [Contributing](CONTRIBUTING.md)

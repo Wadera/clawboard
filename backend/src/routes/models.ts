@@ -12,7 +12,7 @@ export function setModelsGatewayConnector(connector: GatewayConnector): void {
   gatewayConnector = connector;
 }
 
-const CLAWDBOT_CONFIG = process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
+const CLAWDBOT_CONFIG = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
 const AUTH_PROFILES_PATH = process.env.AUTH_PROFILES_PATH || '/clawdbot/auth-profiles.json';
 
 interface AuthProfileUsage {
@@ -313,7 +313,7 @@ router.get('/session-tools/:sessionId', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 20);
-    const transcriptPath = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
+    const transcriptPath = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/clawdbot/sessions';
     const filePath = require('path').join(transcriptPath, `${sessionId}.jsonl`);
     
     const fs = require('fs');
