@@ -45,7 +45,7 @@ services:
       
       # Auth
       JWT_SECRET: ${JWT_SECRET:?JWT secret required}
-      LOGIN_PASSWORD: ${LOGIN_PASSWORD:-changeme}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:?Dashboard password hash required}
       
       # CORS
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8082}
