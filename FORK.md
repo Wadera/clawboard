@@ -24,7 +24,7 @@
 ```
 ┌─────────────────────────────────────┐
 │     ClawBoard (upstream)            │  ← Generic dashboard core
-│     git.skyday.eu/Homelab/ClawBoard │
+│     github.com/Wadera/clawboard │
 └───────────────┬─────────────────────┘
                 │ fork
                 ▼
@@ -52,7 +52,7 @@
 
 ```bash
 # Clone ClawBoard
-git clone https://git.skyday.eu/Homelab/ClawBoard.git yourbot-deploy
+git clone https://github.com/Wadera/clawboard.git yourbot-deploy
 cd yourbot-deploy
 
 # Add upstream remote
@@ -502,6 +502,6 @@ git merge upstream/main
 
 ---
 
-**Questions?** Open an issue: [git.skyday.eu/Homelab/ClawBoard/issues](https://git.skyday.eu/Homelab/ClawBoard/issues)
+**Questions?** Open an issue: [github.com/Wadera/clawboard/issues](https://github.com/Wadera/clawboard/issues)
 
 **Want to share your deployment?** We'd love to see it! Add it to the [Showcase](docs/showcase.md).

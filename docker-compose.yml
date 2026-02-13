@@ -50,22 +50,30 @@ services:
       # CORS
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8082}
       
-      # OpenClaw paths (mounted via volumes)
-      OPENCLAW_SESSIONS_PATH: /openclaw/sessions/sessions.json
-      OPENCLAW_TRANSCRIPTS_DIR: /openclaw/sessions
-      OPENCLAW_CONFIG_PATH: /openclaw/config/openclaw.json
-      OPENCLAW_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:3120}
+      # OpenClaw integration — env var names must match what the backend reads
+      # Sessions file and transcripts directory
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      # OpenClaw config file (openclaw.json)
+      CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
+      # Gateway WebSocket URL — connects to the OpenClaw gateway on the host
+      # Default port 18789 is the standard OpenClaw gateway port
+      CLAWDBOT_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      # Workspace path (bot's workspace with SOUL.md, memory/, etc.)
       WORKSPACE_PATH: /workspace
     volumes:
-      # OpenClaw mounts (read-only)
-      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/openclaw/sessions:ro
-      - ${OPENCLAW_DIR:-~/.openclaw}:/openclaw/config:ro
+      # OpenClaw session data (read-only)
+      # Mount the agent's sessions directory containing sessions.json and transcript files
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/clawdbot/sessions:ro
+      # OpenClaw config file (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/openclaw.json:/clawdbot/clawdbot.json:ro
+      # OpenClaw workspace (read-only) — SOUL.md, memory/, HEARTBEAT.md, etc.
       - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
       
-      # Data directory (read-write)
+      # Data directory for ClawBoard's own data (read-write)
       - ${DATA_DIR:-./data}:/data:rw
       
-      # Config file (read-only)
+      # ClawBoard dashboard config (read-only)
       - ./clawboard.config.json:/app/clawboard.config.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

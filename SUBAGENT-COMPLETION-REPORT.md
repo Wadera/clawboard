@@ -214,7 +214,7 @@ v2.0.0 (97b3690) — Updated release notes, pushed to origin
 - MERGE-SUMMARY.md
 - SUBAGENT-COMPLETION-REPORT.md
 
-**Status:** All changes pushed to `ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git`
+**Status:** All changes pushed to `https://github.com/Wadera/clawboard.git`
 
 ### Wiki Repository
 
@@ -406,5 +406,5 @@ The plugin system is production-ready and well-documented. ClawBoard can now be 
 **Agent:** Subagent dd03af9c  
 **Report Date:** 2026-02-13 14:50 UTC  
 **Working Directory:** /tmp/clawboard-v2/  
-**Main Repo:** ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git  
+**Main Repo:** https://github.com/Wadera/clawboard.git  
 **Wiki Repo:** ssh://git@git.skyday.eu:222/Homelab/ClawBoard.wiki.git
