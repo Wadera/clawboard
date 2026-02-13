@@ -63,32 +63,75 @@ open http://localhost:8082
 
 ## 📚 Documentation
 
-Complete documentation available in the [Wiki](https://git.skyday.eu/Homelab/ClawBoard/wiki/):
+Complete documentation available in the [Wiki](docs/.md):
 
 ### Getting Started
-- **[Requirements](https://git.skyday.eu/Homelab/ClawBoard/wiki/Requirements)** — What you need to run ClawBoard
-- **[Getting Started](https://git.skyday.eu/Homelab/ClawBoard/wiki/Getting-Started)** — 5-minute quick start guide
-- **[Installation](https://git.skyday.eu/Homelab/ClawBoard/wiki/Installation)** — Detailed installation instructions
+- **[Requirements](docs/Requirements.md)** — What you need to run ClawBoard
+- **[Getting Started](docs/Getting-Started.md)** — 5-minute quick start guide
+- **[Installation](docs/Installation.md)** — Detailed installation instructions
 
 ### Configuration & Deployment
-- **[Configuration](https://git.skyday.eu/Homelab/ClawBoard/wiki/Configuration)** — Complete config reference
-- **[Deployment (Docker)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Docker)** — Production deployment
-- **[Deployment (Traefik)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Traefik)** — Auto-SSL with Traefik
-- **[Deployment (Nginx)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Nginx)** — Nginx reverse proxy
+- **[Configuration](docs/Configuration.md)** — Complete config reference
+- **[Deployment (Docker)](docs/Deployment-Docker.md)** — Production deployment
+- **[Deployment (Traefik)](docs/Deployment-Traefik.md)** — Auto-SSL with Traefik
+- **[Deployment (Nginx)](docs/Deployment-Nginx.md)** — Nginx reverse proxy
 
 ### Integration & Usage
-- **[OpenClaw Integration](https://git.skyday.eu/Homelab/ClawBoard/wiki/OpenClaw-Integration)** — Connecting to OpenClaw
-- **[Features](https://git.skyday.eu/Homelab/ClawBoard/wiki/Features)** — Feature overview and usage
-- **[Customization](https://git.skyday.eu/Homelab/ClawBoard/wiki/Customization)** — Make it yours
+- **[OpenClaw Integration](docs/OpenClaw-Integration.md)** — Connecting to OpenClaw
+- **[Features](docs/Features.md)** — Feature overview and usage
+- **[Customization](docs/Customization.md)** — Make it yours
 
 ### Reference
-- **[CLI Reference](https://git.skyday.eu/Homelab/ClawBoard/wiki/CLI-Reference)** — Task management CLI
-- **[API Reference](https://git.skyday.eu/Homelab/ClawBoard/wiki/API-Reference)** — REST API documentation
-- **[Database](https://git.skyday.eu/Homelab/ClawBoard/wiki/Database)** — Database management
+- **[CLI Reference](docs/CLI-Reference.md)** — Task management CLI
+- **[API Reference](docs/API-Reference.md)** — REST API documentation
+- **[Database](docs/Database.md)** — Database management
 
 ### Help & Contributing
-- **[Troubleshooting](https://git.skyday.eu/Homelab/ClawBoard/wiki/Troubleshooting)** — Common issues and solutions
-- **[Contributing](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing)** — How to contribute
+- **[Troubleshooting](docs/Troubleshooting.md)** — Common issues and solutions
+- **[Contributing](docs/Contributing.md)** — How to contribute
+
+## 💻 CLI Tool
+
+ClawBoard includes a CLI for managing tasks, projects, tools, and journals from the command line.
+
+### Setup
+
+```bash
+# Add to PATH
+export PATH="/path/to/clawboard/cli:$PATH"
+
+# Or create symlink
+ln -s /path/to/clawboard/cli/clawboard /usr/local/bin/clawboard
+
+# Configure API URL (default: http://localhost:8080/api)
+export CLAWBOARD_API_URL="http://localhost:8080/api"
+
+# Authenticate (choose one)
+export CLAWBOARD_TOKEN="your-jwt-token"     # Environment variable
+clawboard login                              # Interactive login
+clawboard --token "your-token" list          # Per-command flag
+```
+
+### Quick Start
+
+```bash
+clawboard list                    # List tasks
+clawboard create "My task"        # Create task
+clawboard projects                # List projects
+clawboard tools list              # List tools
+clawboard journal list            # List journal entries
+clawboard --help                  # Full command reference
+```
+
+### Global Flags
+
+| Flag | Env Variable | Description |
+|------|-------------|-------------|
+| `--api URL` | `CLAWBOARD_API_URL` | API base URL (default: `http://localhost:8080/api`) |
+| `--token TOKEN` | `CLAWBOARD_TOKEN` | JWT auth token |
+| | `CLAWBOARD_PASSWORD` | Password for auto-login |
+
+**Requirements:** Python 3 (stdlib only, no external dependencies)
 
 ## 🏗️ Architecture
 
@@ -234,7 +277,7 @@ DOMAIN=localhost
 }
 ```
 
-See [Configuration Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Configuration) for complete reference.
+See [Configuration Guide](docs/Configuration.md) for complete reference.
 
 ## 🔐 Security
 
@@ -275,7 +318,7 @@ docker compose exec clawboard-db psql -U clawboard -d clawboard
 - `bot_status` — Agent status updates
 - `audit_log` — Complete audit trail
 
-See [Database Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Database) for schema and management.
+See [Database Guide](docs/Database.md) for schema and management.
 
 ## 🔄 Updates
 
@@ -334,11 +377,11 @@ docker compose logs clawboard-db
 docker compose restart clawboard-db
 ```
 
-See [Troubleshooting Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Troubleshooting) for more solutions.
+See [Troubleshooting Guide](docs/Troubleshooting.md) for more solutions.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [Contributing Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing).
+Contributions are welcome! Please see [Contributing Guide](docs/Contributing.md).
 
 **Ways to contribute:**
 - 🐛 Report bugs
@@ -358,8 +401,8 @@ docker compose -f docker-compose.dev.yml up
 
 | Who | Role | Contact |
 |-----|------|---------|
-| **Paulina Stopa** (Wadera) | Creator & Architect | pstopa@skyday.eu |
-| **Nim** 🌀 | AI Co-Creator & Lead Engineer | nim@skyday.eu |
+| **Paulina Stopa** (Wadera) | Creator & Architect | your@email.com |
+| **AI Assistant** 🤖 | AI Co-Creator | ai@email.com |
 
 *Yes, an AI co-wrote this dashboard. The future is collaborative.* ✨
 
@@ -380,9 +423,9 @@ Special thanks to the open-source community!
 
 ## 📧 Contact
 
-- **Email:** pstopa@skyday.eu
-- **Repository:** [ClawBoard on Gitea](https://git.skyday.eu/Homelab/ClawBoard)
-- **Wiki:** [Documentation](https://git.skyday.eu/Homelab/ClawBoard/wiki/)
+- **Email:** your@email.com
+- **Repository:** [ClawBoard on Gitea](https://github.com/yourusername/clawboard)
+- **Wiki:** [Documentation](docs/.md)
 
 ## 🗺️ Roadmap
 
@@ -399,4 +442,4 @@ Planned features:
 
 **Built with ❤️ for the OpenClaw community**
 
-[Get Started](https://git.skyday.eu/Homelab/ClawBoard/wiki/Getting-Started) | [Documentation](https://git.skyday.eu/Homelab/ClawBoard/wiki/) | [Contributing](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing)
+[Get Started](docs/Getting-Started.md) | [Documentation](docs/.md) | [Contributing](docs/Contributing.md)

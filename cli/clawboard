@@ -1,0 +1,3070 @@
+#!/usr/bin/env python3
+"""clawboard - CLI for ClawBoard task management.
+
+Usage:
+  clawboard list [--status STATUS] [--project PROJECT] [--priority PRIORITY] [-v]
+  clawboard next
+  clawboard current
+  clawboard get ID
+  clawboard create TITLE [options]
+  clawboard update ID [options]
+  clawboard move ID STATUS [--notes NOTES]
+  clawboard archive ID
+  clawboard delete ID
+  clawboard spawn ID
+  clawboard breakdown ID
+  clawboard auto-archive
+
+  # Subtask management (tri-state: new → in_review → completed)
+  clawboard complete-subtask TASK_ID INDEX       # Agent: marks in_review
+  clawboard approve-subtask TASK_ID INDEX        # Orchestrator: marks completed
+  clawboard reject-subtask TASK_ID INDEX --note  # Orchestrator: back to new
+  clawboard uncomplete-subtask TASK_ID INDEX     # Legacy: marks as new
+
+  # Project management
+  clawboard projects [--include-stats]
+  clawboard project get ID
+  clawboard project create --name NAME [--description DESC] [--status STATUS] [--nfs]
+  clawboard project update ID [--name] [--description] [--status]
+  clawboard project delete ID
+  clawboard project stats ID [--days DAYS]
+  clawboard project context ID [--role ROLE] [--task-id TASK_ID]
+
+  # Project resources (Project Resources)
+  clawboard project set-repo ID --url URL
+  clawboard project set-env ID --prod URL [--dev URL] [--staging URL]
+  clawboard project set-paths ID --nfs PATH [--ssd PATH] [--docker PATH]
+  clawboard project add-notebook ID --type TYPE --id NBID --url URL [--desc DESC] [--query-tips TIPS]
+
+  # Project links
+  clawboard project add-link ID --type TYPE --title TITLE --url URL [--category CAT]
+  clawboard project update-link PROJECT_ID LINK_ID [--type] [--title] [--url]
+  clawboard project delete-link PROJECT_ID LINK_ID
+
+  # Tools management
+  clawboard tools list [--category CAT] [--tag TAG] [--search QUERY] [--project PROJECT] [-v]
+  clawboard tools add --name NAME [--category CAT] [--description DESC] [--usage TEXT] [--usage-file FILE] [--tags TAGS] [--global]
+  clawboard tools update TOOL [--name] [--category] [--description] [--usage] [--tags] [--global/--no-global]
+  clawboard tools delete TOOL [--confirm]
+  clawboard tools link PROJECT TOOL [--override TEXT] [--override-file FILE]
+  clawboard tools unlink PROJECT TOOL
+  clawboard tools context PROJECT
+
+  # Multi-phase job creation
+  clawboard create-multiphase "TITLE" --project PROJECT --tag TAG --phases "Phase 1;Phase 2;..."
+
+  clawboard help
+
+Examples:
+  # Task creation
+  clawboard create "Fix login bug" --project my-project --priority high --subtasks "Check auth;Fix token;Test"
+  clawboard create "Research topic" --project my-project --status ideas --tags "research,agent-task"
+
+  # Task management
+  clawboard list --status todo
+  clawboard move abc123 in-progress --notes "Starting work"
+  clawboard update abc123 --priority urgent --add-subtask "New subtask"
+
+  # Subtask workflow (tri-state)
+  clawboard complete-subtask abc123 0       # Agent marks as in_review
+  clawboard approve-subtask abc123 0        # Orchestrator approves → completed
+  clawboard reject-subtask abc123 0 --note "Needs more testing"
+
+  # Agent spawning
+  clawboard spawn abc123
+
+  # Project creation with NFS skeleton
+  clawboard project create --name "my-project" --description "My new project" --nfs
+
+  # Project resources
+  clawboard project set-repo my-proj --url "https://github.com/example/my-project"
+  clawboard project set-env my-proj --prod "https://example.com/dashboard/" --dev "https://dev.example.com/dashboard/"
+  clawboard project set-paths my-proj --nfs "/data/projects/my-project" --ssd "/opt/clawboard/projects/my-project"
+  clawboard project add-notebook my-proj --type documentation --id "abc123" --url "https://notebooklm.google.com/..." --query-tips "Ask about API structure"
+  clawboard project context my-proj --role agent --task-id abc123
+
+  # Multi-phase job
+  clawboard create-multiphase "Website Redesign" --project my-site --tag "site-redesign" --phases "Design;Frontend;Backend;Testing"
+
+Complete Workflows:
+
+  # Orchestrator: Spawn and verify a task
+  clawboard next                                  # Get next task
+  clawboard move abc123 in-progress               # Start it
+  clawboard spawn abc123                          # Get agent prompt
+  # ... spawn agent ...
+  clawboard get abc123 -v                         # Check progress
+  clawboard approve-subtask abc123 0              # Approve each subtask
+  clawboard approve-subtask abc123 1
+  clawboard move abc123 completed                 # Mark done
+
+  # Agent: Work a task
+  clawboard get abc123 -v                         # Read task
+  # ... do work on subtask 0 ...
+  clawboard complete-subtask abc123 0             # Mark in_review
+  # ... do work on subtask 1 ...
+  clawboard complete-subtask abc123 1             # Mark in_review
+  clawboard move abc123 stuck --notes "Ready"     # Signal done
+
+  # Setup new project
+  clawboard project create --name "my-proj" --nfs
+  clawboard project set-repo my-proj --url "git@..."
+  clawboard project set-env my-proj --prod "https://..." --dev "https://..."
+  clawboard project set-paths my-proj --nfs "/data/projects/my-proj"
+"""
+
+import sys
+import os
+import json
+import argparse
+import urllib.request
+import urllib.parse
+import urllib.error
+from difflib import SequenceMatcher
+from datetime import datetime
+
+# API URL: --api flag > CLAWBOARD_API_URL env > default
+API = os.environ.get("CLAWBOARD_API_URL", "http://localhost:8080/api")
+TOKEN_FILE = os.path.expanduser("~/.config/clawboard/token.json")
+DATA_DIR = os.environ.get("CLAWBOARD_DATA_DIR", os.path.expanduser("~/.local/share/clawboard/projects"))
+# Runtime overrides (set from --api / --token flags in main())
+_CLI_TOKEN = None
+_CLI_API = None
+
+VALID_STATUSES = ["ideas", "todo", "in-progress", "stuck", "review", "completed", "archived"]
+VALID_PRIORITIES = ["urgent", "high", "normal", "low", "someday"]
+VALID_PROJECT_STATUSES = ["active", "paused", "completed", "archived"]
+VALID_LINK_TYPES = ["git", "doc", "url", "api", "project", "dashboard", "notebooklm", "file"]
+VALID_LINK_CATEGORIES = ["repository", "environment", "documentation", "research", "reference", "tool"]
+VALID_NOTEBOOK_TYPES = ["documentation", "research", "reference"]
+VALID_SUBTASK_STATUSES = ["new", "in_review", "completed"]
+VALID_THINKING_LEVELS = ["low", "medium", "high"]
+VALID_TOOL_CATEGORIES = ["ai", "development", "infrastructure", "communication", "monitoring", "documentation", "testing", "deployment"]
+
+# ─── Auth ───
+
+def get_api_url():
+    """Get the effective API URL (flag > env > default)."""
+    if _CLI_API:
+        return _CLI_API
+    return API
+
+def get_token():
+    """Get a valid JWT token.
+    
+    Priority: --token flag > CLAWBOARD_TOKEN env > cached token file.
+    If no token is available, attempts password login if CLAWBOARD_PASSWORD is set.
+    """
+    import time
+    
+    # 1. CLI flag
+    if _CLI_TOKEN:
+        return _CLI_TOKEN
+    
+    # 2. Environment variable
+    env_token = os.environ.get("CLAWBOARD_TOKEN")
+    if env_token:
+        return env_token
+    
+    # 3. Cached token file
+    if os.path.exists(TOKEN_FILE):
+        try:
+            with open(TOKEN_FILE) as f:
+                cached = json.load(f)
+            # Check if token expires in more than 1 hour
+            if cached.get("expires_at", 0) > time.time() + 3600:
+                return cached["token"]
+        except:
+            pass
+    
+    # 4. Password-based login (if CLAWBOARD_PASSWORD is set)
+    password = os.environ.get("CLAWBOARD_PASSWORD")
+    if password:
+        return _login_with_password(password)
+    
+    print("❌ No auth token found. Set CLAWBOARD_TOKEN, use --token, or run 'clawboard login'.", file=sys.stderr)
+    sys.exit(1)
+
+def _login_with_password(password):
+    """Login with password and cache the token."""
+    import time
+    base = get_api_url()
+    url = f"{base}/auth/login"
+    body = json.dumps({"password": password}).encode()
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            token = data["token"]
+            # Cache token
+            os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+            with open(TOKEN_FILE, "w") as f:
+                json.dump({"token": token, "expires_at": time.time() + 6*24*3600}, f)
+            return token
+    except urllib.error.HTTPError as e:
+        print(f"❌ Auth failed: {e.code}", file=sys.stderr)
+        sys.exit(1)
+
+def cmd_login(args):
+    """Login to ClawBoard and cache the token."""
+    import getpass
+    password = getattr(args, 'password', None) or os.environ.get("CLAWBOARD_PASSWORD") or getpass.getpass("Password: ")
+    token = _login_with_password(password)
+    print(f"✅ Logged in. Token cached at {TOKEN_FILE}")
+    return token
+
+# ─── Helpers ───
+
+def is_agent_context():
+    """Check if running in agent context (via --agent flag or CLAWBOARD_AGENT env var)."""
+    # Check environment variable
+    if os.environ.get("CLAWBOARD_AGENT") == "1":
+        return True
+    # Check command-line args
+    return "--agent" in sys.argv
+
+def api(method, path, data=None):
+    """Make API request, return parsed JSON."""
+    url = f"{get_api_url()}{path}"
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {get_token()}")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        try:
+            err = json.loads(body)
+            print(f"❌ API error: {err.get('error', body)}", file=sys.stderr)
+        except:
+            print(f"❌ HTTP {e.code}: {body}", file=sys.stderr)
+        sys.exit(1)
+
+def resolve_project(name):
+    """Fuzzy-match project name. Returns the canonical project name string."""
+    if not name:
+        return None
+    projects = api("GET", "/projects").get("projects", [])
+    
+    # Exact match first
+    for p in projects:
+        if p["name"] == name:
+            return p["name"]
+    
+    # Fuzzy match
+    best = None
+    best_score = 0
+    for p in projects:
+        score = SequenceMatcher(None, name.lower(), p["name"].lower()).ratio()
+        if score > best_score:
+            best_score = score
+            best = p
+        # Also check substring
+        if name.lower() in p["name"].lower() or p["name"].lower() in name.lower():
+            if score > 0.3:
+                best = p
+                best_score = max(score, 0.9)
+    
+    if best and best_score > 0.4:
+        if best["name"] != name:
+            print(f"📁 Matched project: \"{name}\" → \"{best['name']}\"", file=sys.stderr)
+        return best["name"]
+    
+    print(f"⚠️  No project found matching \"{name}\". Available:", file=sys.stderr)
+    for p in projects:
+        print(f"   - {p['name']}", file=sys.stderr)
+    sys.exit(1)
+
+def resolve_project_id(name_or_id):
+    """Resolve project name or ID to a full project ID."""
+    projects = api("GET", "/projects").get("projects", [])
+    
+    # Try ID match first (full or prefix)
+    for p in projects:
+        if p["id"] == name_or_id or p["id"].startswith(name_or_id):
+            return p["id"]
+    
+    # Try name match (exact then fuzzy)
+    for p in projects:
+        if p["name"] == name_or_id:
+            return p["id"]
+    
+    # Fuzzy name match
+    best = None
+    best_score = 0
+    for p in projects:
+        score = SequenceMatcher(None, name_or_id.lower(), p["name"].lower()).ratio()
+        if name_or_id.lower() in p["name"].lower() or p["name"].lower() in name_or_id.lower():
+            score = max(score, 0.9)
+        if score > best_score:
+            best_score = score
+            best = p
+    
+    if best and best_score > 0.4:
+        if best["name"] != name_or_id and not best["id"].startswith(name_or_id):
+            print(f"📁 Matched project: \"{name_or_id}\" → \"{best['name']}\"", file=sys.stderr)
+        return best["id"]
+    
+    print(f"⚠️  No project found matching \"{name_or_id}\". Available:", file=sys.stderr)
+    for p in projects:
+        print(f"   - {p['name']} ({p['id'][:8]})", file=sys.stderr)
+    sys.exit(1)
+
+def validate_status(status):
+    """Validate and auto-correct common status mistakes."""
+    if status in VALID_STATUSES:
+        return status
+    # Common corrections
+    corrections = {
+        "idea": "ideas",
+        "plan": "ideas",
+        "plans": "ideas",
+        "doing": "in-progress",
+        "progress": "in-progress",
+        "wip": "in-progress",
+        "blocked": "stuck",
+        "done": "completed",
+        "complete": "completed",
+        "archive": "archived",
+    }
+    if status.lower() in corrections:
+        corrected = corrections[status.lower()]
+        print(f"📝 Status corrected: \"{status}\" → \"{corrected}\"", file=sys.stderr)
+        return corrected
+    
+    print(f"❌ Invalid status: \"{status}\". Valid: {', '.join(VALID_STATUSES)}", file=sys.stderr)
+    sys.exit(1)
+
+def parse_subtasks(text):
+    """Parse semicolon-separated subtasks into correct API format."""
+    if not text:
+        return None
+    items = [s.strip() for s in text.split(";") if s.strip()]
+    return [{"text": item} for item in items]
+
+def format_subtask_status(s):
+    """Format subtask status with appropriate icon."""
+    status = s.get("status", "new")
+    # Legacy support: if no status field, check completed boolean
+    if status == "new" and s.get("completed"):
+        status = "completed"
+    
+    icons = {
+        "new": "⬜",
+        "in_review": "🔄",
+        "completed": "✅"
+    }
+    return icons.get(status, "❓")
+
+def format_task(t, verbose=False):
+    """Format a task for display."""
+    status_icons = {
+        "ideas": "💡", "todo": "📋", "in-progress": "🔄",
+        "stuck": "🚧", "review": "🔍", "completed": "✅", "archived": "📦"
+    }
+    priority_icons = {
+        "urgent": "🔴", "high": "🟠", "normal": "🟡", "low": "🟢", "someday": "⚪"
+    }
+    icon = status_icons.get(t.get("status", ""), "❓")
+    pri = priority_icons.get(t.get("priority", ""), "")
+    proj = f" 📁{t['project']}" if t.get("project") else ""
+    tags = f" 🏷️{','.join(t['tags'])}" if t.get("tags") else ""
+    subtask_count = len(t.get("subtasks") or [])
+    
+    # Count subtasks by status
+    subtasks = t.get("subtasks") or []
+    done = sum(1 for s in subtasks if s.get("status") == "completed" or s.get("completed"))
+    in_review = sum(1 for s in subtasks if s.get("status") == "in_review")
+    
+    if subtask_count:
+        if in_review > 0:
+            subs = f" [{done}/{subtask_count} ✅ {in_review} 🔄]"
+        else:
+            subs = f" [{done}/{subtask_count}]"
+    else:
+        subs = ""
+    
+    thinking = f" 🧠{t['thinking']}" if t.get("thinking") else ""
+    attempts = f" 🔁{t['attemptCount']}" if t.get("attemptCount", 0) > 0 else ""
+    blocked_icon = " 🔒" if t.get("blocked") else ""
+    
+    short_id = t["id"][:8]
+    line = f"{icon} {pri} {short_id}  {t['title']}{proj}{tags}{subs}{thinking}{attempts}{blocked_icon}"
+    
+    if verbose:
+        line += f"\n   Status: {t.get('status')} | Priority: {t.get('priority')} | ID: {t['id']}"
+        if t.get("description"):
+            desc = t["description"][:120]
+            line += f"\n   {desc}{'...' if len(t.get('description','')) > 120 else ''}"
+        if t.get("notes"):
+            line += f"\n   📝 Notes: {t['notes'][:100]}{'...' if len(t.get('notes','')) > 100 else ''}"
+        if t.get("subtasks"):
+            line += "\n   Subtasks:"
+            for i, s in enumerate(t["subtasks"]):
+                status_icon = format_subtask_status(s)
+                status_label = s.get("status", "new")
+                note = f" — {s.get('reviewNote')}" if s.get("reviewNote") else ""
+                line += f"\n     [{i}] {status_icon} {s.get('text', '???')}{note}"
+        if t.get("blockedBy"):
+            line += f"\n   ⛔ Blocked by: {', '.join(t['blockedBy'])}"
+        if t.get("dependsOn"):
+            dep_ids = [d[:8] for d in t["dependsOn"]]
+            line += f"\n   🔗 Depends on: {', '.join(dep_ids)}"
+        if t.get("blockingTasks"):
+            blocking = [f"{b['title'][:30]} ({b['id'][:8]})" for b in t["blockingTasks"]]
+            line += f"\n   🔒 Blocked by incomplete: {', '.join(blocking)}"
+        if t.get("dependentTasks"):
+            deps = [f"{d['title'][:30]} ({d['id'][:8]})" for d in t["dependentTasks"]]
+            line += f"\n   ⬇️  Blocks: {', '.join(deps)}"
+        if t.get("blocked"):
+            line += f"\n   🔒 BLOCKED (dependencies not complete)"
+    
+    return line
+
+def format_project(p, include_stats=False, stats=None):
+    """Format a project for display."""
+    status_icons = {
+        "active": "🟢", "paused": "⏸️", "completed": "✅", "archived": "📦"
+    }
+    icon = status_icons.get(p.get("status", "active"), "⚪")
+    desc = f" - {p['description'][:50]}..." if p.get("description") and len(p.get("description", "")) > 50 else (f" - {p['description']}" if p.get("description") else "")
+    
+    line = f"  {icon} {p['name']}{desc}  (ID: {p['id'][:12]})"
+    
+    if include_stats and stats:
+        total = stats.get("total", 0)
+        completed = stats.get("completed", 0)
+        in_progress = stats.get("inProgress", 0)
+        line += f"\n     📊 Tasks: {total} total, {in_progress} in-progress, {completed} completed"
+    
+    if p.get("links"):
+        line += "\n     🔗 Links:"
+        for link in p["links"]:
+            line += f"\n        - [{link.get('type', 'other')}] {link.get('title', 'Untitled')}: {link.get('url', '')}"
+    
+    return line
+
+def create_nfs_skeleton(project_name):
+    """Create NFS directory skeleton for a project."""
+    project_dir = os.path.join(DATA_DIR, project_name)
+    
+    if os.path.exists(project_dir):
+        print(f"⚠️  NFS directory already exists: {project_dir}", file=sys.stderr)
+        return project_dir
+    
+    # Create directories
+    dirs = ["repo", "files", "data", "workspace"]
+    try:
+        os.makedirs(project_dir, exist_ok=True)
+        for d in dirs:
+            os.makedirs(os.path.join(project_dir, d), exist_ok=True)
+        
+        # Create .project.yaml
+        project_yaml = f"""# Project: {project_name}
+# Created: {datetime.now().isoformat()}
+
+name: {project_name}
+nfs_path: {project_dir}
+
+structure:
+  repo: "Git repository clone"
+  files: "Documents, media, attachments"
+  data: "Datasets, backups, large files"
+  workspace: "Agent working directory"
+"""
+        with open(os.path.join(project_dir, ".project.yaml"), "w") as f:
+            f.write(project_yaml)
+        
+        print(f"✅ Created NFS skeleton: {project_dir}", file=sys.stderr)
+        print(f"   📁 repo/", file=sys.stderr)
+        print(f"   📁 files/", file=sys.stderr)
+        print(f"   📁 data/", file=sys.stderr)
+        print(f"   📁 workspace/", file=sys.stderr)
+        print(f"   📄 .project.yaml", file=sys.stderr)
+        return project_dir
+    except OSError as e:
+        print(f"❌ Failed to create NFS skeleton: {e}", file=sys.stderr)
+        return None
+
+def create_tracker_doc(project_name, tag, phases, master_task_id, phase_task_ids):
+    """Create a tracker document in the project's files directory."""
+    project_dir = os.path.join(DATA_DIR, project_name, "files")
+    
+    if not os.path.exists(project_dir):
+        os.makedirs(project_dir, exist_ok=True)
+    
+    tracker_path = os.path.join(project_dir, f"{tag.upper()}-TRACKER.md")
+    
+    # Build phase table
+    phase_rows = []
+    for i, (phase_name, task_id) in enumerate(zip(phases, phase_task_ids)):
+        phase_rows.append(f"| Phase {i+1} | `{task_id[:8]}` | ⬜ Todo | {phase_name} |")
+    
+    tracker_content = f"""# {tag.replace('-', ' ').title()} - Tracker
+
+**Status:** 🟡 In Progress  
+**Started:** {datetime.now().strftime('%Y-%m-%d')}  
+**Master Task:** `{master_task_id[:8]}`
+
+---
+
+## Quick Links
+
+| Resource | Link |
+|----------|------|
+| Master Task | `{master_task_id}` |
+| This Tracker | `{tracker_path}` |
+| NFS Project Root | `/data/projects/{project_name}/` |
+
+---
+
+## Phase Overview
+
+| Phase | Task ID | Status | Notes |
+|-------|---------|--------|-------|
+{chr(10).join(phase_rows)}
+
+---
+
+## Phase Details & Handoff Notes
+
+"""
+    
+    # Add placeholder sections for each phase
+    for i, phase_name in enumerate(phases):
+        tracker_content += f"""### Phase {i+1}: {phase_name} (`{phase_task_ids[i][:8]}`)
+
+**Goal:** (To be filled)
+
+**Key Files:**
+- (To be filled)
+
+**Completion Criteria:**
+- [ ] (To be filled)
+
+**Notes for Next Phase:**
+- (To be filled by agent)
+
+---
+
+"""
+    
+    tracker_content += f"""## Change Log
+
+| Date | Phase | Change | Author |
+|------|-------|--------|--------|
+| {datetime.now().strftime('%Y-%m-%d')} | Setup | Created tracker document | CLI |
+
+---
+
+## Agent Instructions
+
+**When working on any phase:**
+
+1. **Read this tracker first** - Understand context from previous phases
+2. **Update "Notes for Next Phase"** - Document important findings
+3. **Update Change Log** - Record what you changed
+4. **Mark subtasks correctly** - Use `complete-subtask` (in_review), not completed
+5. **Document blockers** - Add to "Blocked Items" section
+
+---
+
+*Last Updated: {datetime.now().strftime('%Y-%m-%d')} by CLI*
+"""
+    
+    with open(tracker_path, "w") as f:
+        f.write(tracker_content)
+    
+    print(f"✅ Created tracker: {tracker_path}", file=sys.stderr)
+    return tracker_path
+
+# ─── Commands ───
+
+def cmd_list(args):
+    params = {}
+    if args.status:
+        params["status"] = validate_status(args.status)
+    if args.project:
+        params["project"] = resolve_project(args.project)
+    if args.priority:
+        params["priority"] = args.priority
+    
+    qs = "&".join(f"{k}={urllib.parse.quote(v)}" for k, v in params.items())
+    path = f"/tasks?{qs}" if qs else "/tasks"
+    result = api("GET", path)
+    tasks = result.get("tasks", [])
+    
+    if not tasks:
+        print("No tasks found.")
+        return
+    
+    # Group by status
+    by_status = {}
+    for t in tasks:
+        by_status.setdefault(t.get("status", "unknown"), []).append(t)
+    
+    for status in VALID_STATUSES:
+        if status in by_status:
+            print(f"\n── {status.upper()} ({len(by_status[status])}) ──")
+            for t in by_status[status]:
+                print(f"  {format_task(t, verbose=args.verbose)}")
+
+def cmd_next(args):
+    result = api("GET", "/tasks/next")
+    task = result.get("task")
+    if not task:
+        print(f"No auto-start tasks in queue. (queue length: {result.get('queueLength', 0)})")
+        return
+    print(format_task(task, verbose=True))
+
+def cmd_current(args):
+    result = api("GET", "/tasks/current")
+    task = result.get("task")
+    if not task:
+        print("No current task (nothing in-progress).")
+        return
+    print(format_task(task, verbose=True))
+    print(f"\n   Full ID: {task['id']}")
+
+def cmd_get(args):
+    task_id = resolve_task_id(args.id)
+    result = api("GET", f"/tasks/{task_id}")
+    task = result.get("task", result)
+    print(format_task(task, verbose=True))
+    print(f"\n   Full ID: {task['id']}")
+
+def cmd_create(args):
+    data = {"title": args.title}
+    
+    if args.status:
+        data["status"] = validate_status(args.status)
+    else:
+        data["status"] = "ideas"
+    
+    if args.priority:
+        if args.priority not in VALID_PRIORITIES:
+            print(f"❌ Invalid priority: {args.priority}. Valid: {', '.join(VALID_PRIORITIES)}", file=sys.stderr)
+            sys.exit(1)
+        data["priority"] = args.priority
+    else:
+        data["priority"] = "normal"
+    
+    if args.project:
+        data["project"] = resolve_project(args.project)
+    
+    if args.description:
+        data["description"] = args.description
+    
+    if args.subtasks:
+        data["subtasks"] = parse_subtasks(args.subtasks)
+    
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    
+    if args.blocked_by:
+        data["blockedBy"] = [b.strip() for b in args.blocked_by.split(",") if b.strip()]
+    
+    if args.depends_on:
+        data["dependsOn"] = [d.strip() for d in args.depends_on.split(",") if d.strip()]
+    
+    if args.auto_start is not None:
+        data["autoStart"] = args.auto_start
+    
+    if args.thinking:
+        data["thinking"] = args.thinking
+    
+    result = api("POST", "/tasks", data)
+    task = result.get("task", {})
+    print(f"✅ Created: {format_task(task)}")
+    print(f"   ID: {task['id']}")
+
+def cmd_update(args):
+    task_id = resolve_task_id(args.id)
+    data = {}
+    
+    if args.status:
+        data["status"] = validate_status(args.status)
+    if args.priority:
+        data["priority"] = args.priority
+    if args.project:
+        data["project"] = resolve_project(args.project)
+    if args.description:
+        data["description"] = args.description
+    if args.title:
+        data["title"] = args.title
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    if args.subtasks:
+        data["subtasks"] = parse_subtasks(args.subtasks)
+    if args.depends_on:
+        data["dependsOn"] = [d.strip() for d in args.depends_on.split(",") if d.strip()]
+    if args.notes:
+        data["notes"] = args.notes
+    if args.thinking:
+        data["thinking"] = args.thinking
+    if hasattr(args, 'auto_start') and args.auto_start is not None:
+        data["autoStart"] = args.auto_start == "true"
+    if args.add_subtask:
+        # Fetch current, append
+        current = api("GET", f"/tasks/{task_id}")
+        existing = current.get("task", {}).get("subtasks") or []
+        new_subs = parse_subtasks(args.add_subtask)
+        data["subtasks"] = existing + new_subs
+    
+    if not data:
+        print("Nothing to update. Use --status, --priority, --project, etc.", file=sys.stderr)
+        sys.exit(1)
+    
+    result = api("PATCH", f"/tasks/{task_id}", data)
+    task = result.get("task", {})
+    print(f"✅ Updated: {format_task(task)}")
+
+def cmd_move(args):
+    task_id = resolve_task_id(args.id)
+    status = validate_status(args.status)
+    
+    # Guardrail: block move to completed if subtasks not approved (unless --force)
+    force = getattr(args, 'force', False)
+    if status == "completed" and not force:
+        # Fetch current task to check subtasks
+        current = api("GET", f"/tasks/{task_id}")
+        task = current.get("task", current)
+        subtasks = task.get("subtasks") or []
+        
+        if subtasks:
+            # Check if all subtasks are completed
+            unapproved = []
+            for i, s in enumerate(subtasks):
+                s_status = s.get("status", "new")
+                if s_status != "completed":
+                    unapproved.append((i, s_status, s.get("text", "???")))
+            
+            if unapproved:
+                # Block the move and show helpful error
+                print(f"❌ Cannot move to completed — subtasks not approved:", file=sys.stderr)
+                for idx, s_status, text in unapproved:
+                    icon = format_subtask_status({"status": s_status})
+                    print(f"  [{idx}] {icon} {s_status}: \"{text}\"", file=sys.stderr)
+                print(f"\nRun: clawboard review {task_id[:8]}", file=sys.stderr)
+                print(f"Or use --force to override this check.", file=sys.stderr)
+                sys.exit(1)
+    
+    if force:
+        print("⚠️ Force override: skipping guardrail checks. Make sure you know what you're doing.", file=sys.stderr)
+    
+    data = {"status": status}
+    if args.notes:
+        data["notes"] = args.notes
+    result = api("PATCH", f"/tasks/{task_id}", data)
+    task = result.get("task", {})
+    print(f"✅ Moved: {format_task(task)}")
+
+def cmd_archive(args):
+    task_id = resolve_task_id(args.id)
+    result = api("POST", f"/tasks/{task_id}/archive")
+    print(f"✅ Archived: {task_id}")
+
+def cmd_delete(args):
+    task_id = resolve_task_id(args.id)
+    result = api("DELETE", f"/tasks/{task_id}")
+    print(f"✅ Deleted: {task_id}")
+
+def cmd_spawn(args):
+    task_id = resolve_task_id(args.id)
+    result = api("POST", f"/tasks/{task_id}/spawn")
+    prompt = result.get("prompt", "")
+    print("─── Agent Spawn Prompt ───")
+    print(prompt)
+    print("───────────────────────────")
+
+def cmd_breakdown(args):
+    task_id = resolve_task_id(args.id)
+    print("🤖 Generating subtasks via AI... (this may take a moment)")
+    result = api("POST", f"/tasks/{task_id}/breakdown")
+    task = result.get("task", {})
+    subtasks = task.get("subtasks", [])
+    print(f"✅ Generated {len(subtasks)} subtasks:")
+    for i, s in enumerate(subtasks):
+        icon = format_subtask_status(s)
+        print(f"  [{i}] {icon} {s.get('text', '???')}")
+
+def cmd_auto_archive(args):
+    result = api("POST", "/tasks/auto-archive")
+    archived = result.get("archived", 0)
+    print(f"✅ Auto-archived {archived} completed task(s)")
+
+def cmd_complete_subtask(args):
+    """Agent marks subtask as in_review (NOT completed)."""
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    # Use the new tri-state API: mark as in_review with agent role
+    result = api("PATCH", f"/tasks/{task_id}/subtasks/{index}/status", {
+        "status": "in_review",
+        "role": "agent"
+    })
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    if index < len(subtasks):
+        print(f"🔄 Marked subtask [{index}] as in_review: {subtasks[index].get('text', '')}")
+    else:
+        print(f"🔄 Marked subtask [{index}] as in_review")
+    
+    summary = result.get("subtaskSummary", {})
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    print(format_task(task, verbose=True))
+
+def cmd_approve_subtask(args):
+    """Orchestrator approves subtask → marks as completed."""
+    # Block if running in agent context
+    if is_agent_context():
+        print("❌ Agents cannot approve subtasks. Use 'complete-subtask' to mark as in_review.", file=sys.stderr)
+        print("   The orchestrator will review and approve.", file=sys.stderr)
+        sys.exit(1)
+    
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    result = api("POST", f"/tasks/{task_id}/subtasks/{index}/approve")
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    if index < len(subtasks):
+        print(f"✅ Approved subtask [{index}]: {subtasks[index].get('text', '')}")
+    else:
+        print(f"✅ Approved subtask [{index}]")
+    
+    summary = result.get("subtaskSummary", {})
+    all_completed = result.get("allCompleted", False)
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    
+    if all_completed:
+        print(f"   🎉 All subtasks completed! Task can be marked as completed.")
+    
+    print(format_task(task, verbose=True))
+
+def cmd_reject_subtask(args):
+    """Orchestrator rejects subtask → marks as new with note."""
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    data = {}
+    if args.note:
+        data["note"] = args.note
+    
+    result = api("POST", f"/tasks/{task_id}/subtasks/{index}/reject", data)
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    note_text = f" (Note: {args.note})" if args.note else ""
+    if index < len(subtasks):
+        print(f"↩️ Rejected subtask [{index}]: {subtasks[index].get('text', '')}{note_text}")
+    else:
+        print(f"↩️ Rejected subtask [{index}]{note_text}")
+    
+    summary = result.get("subtaskSummary", {})
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    print(format_task(task, verbose=True))
+
+def cmd_uncomplete_subtask(args):
+    """Legacy: mark subtask as new (uncompleted)."""
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    # Use legacy PUT endpoint for backward compat
+    result = api("PUT", f"/tasks/{task_id}/subtasks/{index}", {
+        "status": "new"
+    })
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    if index < len(subtasks):
+        print(f"⬜ Reset subtask [{index}] to new: {subtasks[index].get('text', '')}")
+    
+    print(format_task(task, verbose=True))
+
+def cmd_review(args):
+    """Show a review-focused view of a task and its subtasks."""
+    task_id = resolve_task_id(args.id)
+    result = api("GET", f"/tasks/{task_id}")
+    task = result.get("task", result)
+    
+    subtasks = task.get("subtasks") or []
+    title = task.get("title", "Unknown")
+    status = task.get("status", "unknown")
+    
+    # Count subtasks by status
+    completed = sum(1 for s in subtasks if s.get("status") == "completed")
+    in_review = sum(1 for s in subtasks if s.get("status") == "in_review")
+    new = sum(1 for s in subtasks if s.get("status") == "new")
+    total = len(subtasks)
+    
+    short_id = task_id[:8]
+    
+    print(f"\n📋 Review: {title} ({short_id})")
+    print(f"Status: {status} | Subtasks: {completed}/{total} approved")
+    print()
+    
+    # Display subtasks with clear markers
+    for i, s in enumerate(subtasks):
+        s_status = s.get("status", "new")
+        icon = format_subtask_status(s)
+        text = s.get("text", "???")
+        note = f" — {s.get('reviewNote')}" if s.get("reviewNote") else ""
+        
+        marker = ""
+        if s_status == "in_review":
+            marker = "  ← NEEDS REVIEW"
+        elif s_status == "new":
+            marker = "  ← NOT STARTED"
+        
+        print(f"  [{i}] {icon} {s_status}: {text}{note}{marker}")
+    
+    print()
+    print("Actions:")
+    
+    # Show approve/reject for subtasks in review
+    for i, s in enumerate(subtasks):
+        if s.get("status") == "in_review":
+            print(f"  clawboard approve-subtask {short_id} {i}    # Approve subtask [{i}]")
+            print(f"  clawboard reject-subtask {short_id} {i}     # Reject subtask [{i}]")
+    
+    # Show move to completed if all approved
+    if completed == total and total > 0:
+        print(f"  clawboard move {short_id} completed       # Complete (all approved)")
+    elif total > 0:
+        print(f"  # Cannot complete yet — {total - completed} subtask(s) not approved")
+    
+    print(f"  clawboard move {short_id} in-progress     # Send back for more work")
+    print()
+
+def cmd_projects(args):
+    result = api("GET", "/projects")
+    projects = result.get("projects", [])
+    
+    for p in projects:
+        stats = None
+        if args.include_stats:
+            try:
+                stats_result = api("GET", f"/projects/{p['id']}/stats")
+                stats = stats_result.get("stats", stats_result)
+            except:
+                pass
+        print(format_project(p, include_stats=args.include_stats, stats=stats))
+
+def cmd_project_get(args):
+    project_id = resolve_project_id(args.id)
+    result = api("GET", f"/projects/{project_id}")
+    project = result.get("project", result)
+    
+    status_icons = {
+        "active": "🟢", "paused": "⏸️", "completed": "✅", "archived": "📦"
+    }
+    icon = status_icons.get(project.get("status", "active"), "⚪")
+    
+    print(f"\n{icon} {project['name']}")
+    print(f"   ID: {project['id']}")
+    print(f"   Status: {project.get('status', 'active')}")
+    if project.get("description"):
+        print(f"   Description: {project['description']}")
+    
+    # Show resources if available
+    resources = project.get("resources", {})
+    if resources:
+        print("   📦 Resources:")
+        repos = resources.get("repositories", {})
+        if repos.get("main"):
+            print(f"      Git: {repos['main']}")
+        
+        envs = resources.get("environments", {})
+        if envs.get("production"):
+            print(f"      Prod: {envs['production']}")
+        if envs.get("development"):
+            print(f"      Dev: {envs['development']}")
+        
+        paths = resources.get("localPaths", {})
+        if paths.get("nfsRoot"):
+            print(f"      NFS: {paths['nfsRoot']}")
+        if paths.get("ssdBuild"):
+            print(f"      SSD: {paths['ssdBuild']}")
+        
+        notebooks = resources.get("notebooks", {})
+        if notebooks:
+            print("   📓 Notebooks:")
+            for ntype in ["documentation", "research"]:
+                nb = notebooks.get(ntype)
+                if nb:
+                    print(f"      [{ntype}] {nb.get('description', 'No description')} (ID: {nb.get('id', 'N/A')[:8]})")
+    
+    if project.get("links"):
+        print("   🔗 Links:")
+        for link in project["links"]:
+            print(f"     - [{link.get('type', 'other')}] {link.get('title', 'Untitled')}: {link.get('url', '')}")
+            if link.get("id"):
+                print(f"       Link ID: {link['id']}")
+
+def cmd_project_create(args):
+    if not args.name:
+        print("❌ --name is required", file=sys.stderr)
+        sys.exit(1)
+    
+    data = {"name": args.name}
+    if args.description:
+        data["description"] = args.description
+    if args.status:
+        if args.status not in VALID_PROJECT_STATUSES:
+            print(f"❌ Invalid project status: {args.status}. Valid: {', '.join(VALID_PROJECT_STATUSES)}", file=sys.stderr)
+            sys.exit(1)
+        data["status"] = args.status
+    
+    # Create NFS skeleton if requested
+    nfs_path = None
+    if args.nfs:
+        nfs_path = create_nfs_skeleton(args.name)
+    
+    result = api("POST", "/projects", data)
+    project = result.get("project", {})
+    project_id = project.get("id", "")
+    
+    print(f"✅ Created project: {project.get('name', '')}")
+    print(f"   ID: {project_id}")
+    
+    # If NFS was created, set the path in resources
+    if nfs_path and project_id:
+        try:
+            api("PATCH", f"/projects/{project_id}/resources", {
+                "localPaths": {
+                    "nfsRoot": nfs_path
+                }
+            })
+            print(f"   NFS: {nfs_path}")
+        except:
+            print(f"   ⚠️  NFS created but failed to update project resources", file=sys.stderr)
+
+def cmd_project_update(args):
+    project_id = resolve_project_id(args.id)
+    data = {}
+    
+    if args.name:
+        data["name"] = args.name
+    if args.description:
+        data["description"] = args.description
+    if args.status:
+        if args.status not in VALID_PROJECT_STATUSES:
+            print(f"❌ Invalid project status: {args.status}. Valid: {', '.join(VALID_PROJECT_STATUSES)}", file=sys.stderr)
+            sys.exit(1)
+        data["status"] = args.status
+    
+    if not data:
+        print("Nothing to update. Use --name, --description, or --status.", file=sys.stderr)
+        sys.exit(1)
+    
+    result = api("PATCH", f"/projects/{project_id}", data)
+    project = result.get("project", {})
+    print(f"✅ Updated project: {project.get('name', '')}")
+
+def cmd_project_archive(args):
+    """Archive a project (soft delete - preserves all data)"""
+    project_id = resolve_project_id(args.id)
+    result = api("POST", f"/projects/{project_id}/archive")
+    project = result.get("project", {})
+    print(f"📦 Archived project: {project.get('name', project_id)}")
+    print(f"   ID: {project_id}")
+    print(f"   All tasks and links preserved")
+    print(f"   Use 'clawboard project unarchive {project_id[:8]}' to restore")
+
+def cmd_project_unarchive(args):
+    """Restore a project from archive"""
+    project_id = resolve_project_id(args.id)
+    result = api("POST", f"/projects/{project_id}/unarchive")
+    project = result.get("project", {})
+    print(f"✅ Restored project from archive: {project.get('name', project_id)}")
+    print(f"   ID: {project_id}")
+    print(f"   Status: {project.get('status', 'active')}")
+
+def cmd_project_delete(args):
+    """Delete a project (archive by default, hard delete with --confirm)"""
+    project_id = resolve_project_id(args.id)
+    
+    # If not confirmed, show preview first
+    if not args.confirm:
+        # Get delete preview
+        preview = api("GET", f"/projects/{project_id}/delete-preview")
+        preview_data = preview.get("preview", {})
+        project = preview_data.get("project", {})
+        tasks = preview_data.get("tasks", [])
+        links = preview_data.get("links", [])
+        
+        print(f"\n⚠️  DELETE PREVIEW for project: {project.get('name', 'Unknown')}")
+        print(f"   ID: {project_id}")
+        print(f"   Status: {project.get('status', 'unknown')}")
+        print(f"\n📋 Will affect:")
+        print(f"   • {len(tasks)} tasks")
+        print(f"   • {len(links)} links")
+        
+        if tasks:
+            print(f"\n   Tasks to be deleted:")
+            for task in tasks[:5]:  # Show first 5
+                print(f"     - {task.get('title', 'Untitled')} ({task.get('status', 'unknown')})")
+            if len(tasks) > 5:
+                print(f"     ... and {len(tasks) - 5} more")
+        
+        print(f"\n⚠️  This will SOFT DELETE (archive) the project by default.")
+        print(f"   Use --confirm for permanent hard delete.")
+        print(f"   Or use 'clawboard project archive {project_id[:8]}' to archive explicitly.")
+        sys.exit(0)
+    
+    # Confirmed delete - check if hard or soft
+    if args.hard:
+        # Hard delete - permanent!
+        print(f"\n🔴 PERMANENT DELETE - This cannot be undone!")
+        result = api("DELETE", f"/projects/{project_id}?hard=true")
+        deleted_tasks = result.get("deletedTasks", 0)
+        deleted_links = result.get("deletedLinks", 0)
+        print(f"✅ Permanently deleted project: {project_id}")
+        print(f"   Deleted {deleted_tasks} tasks")
+        print(f"   Deleted {deleted_links} links")
+    else:
+        # Soft delete (archive)
+        result = api("DELETE", f"/projects/{project_id}")
+        print(f"📦 Project archived (soft delete): {project_id}")
+        print(f"   Use 'clawboard project unarchive {project_id[:8]}' to restore")
+
+def cmd_project_stats(args):
+    project_id = resolve_project_id(args.id)
+    params = {}
+    if args.days:
+        params["days"] = str(args.days)
+    
+    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    path = f"/projects/{project_id}/stats?{qs}" if qs else f"/projects/{project_id}/stats"
+    result = api("GET", path)
+    stats = result.get("stats", result)
+    
+    print(f"\n📊 Project Stats (last {args.days or 7} days)")
+    print(f"   Total tasks: {stats.get('total', 0)}")
+    print(f"   Completed: {stats.get('completed', 0)}")
+    print(f"   In Progress: {stats.get('inProgress', stats.get('in_progress', 0))}")
+    print(f"   Todo: {stats.get('todo', 0)}")
+    print(f"   Ideas: {stats.get('ideas', 0)}")
+    print(f"   Stuck: {stats.get('stuck', 0)}")
+    if stats.get("completedThisPeriod") is not None:
+        print(f"   Completed this period: {stats.get('completedThisPeriod', 0)}")
+    if stats.get("velocity") is not None:
+        print(f"   Velocity: {stats.get('velocity', 0)} tasks/day")
+
+def cmd_project_context(args):
+    project_id = resolve_project_id(args.id)
+    params = {}
+    if args.role:
+        if args.role not in ["agent", "orchestrator"]:
+            print(f"❌ Invalid role: {args.role}. Must be 'agent' or 'orchestrator'", file=sys.stderr)
+            sys.exit(1)
+        params["role"] = args.role
+    if args.task_id:
+        params["taskId"] = args.task_id
+    
+    qs = "&".join(f"{k}={urllib.parse.quote(v)}" for k, v in params.items())
+    path = f"/projects/{project_id}/context?{qs}" if qs else f"/projects/{project_id}/context"
+    result = api("GET", path)
+    
+    context = result.get("context", {})
+    
+    # Format context nicely
+    print(f"─── Project Context ({args.role or 'agent'}) ───")
+    
+    if isinstance(context, dict):
+        # Structured context
+        if context.get("project"):
+            p = context["project"]
+            print(f"\n📁 Project: {p.get('name', 'Unknown')}")
+            if p.get("description"):
+                print(f"   {p['description']}")
+        
+        if context.get("resources"):
+            r = context["resources"]
+            print("\n📦 Resources:")
+            if r.get("repository"):
+                print(f"   Repository: {r['repository']}")
+            if r.get("environments"):
+                for env, url in r["environments"].items():
+                    print(f"   {env.title()}: {url}")
+            if r.get("paths"):
+                for path_type, path_val in r["paths"].items():
+                    print(f"   {path_type}: {path_val}")
+        
+        if context.get("notebooks"):
+            print("\n📓 Notebooks:")
+            for nb in context["notebooks"]:
+                print(f"   [{nb.get('type', 'unknown')}] {nb.get('description', 'No description')}")
+                if nb.get("queryTips"):
+                    for tip in nb["queryTips"][:2]:
+                        print(f"      💡 {tip}")
+        
+        if context.get("toolInstructions"):
+            print("\n🔧 Tool Instructions:")
+            for tool, instructions in context["toolInstructions"].items():
+                print(f"   {tool}:")
+                for line in str(instructions).split("\n")[:3]:
+                    print(f"      {line}")
+        
+        if context.get("files"):
+            files = context["files"]
+            if files.get("sourceTree"):
+                print(f"\n📂 Source Tree: ({len(files['sourceTree'])} files)")
+                for f in files["sourceTree"][:10]:
+                    print(f"   {f}")
+                if len(files["sourceTree"]) > 10:
+                    print(f"   ... and {len(files['sourceTree']) - 10} more")
+    else:
+        # Legacy string context
+        print(context)
+    
+    print("────────────────────────")
+
+def cmd_project_set_repo(args):
+    project_id = resolve_project_id(args.id)
+    
+    if not args.url:
+        print("❌ --url is required", file=sys.stderr)
+        sys.exit(1)
+    
+    result = api("PATCH", f"/projects/{project_id}/resources", {
+        "repositories": {
+            "main": args.url
+        }
+    })
+    
+    print(f"✅ Set repository: {args.url}")
+
+def cmd_project_set_env(args):
+    project_id = resolve_project_id(args.id)
+    
+    if not args.prod and not args.dev and not args.staging:
+        print("❌ At least one of --prod, --dev, or --staging is required", file=sys.stderr)
+        sys.exit(1)
+    
+    envs = {}
+    if args.prod:
+        envs["production"] = args.prod
+    if args.dev:
+        envs["development"] = args.dev
+    if args.staging:
+        envs["staging"] = args.staging
+    
+    result = api("PATCH", f"/projects/{project_id}/resources", {
+        "environments": envs
+    })
+    
+    print(f"✅ Set environments:")
+    for env, url in envs.items():
+        print(f"   {env}: {url}")
+
+def cmd_project_set_paths(args):
+    project_id = resolve_project_id(args.id)
+    
+    if not args.nfs and not args.ssd and not args.docker:
+        print("❌ At least one of --nfs, --ssd, or --docker is required", file=sys.stderr)
+        sys.exit(1)
+    
+    paths = {}
+    if args.nfs:
+        paths["nfsRoot"] = args.nfs
+    if args.ssd:
+        paths["ssdBuild"] = args.ssd
+    if args.docker:
+        paths["dockerCompose"] = args.docker
+    
+    result = api("PATCH", f"/projects/{project_id}/resources", {
+        "localPaths": paths
+    })
+    
+    print(f"✅ Set paths:")
+    for path_type, path_val in paths.items():
+        print(f"   {path_type}: {path_val}")
+
+def cmd_project_add_notebook(args):
+    project_id = resolve_project_id(args.id)
+    
+    if not args.type or not args.nb_id or not args.url:
+        print("❌ --type, --id, and --url are required", file=sys.stderr)
+        sys.exit(1)
+    
+    if args.type not in VALID_NOTEBOOK_TYPES:
+        print(f"❌ Invalid notebook type: {args.type}. Valid: {', '.join(VALID_NOTEBOOK_TYPES)}", file=sys.stderr)
+        sys.exit(1)
+    
+    notebook = {
+        "id": args.nb_id,
+        "url": args.url,
+        "description": args.desc or "",
+        "queryTips": [t.strip() for t in args.query_tips.split(";")] if args.query_tips else []
+    }
+    
+    # Get current resources
+    current = api("GET", f"/projects/{project_id}/resources")
+    resources = current.get("resources", {})
+    notebooks = resources.get("notebooks", {})
+    
+    # Add/update notebook
+    notebooks[args.type] = notebook
+    
+    result = api("PATCH", f"/projects/{project_id}/resources", {
+        "notebooks": notebooks
+    })
+    
+    print(f"✅ Added notebook [{args.type}]:")
+    print(f"   ID: {args.nb_id}")
+    print(f"   URL: {args.url}")
+    if args.desc:
+        print(f"   Description: {args.desc}")
+    if args.query_tips:
+        print(f"   Query tips: {args.query_tips}")
+
+def cmd_project_add_link(args):
+    project_id = resolve_project_id(args.id)
+    
+    if not args.type or not args.title or not args.url:
+        print("❌ --type, --title, and --url are all required", file=sys.stderr)
+        sys.exit(1)
+    
+    if args.type not in VALID_LINK_TYPES:
+        print(f"❌ Invalid link type: {args.type}. Valid: {', '.join(VALID_LINK_TYPES)}", file=sys.stderr)
+        sys.exit(1)
+    
+    data = {
+        "type": args.type,
+        "title": args.title,
+        "url": args.url
+    }
+    
+    # Category support (if backend supports it)
+    if args.category:
+        if args.category not in VALID_LINK_CATEGORIES:
+            print(f"⚠️  Unknown category: {args.category}. Valid: {', '.join(VALID_LINK_CATEGORIES)}", file=sys.stderr)
+        data["category"] = args.category
+    
+    result = api("POST", f"/projects/{project_id}/links", data)
+    link = result.get("link", {})
+    print(f"✅ Added link: [{args.type}] {args.title}")
+    print(f"   Link ID: {link.get('id', 'N/A')}")
+
+def cmd_project_update_link(args):
+    project_id = resolve_project_id(args.project_id)
+    link_id = args.link_id
+    
+    data = {}
+    if args.type:
+        if args.type not in VALID_LINK_TYPES:
+            print(f"❌ Invalid link type: {args.type}. Valid: {', '.join(VALID_LINK_TYPES)}", file=sys.stderr)
+            sys.exit(1)
+        data["type"] = args.type
+    if args.title:
+        data["title"] = args.title
+    if args.url:
+        data["url"] = args.url
+    
+    if not data:
+        print("Nothing to update. Use --type, --title, or --url.", file=sys.stderr)
+        sys.exit(1)
+    
+    result = api("PUT", f"/projects/{project_id}/links/{link_id}", data)
+    print(f"✅ Updated link: {link_id}")
+
+def cmd_project_delete_link(args):
+    project_id = resolve_project_id(args.project_id)
+    link_id = args.link_id
+    
+    result = api("DELETE", f"/projects/{project_id}/links/{link_id}")
+    print(f"✅ Deleted link: {link_id}")
+
+def cmd_create_multiphase(args):
+    """Create a multi-phase job with tracker document."""
+    if not args.title or not args.project or not args.tag or not args.phases:
+        print("❌ --project, --tag, and --phases are required", file=sys.stderr)
+        sys.exit(1)
+    
+    project_name = resolve_project(args.project)
+    phases = [p.strip() for p in args.phases.split(";") if p.strip()]
+    
+    if len(phases) < 2:
+        print("❌ Multi-phase jobs need at least 2 phases", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"🔄 Creating multi-phase job: {args.title}")
+    print(f"   Project: {project_name}")
+    print(f"   Tag: {args.tag}")
+    print(f"   Phases: {len(phases)}")
+    
+    # Create master task
+    master_subtasks = [{"text": f"Phase {i+1}: {phase}"} for i, phase in enumerate(phases)]
+    master_data = {
+        "title": args.title,
+        "project": project_name,
+        "status": "ideas",
+        "priority": args.priority or "normal",
+        "tags": [args.tag, "multi-phase", "master"],
+        "subtasks": master_subtasks,
+        "description": f"Multi-phase project with {len(phases)} phases. See tracker document."
+    }
+    
+    master_result = api("POST", "/tasks", master_data)
+    master_task = master_result.get("task", {})
+    master_id = master_task.get("id", "")
+    print(f"✅ Created master task: {master_id[:8]}")
+    
+    # Create individual phase tasks (with dependencies: phase N depends on phase N-1)
+    phase_task_ids = []
+    for i, phase in enumerate(phases):
+        phase_data = {
+            "title": f"{args.title} - Phase {i+1}: {phase}",
+            "project": project_name,
+            "status": "ideas",
+            "priority": args.priority or "normal",
+            "tags": [args.tag, f"phase-{i+1}"],
+            "description": f"Phase {i+1} of multi-phase job. Master task: {master_id[:8]}",
+            "autoStart": True if i == 0 else False  # Only first phase auto-starts
+        }
+        
+        # Add dependency on previous phase (except for first phase)
+        if i > 0:
+            phase_data["dependsOn"] = [phase_task_ids[i-1]]
+        
+        phase_result = api("POST", "/tasks", phase_data)
+        phase_task = phase_result.get("task", {})
+        phase_task_ids.append(phase_task.get("id", ""))
+        
+        dep_info = f" (depends on Phase {i})" if i > 0 else ""
+        print(f"   ✅ Phase {i+1}: {phase_task.get('id', '')[:8]}{dep_info}")
+    
+    # Create tracker document
+    tracker_path = create_tracker_doc(project_name, args.tag, phases, master_id, phase_task_ids)
+    
+    # Update master task with tracker path
+    tracker_note = f"📋 TRACKER: {tracker_path}"
+    api("PATCH", f"/tasks/{master_id}", {"notes": tracker_note})
+    
+    # Update phase tasks with tracker reference
+    for phase_id in phase_task_ids:
+        api("PATCH", f"/tasks/{phase_id}", {
+            "notes": tracker_note
+        })
+    
+    print(f"\n✅ Multi-phase job created!")
+    print(f"   Master task: {master_id[:8]}")
+    print(f"   Tracker: {tracker_path}")
+    print(f"   Phases: {len(phases)}")
+
+def resolve_task_id(short_id):
+    """Resolve a short ID prefix to a full task ID."""
+    if len(short_id) >= 36:
+        return short_id
+    # Search all tasks for prefix match
+    result = api("GET", "/tasks")
+    tasks = result.get("tasks", [])
+    matches = [t for t in tasks if t["id"].startswith(short_id)]
+    if len(matches) == 1:
+        return matches[0]["id"]
+    elif len(matches) == 0:
+        # Try archived too
+        result2 = api("GET", "/tasks?status=archived")
+        archived = result2.get("tasks", [])
+        matches = [t for t in archived if t["id"].startswith(short_id)]
+        if len(matches) == 1:
+            return matches[0]["id"]
+        print(f"❌ No task found with ID prefix: {short_id}", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print(f"❌ Ambiguous ID prefix \"{short_id}\", matches:", file=sys.stderr)
+        for m in matches:
+            print(f"   {m['id'][:12]}  {m['title'][:50]}", file=sys.stderr)
+        sys.exit(1)
+
+# ─── Journal Commands ───
+
+def cmd_journal_list(args):
+    """List journal entries."""
+    result = api("GET", "/journal")
+    entries = result.get("entries", [])
+    
+    if not entries:
+        print("No journal entries found.")
+        return
+    
+    # Sort by date (newest first)
+    entries = sorted(entries, key=lambda e: e.get("date", e.get("created_at", "")), reverse=True)
+    
+    total = result.get("total", len(entries))
+    print(f"\n📔 Journal Entries ({total})\n")
+    
+    for entry in entries:
+        # Use date field, fallback to created_at
+        entry_date = entry.get("date", entry.get("created_at", ""))
+        if entry_date:
+            # Format date nicely
+            try:
+                dt = datetime.fromisoformat(entry_date.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d")
+            except:
+                date_str = entry_date[:10]
+        else:
+            date_str = "Unknown"
+        
+        mood_icons = {
+            "happy": "😊", "sad": "😢", "excited": "🎉", "calm": "😌",
+            "anxious": "😰", "angry": "😡", "neutral": "😐", "grateful": "🙏"
+        }
+        mood = entry.get("mood", "")
+        mood_icon = mood_icons.get(mood, "")
+        mood_str = f" {mood_icon} {mood}" if mood else ""
+        
+        entry_id = entry.get("id", "")[:8]
+        
+        # Show first highlight or reflection preview
+        reflection = entry.get("reflection_text", "")
+        highlights = entry.get("highlights", [])
+        
+        if highlights:
+            preview = f"• {highlights[0]}"
+            if len(highlights) > 1:
+                preview += f" (+{len(highlights)-1} more)"
+        else:
+            preview = reflection[:60].replace("\n", " ")
+            if len(reflection) > 60:
+                preview += "..."
+        
+        print(f"  {date_str}  [{entry_id}]{mood_str}")
+        print(f"    {preview}")
+        
+        if args.verbose and len(highlights) > 1:
+            for h in highlights[1:]:
+                print(f"    • {h}")
+            print()
+
+def cmd_journal_create(args):
+    """Create a journal entry."""
+    if not args.content:
+        print("❌ --content is required", file=sys.stderr)
+        sys.exit(1)
+    
+    # Default to today if no date specified
+    if not args.date:
+        args.date = datetime.now().strftime("%Y-%m-%d")
+    
+    data = {
+        "date": args.date,
+        "reflection_text": args.content
+    }
+    
+    if args.mood:
+        data["mood"] = args.mood
+    
+    if args.highlights:
+        data["highlights"] = [h.strip() for h in args.highlights.split(";") if h.strip()]
+    
+    if args.image:
+        data["image_path"] = args.image
+    
+    result = api("POST", "/journal", data)
+    entry = result.get("entry", result)
+    
+    print(f"✅ Created journal entry for {args.date}")
+    print(f"   ID: {entry.get('id', 'N/A')}")
+    if entry.get("mood"):
+        print(f"   Mood: {entry['mood']}")
+    if entry.get("highlights"):
+        print(f"   Highlights: {len(entry['highlights'])}")
+
+def cmd_journal_get(args):
+    """Get a journal entry by ID."""
+    entry_id = args.id
+    result = api("GET", f"/journal/{entry_id}")
+    entry = result.get("entry", result)
+    
+    entry_date = entry.get("date", "")
+    if entry_date:
+        try:
+            dt = datetime.fromisoformat(entry_date.replace("Z", "+00:00"))
+            date_str = dt.strftime("%Y-%m-%d")
+        except:
+            date_str = entry_date[:10]
+    else:
+        date_str = "Unknown"
+    
+    print(f"\n📔 Journal Entry - {date_str}")
+    print(f"   ID: {entry.get('id', 'N/A')}")
+    
+    if entry.get("mood"):
+        mood_icons = {
+            "happy": "😊", "sad": "😢", "excited": "🎉", "calm": "😌",
+            "anxious": "😰", "angry": "😡", "neutral": "😐", "grateful": "🙏"
+        }
+        mood = entry.get("mood", "")
+        mood_icon = mood_icons.get(mood, "")
+        print(f"   Mood: {mood_icon} {mood}")
+    
+    if entry.get("highlights"):
+        print(f"\n   ✨ Highlights:")
+        for h in entry["highlights"]:
+            print(f"      • {h}")
+    
+    reflection = entry.get("reflection_text", "")
+    if reflection:
+        print(f"\n{reflection}\n")
+
+# ─── Status/Health Commands ───
+
+def cmd_status(args):
+    """Show API status and health information."""
+    
+    # Fetch health and status endpoints
+    try:
+        health = api("GET", "/health")
+    except:
+        health = {"status": "error", "message": "Health endpoint unreachable"}
+    
+    try:
+        status = api("GET", "/status")
+    except:
+        status = {"status": "error", "message": "Status endpoint unreachable"}
+    
+    # Color helpers
+    def green(text):
+        return f"\033[92m{text}\033[0m"
+    
+    def red(text):
+        return f"\033[91m{text}\033[0m"
+    
+    def yellow(text):
+        return f"\033[93m{text}\033[0m"
+    
+    # Print health status
+    print("\n🏥 System Health\n")
+    
+    # API status
+    api_status = health.get("status", "unknown")
+    if api_status == "healthy" or api_status == "ok":
+        print(f"  API: {green('✓ Healthy')}")
+    else:
+        print(f"  API: {red('✗ Unhealthy')} ({api_status})")
+    
+    # Database health
+    db_health = health.get("database", status.get("database", {}))
+    if isinstance(db_health, dict):
+        db_status = db_health.get("status", "unknown")
+    else:
+        db_status = "connected" if db_health else "disconnected"
+    
+    if db_status in ("connected", "healthy", "ok"):
+        print(f"  Database: {green('✓ Connected')}")
+    else:
+        print(f"  Database: {red('✗ Disconnected')} ({db_status})")
+    
+    # WebSocket status
+    ws_status = status.get("websocket", health.get("websocket", {}))
+    if isinstance(ws_status, dict):
+        ws_active = ws_status.get("active", False)
+        ws_connections = ws_status.get("connections", 0)
+    else:
+        ws_active = ws_status
+        ws_connections = 0
+    
+    if ws_active:
+        print(f"  WebSocket: {green('✓ Active')} ({ws_connections} connections)")
+    else:
+        print(f"  WebSocket: {yellow('⚠ Inactive')}")
+    
+    # Task counts
+    print("\n📊 Task Statistics\n")
+    
+    task_counts = status.get("taskCounts", status.get("tasks", {}))
+    if task_counts:
+        total = task_counts.get("total", 0)
+        by_status = task_counts.get("byStatus", {})
+        
+        print(f"  Total: {total}")
+        
+        if by_status:
+            for s in ["ideas", "todo", "in-progress", "stuck", "completed", "archived"]:
+                count = by_status.get(s, 0)
+                if count > 0:
+                    icon = {"ideas": "💡", "todo": "📋", "in-progress": "🔄", 
+                            "stuck": "🚧", "completed": "✅", "archived": "📦"}.get(s, "•")
+                    print(f"  {icon} {s}: {count}")
+    
+    # Uptime
+    uptime = status.get("uptime", health.get("uptime"))
+    if uptime:
+        if isinstance(uptime, (int, float)):
+            # Convert seconds to human readable
+            hours = int(uptime // 3600)
+            minutes = int((uptime % 3600) // 60)
+            uptime_str = f"{hours}h {minutes}m"
+        else:
+            uptime_str = str(uptime)
+        
+        print(f"\n⏱️  Uptime: {uptime_str}\n")
+
+# ─── Tools Commands ───
+
+def resolve_tool(name_or_id):
+    """Resolve tool name or ID to a tool dict {id, name}. Supports fuzzy matching."""
+    tools = api("GET", "/tools").get("tools", [])
+    
+    # Try ID match first (full or prefix)
+    for t in tools:
+        if t["id"] == name_or_id or t["id"].startswith(name_or_id):
+            return t
+    
+    # Exact name match
+    for t in tools:
+        if t["name"].lower() == name_or_id.lower():
+            return t
+    
+    # Fuzzy name match
+    best = None
+    best_score = 0
+    for t in tools:
+        score = SequenceMatcher(None, name_or_id.lower(), t["name"].lower()).ratio()
+        if name_or_id.lower() in t["name"].lower() or t["name"].lower() in name_or_id.lower():
+            score = max(score, 0.9)
+        if score > best_score:
+            best_score = score
+            best = t
+    
+    if best and best_score > 0.4:
+        if best["name"].lower() != name_or_id.lower() and not best["id"].startswith(name_or_id):
+            print(f"🔧 Matched tool: \"{name_or_id}\" → \"{best['name']}\"", file=sys.stderr)
+        return best
+    
+    print(f"⚠️  No tool found matching \"{name_or_id}\". Available:", file=sys.stderr)
+    for t in tools:
+        print(f"   - {t['name']} ({t['id'][:8]})", file=sys.stderr)
+    sys.exit(1)
+
+def format_tool(t, verbose=False):
+    """Format a tool for display."""
+    global_icon = "🌐" if t.get("is_global") else "📌"
+    category = t.get("category") or "uncategorized"
+    tags = f" 🏷️{','.join(t['tags'])}" if t.get("tags") else ""
+    version = f" v{t.get('version', 1)}" if t.get("version", 1) > 1 else ""
+    short_id = t["id"][:8]
+    
+    line = f"  {global_icon} {short_id}  {t['name']}  [{category}]{tags}{version}"
+    
+    if verbose:
+        line += f"\n     ID: {t['id']}"
+        if t.get("description"):
+            desc = t["description"][:120]
+            line += f"\n     {desc}{'...' if len(t.get('description', '')) > 120 else ''}"
+        if t.get("usage_instructions"):
+            usage = t["usage_instructions"][:200]
+            line += f"\n     📋 Usage: {usage}{'...' if len(t.get('usage_instructions', '')) > 200 else ''}"
+    
+    return line
+
+def cmd_tools_list(args):
+    """List tools with optional filters."""
+    if args.project:
+        # List tools for a specific project
+        project_id = resolve_project_id(args.project)
+        result = api("GET", f"/projects/{project_id}/tools")
+        tools = result.get("tools", [])
+        
+        if not tools:
+            print("No tools linked to this project.")
+            return
+        
+        print(f"\n🔧 Tools for project ({len(tools)})\n")
+        for pt in tools:
+            tool = pt.get("tool", pt)
+            override = pt.get("override_instructions")
+            override_marker = " ⚡override" if override else ""
+            print(f"{format_tool(tool, verbose=args.verbose)}{override_marker}")
+            if args.verbose and override:
+                override_preview = override[:150]
+                print(f"     ⚡ Override: {override_preview}{'...' if len(override) > 150 else ''}")
+    else:
+        # List all tools with optional filters
+        params = {}
+        if args.category:
+            params["category"] = args.category
+        if args.tag:
+            params["tag"] = args.tag
+        if args.search:
+            params["search"] = args.search
+        
+        qs = "&".join(f"{k}={urllib.parse.quote(v)}" for k, v in params.items())
+        path = f"/tools?{qs}" if qs else "/tools"
+        result = api("GET", path)
+        tools = result.get("tools", [])
+        
+        if not tools:
+            print("No tools found.")
+            return
+        
+        # Group by category
+        by_category = {}
+        for t in tools:
+            cat = t.get("category") or "uncategorized"
+            by_category.setdefault(cat, []).append(t)
+        
+        print(f"\n🔧 Tools ({len(tools)})\n")
+        for cat in sorted(by_category.keys()):
+            print(f"── {cat.upper()} ({len(by_category[cat])}) ──")
+            for t in by_category[cat]:
+                print(format_tool(t, verbose=args.verbose))
+            print()
+
+def cmd_tools_get(args):
+    """Get full details of a single tool."""
+    tool = resolve_tool(args.tool)
+    # Fetch full tool details via API
+    try:
+        result = api("GET", f"/tools/{tool['id']}")
+        t = result.get("tool", tool)
+    except Exception:
+        t = tool
+
+    print(f"\n🔧 {t['name']}")
+    print(f"   ID:       {t['id']}")
+    print(f"   Category: {t.get('category') or 'uncategorized'}")
+    print(f"   Global:   {'Yes' if t.get('is_global') else 'No'}")
+    if t.get('description'):
+        print(f"   Desc:     {t['description']}")
+    if t.get('tags'):
+        print(f"   Tags:     {', '.join(t['tags'])}")
+    if t.get('version'):
+        print(f"   Version:  {t['version']}")
+
+    # Instructions
+    instructions = t.get('usage_instructions') or ''
+    if instructions:
+        if args.full:
+            print(f"\n📋 Instructions:\n{instructions}")
+        else:
+            preview = instructions[:300]
+            truncated = '...' if len(instructions) > 300 else ''
+            print(f"\n📋 Instructions (preview):\n{preview}{truncated}")
+            if truncated:
+                print(f"\n   (Use --full to see all {len(instructions)} chars)")
+
+    # Linked projects
+    projects = t.get('projects') or t.get('linked_projects') or []
+    if projects:
+        print(f"\n🔗 Linked projects:")
+        for p in projects:
+            if isinstance(p, dict):
+                print(f"   - {p.get('name', p.get('id', '?'))}")
+            else:
+                print(f"   - {p}")
+    print()
+
+
+def cmd_tools_search(args):
+    """Search tools by name, description, tags, or instructions."""
+    query = args.query.lower()
+
+    # Try server-side search first
+    try:
+        qs = urllib.parse.urlencode({"search": args.query})
+        result = api("GET", f"/tools?{qs}")
+        tools = result.get("tools", [])
+    except Exception:
+        tools = []
+
+    # Also do client-side filtering for broader matching (instructions, tags)
+    all_tools = api("GET", "/tools").get("tools", [])
+    matched_ids = {t["id"] for t in tools}
+
+    for t in all_tools:
+        if t["id"] in matched_ids:
+            continue
+        searchable = " ".join([
+            t.get("name", ""),
+            t.get("description", ""),
+            t.get("usage_instructions", ""),
+            " ".join(t.get("tags", [])),
+            t.get("category", ""),
+        ]).lower()
+        if query in searchable:
+            tools.append(t)
+
+    if not tools:
+        print(f"No tools matching \"{args.query}\".")
+        return
+
+    print(f"\n🔍 Tools matching \"{args.query}\" ({len(tools)})\n")
+    for t in tools:
+        print(format_tool(t, verbose=True))
+    print()
+
+
+def cmd_tools_add(args):
+    """Create a new tool."""
+    if not args.name:
+        print("❌ --name is required", file=sys.stderr)
+        sys.exit(1)
+    
+    data = {"name": args.name}
+    
+    if args.category:
+        data["category"] = args.category
+    if args.description:
+        data["description"] = args.description
+    if args.usage:
+        data["usage_instructions"] = args.usage
+    elif args.usage_file:
+        try:
+            with open(args.usage_file) as f:
+                data["usage_instructions"] = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.usage_file}", file=sys.stderr)
+            sys.exit(1)
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    if args.tool_global:
+        data["is_global"] = True
+    
+    result = api("POST", "/tools", data)
+    tool = result.get("tool", {})
+    print(f"✅ Created tool: {tool.get('name', '')}")
+    print(f"   ID: {tool.get('id', 'N/A')}")
+
+def cmd_tools_update(args):
+    """Update an existing tool."""
+    tool = resolve_tool(args.tool)
+    data = {}
+    
+    if args.name:
+        data["name"] = args.name
+    if args.category:
+        data["category"] = args.category
+    if args.description:
+        data["description"] = args.description
+    if args.usage:
+        data["usage_instructions"] = args.usage
+    elif args.usage_file:
+        try:
+            with open(args.usage_file) as f:
+                data["usage_instructions"] = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.usage_file}", file=sys.stderr)
+            sys.exit(1)
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    if args.tool_global is not None:
+        data["is_global"] = args.tool_global
+    
+    if not data:
+        print("Nothing to update. Use --name, --category, --description, --usage, --tags, or --global.", file=sys.stderr)
+        sys.exit(1)
+    
+    result = api("PUT", f"/tools/{tool['id']}", data)
+    updated = result.get("tool", {})
+    print(f"✅ Updated tool: {updated.get('name', tool['name'])}")
+    print(f"   Version: {updated.get('version', '?')}")
+
+def cmd_tools_delete(args):
+    """Delete a tool with confirmation."""
+    tool = resolve_tool(args.tool)
+    
+    if not args.confirm:
+        print(f"⚠️  About to delete tool: {tool['name']} ({tool['id'][:8]})")
+        print(f"   Category: {tool.get('category', 'uncategorized')}")
+        print(f"   Global: {'Yes' if tool.get('is_global') else 'No'}")
+        print(f"\n   Use --confirm to proceed.")
+        sys.exit(0)
+    
+    api("DELETE", f"/tools/{tool['id']}")
+    print(f"✅ Deleted tool: {tool['name']}")
+
+def cmd_tools_link(args):
+    """Link a tool to a project."""
+    project_id = resolve_project_id(args.project)
+    tool = resolve_tool(args.tool)
+    
+    # Get current project tools
+    current = api("GET", f"/projects/{project_id}/tools")
+    current_tools = current.get("tools", [])
+    
+    # Check if already linked
+    for pt in current_tools:
+        t = pt.get("tool", pt)
+        if t.get("id") == tool["id"] or pt.get("tool_id") == tool["id"]:
+            print(f"⚠️  Tool '{tool['name']}' is already linked to this project.", file=sys.stderr)
+            sys.exit(1)
+    
+    # Build new tools list (existing + new)
+    new_tools = []
+    for pt in current_tools:
+        entry = {"tool_id": pt.get("tool_id", pt.get("tool", {}).get("id", ""))}
+        if pt.get("override_instructions"):
+            entry["override_instructions"] = pt["override_instructions"]
+        new_tools.append(entry)
+    
+    # Add new tool
+    new_entry = {"tool_id": tool["id"]}
+    if args.override:
+        new_entry["override_instructions"] = args.override
+    elif args.override_file:
+        try:
+            with open(args.override_file) as f:
+                new_entry["override_instructions"] = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.override_file}", file=sys.stderr)
+            sys.exit(1)
+    new_tools.append(new_entry)
+    
+    result = api("PUT", f"/projects/{project_id}/tools", {"tools": new_tools})
+    print(f"✅ Linked tool '{tool['name']}' to project")
+    if new_entry.get("override_instructions"):
+        print(f"   ⚡ With override instructions")
+
+def cmd_tools_unlink(args):
+    """Unlink a tool from a project."""
+    project_id = resolve_project_id(args.project)
+    tool = resolve_tool(args.tool)
+    
+    # Get current project tools
+    current = api("GET", f"/projects/{project_id}/tools")
+    current_tools = current.get("tools", [])
+    
+    # Build new tools list without the target tool
+    found = False
+    new_tools = []
+    for pt in current_tools:
+        pt_tool_id = pt.get("tool_id", pt.get("tool", {}).get("id", ""))
+        if pt_tool_id == tool["id"]:
+            found = True
+            continue
+        entry = {"tool_id": pt_tool_id}
+        if pt.get("override_instructions"):
+            entry["override_instructions"] = pt["override_instructions"]
+        new_tools.append(entry)
+    
+    if not found:
+        print(f"⚠️  Tool '{tool['name']}' is not linked to this project.", file=sys.stderr)
+        sys.exit(1)
+    
+    api("PUT", f"/projects/{project_id}/tools", {"tools": new_tools})
+    print(f"✅ Unlinked tool '{tool['name']}' from project")
+
+def cmd_tools_context(args):
+    """Preview effective tool context for a project."""
+    project_id = resolve_project_id(args.project)
+    
+    # Get project tools (linked tools with overrides)
+    project_result = api("GET", f"/projects/{project_id}/tools")
+    project_tools = project_result.get("tools", [])
+    
+    # Get all tools to find globals
+    all_result = api("GET", "/tools")
+    all_tools = all_result.get("tools", [])
+    
+    # Build effective tools map
+    effective = {}
+    
+    # Add global tools first
+    for t in all_tools:
+        if t.get("is_global"):
+            effective[t["id"]] = {
+                "name": t["name"],
+                "category": t.get("category") or "uncategorized",
+                "description": t.get("description"),
+                "instructions": t.get("usage_instructions"),
+                "source": "🌐 global",
+                "has_override": False,
+            }
+    
+    # Add/override with project-linked tools
+    for pt in project_tools:
+        tool = pt.get("tool", pt)
+        tool_id = tool.get("id", pt.get("tool_id", ""))
+        override = pt.get("override_instructions")
+        has_override = override is not None and override != ""
+        
+        effective[tool_id] = {
+            "name": tool.get("name", "Unknown"),
+            "category": tool.get("category") or "uncategorized",
+            "description": tool.get("description"),
+            "instructions": override if has_override else tool.get("usage_instructions"),
+            "source": "⚡ override" if has_override else ("📌 linked" if not tool.get("is_global") else "🌐 global"),
+            "has_override": has_override,
+        }
+    
+    if not effective:
+        print("No effective tools for this project.")
+        return
+    
+    # Output markdown-like format
+    print(f"─── Effective Tool Context ({len(effective)} tools) ───\n")
+    
+    # Group by category
+    by_category = {}
+    for tid, info in effective.items():
+        cat = info["category"]
+        by_category.setdefault(cat, []).append(info)
+    
+    for cat in sorted(by_category.keys()):
+        print(f"## {cat.upper()}\n")
+        for info in sorted(by_category[cat], key=lambda x: x["name"]):
+            print(f"### {info['name']}  [{info['source']}]")
+            if info.get("description"):
+                print(f"  {info['description']}")
+            if info.get("instructions"):
+                print(f"\n  {info['instructions']}\n")
+            else:
+                print(f"  (no usage instructions)\n")
+    
+    print("───────────────────────────────────────────")
+
+
+def cmd_tools_generate_md(args):
+    """Generate TOOLS.md from the tools database."""
+    import subprocess
+    
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "..", "scripts", "generate-tools-md.py")
+    
+    # If the script doesn't exist at relative path, try common locations
+    if not os.path.exists(script_path):
+        alt_paths = []
+        for p in alt_paths:
+            if os.path.exists(p):
+                script_path = p
+                break
+    
+    if not os.path.exists(script_path) or getattr(args, "slim", False):
+        # Inline generation using the API
+        all_result = api("GET", "/tools")
+        tools = all_result.get("tools", [])
+        
+        if getattr(args, "json", False):
+            output = json.dumps(tools, indent=2)
+        elif getattr(args, "slim", False):
+            output = _generate_tools_md_slim(tools)
+        else:
+            output = _generate_tools_md_inline(tools, include_header=not getattr(args, "no_header", False))
+        
+        if args.output:
+            with open(args.output, "w") as f:
+                f.write(output)
+            print(f"✅ Generated {'slim ' if getattr(args, 'slim', False) else ''}TOOLS.md with {len(tools)} tools → {args.output}", file=sys.stderr)
+        else:
+            print(output)
+        return
+    
+    cmd = [sys.executable, script_path]
+    if args.output:
+        cmd.extend(["--output", args.output])
+    if getattr(args, "no_header", False):
+        cmd.append("--no-header")
+    if getattr(args, "json", False):
+        cmd.append("--json")
+    cmd.extend(["--api-url", API])
+    
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
+
+
+def _generate_tools_md_slim(tools):
+    """Generate a compact TOOLS.md index (~60-80 lines) without full instructions."""
+    from datetime import datetime, timezone
+    from collections import defaultdict
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines = [
+        "# TOOLS.md - Tool Registry (Auto-Generated)",
+        "",
+        "> ⚠️ **DO NOT EDIT THIS FILE MANUALLY**",
+        f"> Auto-generated on {now} from the tool database ({len(tools)} tools).",
+        "> To update tools, use `clawboard tools update <id>` or the dashboard at https://example.com/dashboard/tools",
+        "> To regenerate: `clawboard tools generate-md --slim -o TOOLS.md`",
+        "",
+        "## Quick Reference",
+        "",
+        "| Tool | Category | Description |",
+        "|------|----------|-------------|",
+    ]
+
+    for tool in sorted(tools, key=lambda t: (t.get("category", ""), t.get("name", ""))):
+        name = tool.get("name", "Unknown")
+        cat = tool.get("category", "uncategorized")
+        desc = (tool.get("description") or "").replace("|", "\\|").split("\n")[0][:80]
+        lines.append(f"| {name} | {cat} | {desc} |")
+
+    lines.append("")
+    lines.append("## How to Get Tool Details")
+    lines.append("")
+    lines.append("```bash")
+    lines.append("# Full details for one tool")
+    lines.append("clawboard tools get <tool-name>")
+    lines.append("")
+    lines.append("# All tools relevant to a project")
+    lines.append("clawboard tools context <project-name>")
+    lines.append("")
+    lines.append("# Search tools")
+    lines.append("clawboard tools list --category <category>")
+    lines.append("```")
+    lines.append("")
+
+    # Project tool mappings
+    by_project = defaultdict(list)
+    for tool in tools:
+        for proj in tool.get("projects", []):
+            proj_name = proj.get("name", proj) if isinstance(proj, dict) else str(proj)
+            by_project[proj_name].append(tool.get("name", "Unknown"))
+
+    if by_project:
+        lines.append("## Project Tool Mappings")
+        lines.append("")
+        for proj in sorted(by_project.keys()):
+            tool_names = ", ".join(sorted(by_project[proj]))
+            lines.append(f"- **{proj}**: {tool_names}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _generate_tools_md_inline(tools, include_header=True):
+    """Inline TOOLS.md generation (fallback when script not found)."""
+    from datetime import datetime, timezone
+    from collections import defaultdict
+    
+    lines = []
+    if include_header:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        lines.append("# TOOLS.md - Tool Registry")
+        lines.append("")
+        lines.append(f"> Auto-generated from database on {now}")
+        lines.append(f"> {len(tools)} tools registered")
+        lines.append(">")
+        lines.append("> **Do not edit manually** — changes will be overwritten.")
+        lines.append("> Use `clawboard tools` commands or the dashboard to manage tools.")
+        lines.append("")
+
+    if not tools:
+        lines.append("*No tools registered yet.*")
+        return "\n".join(lines)
+
+    by_category = defaultdict(list)
+    for tool in tools:
+        cat = tool.get("category") or "uncategorized"
+        by_category[cat].append(tool)
+
+    lines.append("## Table of Contents")
+    lines.append("")
+    for cat in sorted(by_category.keys()):
+        cat_display = cat.replace("-", " ").title()
+        cat_anchor = cat.lower().replace(" ", "-").replace("_", "-")
+        lines.append(f"- [{cat_display}](#{cat_anchor}) ({len(by_category[cat])} tools)")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    for cat in sorted(by_category.keys()):
+        cat_display = cat.replace("-", " ").title()
+        lines.append(f"## {cat_display}")
+        lines.append("")
+        for tool in sorted(by_category[cat], key=lambda t: t.get("name", "")):
+            name = tool.get("name", "Unknown")
+            desc = tool.get("description", "")
+            instructions = tool.get("usage_instructions", "")
+            tags = tool.get("tags", [])
+            is_global = tool.get("is_global", False)
+            badges = []
+            if is_global:
+                badges.append("🌐 global")
+            if tags:
+                badges.append(" ".join(f"`{t}`" for t in tags))
+            badge_str = f"  ({', '.join(badges)})" if badges else ""
+            lines.append(f"### {name}{badge_str}")
+            lines.append("")
+            if desc:
+                lines.append(f"*{desc}*")
+                lines.append("")
+            if instructions:
+                lines.append(instructions.strip())
+                lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
+# ─── Shell Completion Commands ───
+
+def cmd_completion(args):
+    """Generate shell completion scripts."""
+    
+    if args.shell == "bash":
+        # Generate bash completion script
+        script = """# clawboard bash completion
+_clawboard_completion() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    
+    # Top-level commands
+    local commands="list next current get create update move archive delete spawn breakdown auto-archive complete-subtask approve-subtask reject-subtask uncomplete-subtask projects project create-multiphase journal tools status completion help"
+    
+    # If we're completing the first argument
+    if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
+        return 0
+    fi
+    
+    # Command-specific completions
+    case "${COMP_WORDS[1]}" in
+        list|ls)
+            case "${prev}" in
+                --status|-s)
+                    COMPREPLY=( $(compgen -W "ideas todo in-progress stuck completed archived" -- ${cur}) )
+                    return 0
+                    ;;
+                --priority)
+                    COMPREPLY=( $(compgen -W "urgent high normal low someday" -- ${cur}) )
+                    return 0
+                    ;;
+            esac
+            local opts="--status --project --priority --verbose -s -p -v"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            ;;
+        project)
+            local project_cmds="get create update delete stats context set-repo set-env set-paths add-notebook add-link update-link delete-link"
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${project_cmds}" -- ${cur}) )
+            fi
+            ;;
+        journal)
+            local journal_cmds="list create get"
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${journal_cmds}" -- ${cur}) )
+            fi
+            ;;
+        tools)
+            local tools_cmds="list add update delete link unlink context generate-md"
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${tools_cmds}" -- ${cur}) )
+            else
+                case "${COMP_WORDS[2]}" in
+                    list)
+                        case "${prev}" in
+                            --category)
+                                COMPREPLY=( $(compgen -W "ai development infrastructure communication monitoring documentation testing deployment" -- ${cur}) )
+                                return 0
+                                ;;
+                        esac
+                        local opts="--category --tag --search --project --verbose -v"
+                        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                        ;;
+                    add)
+                        local opts="--name --category --description --usage --usage-file --tags --global"
+                        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                        ;;
+                    update)
+                        local opts="--name --category --description --usage --usage-file --tags --global --no-global"
+                        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                        ;;
+                    delete)
+                        local opts="--confirm"
+                        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                        ;;
+                    link)
+                        local opts="--override --override-file"
+                        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                        ;;
+                esac
+            fi
+            ;;
+        completion)
+            local shells="bash zsh"
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${shells}" -- ${cur}) )
+            fi
+            ;;
+    esac
+}
+
+complete -F _clawboard_completion clawboard
+
+# Installation instructions:
+# Add this to your ~/.bashrc:
+#   eval "$(clawboard completion bash)"
+#
+# Or save to a file:
+#   clawboard completion bash > ~/.clawboard-completion.bash
+#   echo 'source ~/.clawboard-completion.bash' >> ~/.bashrc
+"""
+        print(script)
+    
+    elif args.shell == "zsh":
+        # Generate zsh completion script
+        script = """#compdef clawboard
+
+_clawboard() {
+    local -a commands
+    commands=(
+        'list:List tasks'
+        'next:Get next auto-start task'
+        'current:Get current in-progress task'
+        'get:Get task details'
+        'create:Create a task'
+        'update:Update a task'
+        'move:Move task to a status'
+        'archive:Archive a task'
+        'delete:Delete a task'
+        'spawn:Get agent spawn prompt'
+        'breakdown:AI-generate subtasks'
+        'auto-archive:Auto-archive completed tasks'
+        'complete-subtask:Mark subtask as in_review'
+        'approve-subtask:Approve subtask'
+        'reject-subtask:Reject subtask'
+        'uncomplete-subtask:Reset subtask to new'
+        'projects:List projects'
+        'project:Project management'
+        'create-multiphase:Create multi-phase job'
+        'tools:Tools management'
+        'journal:Journal commands'
+        'status:Show system status and health'
+        'completion:Generate shell completion'
+        'help:Show help'
+    )
+    
+    _arguments -C \
+        '1: :->command' \
+        '*:: :->args'
+    
+    case $state in
+        command)
+            _describe 'clawboard commands' commands
+            ;;
+        args)
+            case $line[1] in
+                list|ls)
+                    _arguments \
+                        '--status[Filter by status]:status:(ideas todo in-progress stuck completed archived)' \
+                        '--project[Filter by project]:project:' \
+                        '--priority[Filter by priority]:priority:(urgent high normal low someday)' \
+                        '--verbose[Verbose output]'
+                    ;;
+                project)
+                    local -a project_commands
+                    project_commands=(
+                        'get:Get project details'
+                        'create:Create a project'
+                        'update:Update a project'
+                        'delete:Delete a project'
+                        'stats:Get project statistics'
+                        'context:Get project context'
+                        'set-repo:Set repository URL'
+                        'set-env:Set environment URLs'
+                        'set-paths:Set local paths'
+                        'add-notebook:Add NotebookLM'
+                        'add-link:Add project link'
+                        'update-link:Update project link'
+                        'delete-link:Delete project link'
+                    )
+                    _describe 'project commands' project_commands
+                    ;;
+                tools)
+                    local -a tools_commands
+                    tools_commands=(
+                        'list:List tools'
+                        'add:Create a new tool'
+                        'update:Update a tool'
+                        'delete:Delete a tool'
+                        'link:Link tool to project'
+                        'unlink:Unlink tool from project'
+                        'context:Preview effective tool context'
+                    )
+                    _describe 'tools commands' tools_commands
+                    ;;
+                journal)
+                    local -a journal_commands
+                    journal_commands=(
+                        'list:List journal entries'
+                        'create:Create journal entry'
+                        'get:Get journal entry'
+                    )
+                    _describe 'journal commands' journal_commands
+                    ;;
+                completion)
+                    _arguments '1:shell:(bash zsh)'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_clawboard
+
+# Installation instructions:
+# Add this to your ~/.zshrc:
+#   eval "$(clawboard completion zsh)"
+#
+# Or save to a file and add to fpath:
+#   clawboard completion zsh > ~/.zsh/completions/_clawboard
+#   # Add to ~/.zshrc:
+#   fpath=(~/.zsh/completions $fpath)
+#   autoload -U compinit && compinit
+"""
+        print(script)
+    
+    else:
+        print(f"❌ Unknown shell: {args.shell}. Supported: bash, zsh", file=sys.stderr)
+        sys.exit(1)
+
+# ─── Main ───
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="clawboard",
+        description="ClawBoard — task, project, and tool management CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Subtask Workflow (tri-state):
+  ⬜ new → 🔄 in_review → ✅ completed
+
+  Agent workflow:
+    1. Work on subtask
+    2. clawboard complete-subtask TASK_ID INDEX  (marks in_review)
+    3. When all done: clawboard move TASK_ID stuck --notes "Ready for review"
+
+  Orchestrator workflow:
+    1. Review subtask
+    2. clawboard approve-subtask TASK_ID INDEX   (marks completed)
+       OR clawboard reject-subtask TASK_ID INDEX --note "Reason"
+"""
+    )
+    # Global flags
+    parser.add_argument("--api", help="API base URL (overrides CLAWBOARD_API_URL)")
+    parser.add_argument("--token", help="Auth token (overrides CLAWBOARD_TOKEN)")
+    
+    sub = parser.add_subparsers(dest="command")
+    
+    # login
+    p_login = sub.add_parser("login", help="Login and cache auth token")
+    p_login.add_argument("--password", help="Password (or use CLAWBOARD_PASSWORD env, or interactive prompt)")
+    
+    # list
+    p_list = sub.add_parser("list", aliases=["ls"], help="List tasks")
+    p_list.add_argument("--status", "-s")
+    p_list.add_argument("--project", "-p")
+    p_list.add_argument("--priority")
+    p_list.add_argument("--verbose", "-v", action="store_true")
+    
+    # next
+    sub.add_parser("next", help="Get next auto-start task")
+    
+    # current
+    sub.add_parser("current", help="Get current in-progress task")
+    
+    # get
+    p_get = sub.add_parser("get", help="Get task details")
+    p_get.add_argument("id")
+    
+    # create
+    p_create = sub.add_parser("create", aliases=["new"], help="Create a task")
+    p_create.add_argument("title")
+    p_create.add_argument("--description", "-d")
+    p_create.add_argument("--status", "-s", default="ideas")
+    p_create.add_argument("--priority", default="normal")
+    p_create.add_argument("--project", "-p")
+    p_create.add_argument("--subtasks", help="Semicolon-separated subtask list")
+    p_create.add_argument("--tags", help="Comma-separated tags")
+    p_create.add_argument("--blocked-by", help="Comma-separated blocker IDs")
+    p_create.add_argument("--depends-on", help="Comma-separated task IDs this task depends on")
+    p_create.add_argument("--auto-start", type=bool, default=None)
+    p_create.add_argument("--thinking", choices=VALID_THINKING_LEVELS, help="AI reasoning depth (low/medium/high)")
+    
+    # update
+    p_update = sub.add_parser("update", aliases=["edit"], help="Update a task")
+    p_update.add_argument("id")
+    p_update.add_argument("--title")
+    p_update.add_argument("--description", "-d")
+    p_update.add_argument("--status", "-s")
+    p_update.add_argument("--priority")
+    p_update.add_argument("--project", "-p")
+    p_update.add_argument("--subtasks", help="Replace all subtasks (semicolon-separated)")
+    p_update.add_argument("--add-subtask", help="Append subtasks (semicolon-separated)")
+    p_update.add_argument("--tags", help="Comma-separated tags")
+    p_update.add_argument("--depends-on", help="Comma-separated task IDs this task depends on")
+    p_update.add_argument("--notes", help="Task notes")
+    p_update.add_argument("--thinking", choices=VALID_THINKING_LEVELS, help="AI reasoning depth (low/medium/high)")
+    p_update.add_argument("--auto-start", choices=["true", "false"], help="Enable/disable auto-start flag")
+    
+    # move
+    p_move = sub.add_parser("move", help="Move task to a status")
+    p_move.add_argument("id")
+    p_move.add_argument("status")
+    p_move.add_argument("--notes", help="Add notes when moving")
+    p_move.add_argument("--force", "-f", action="store_true", help="Force move, bypass guardrail checks")
+    
+    # review
+    p_review = sub.add_parser("review", help="Show review-focused view of task and subtasks")
+    p_review.add_argument("id")
+    
+    # archive
+    p_archive = sub.add_parser("archive", help="Archive a task")
+    p_archive.add_argument("id")
+    
+    # delete
+    p_delete = sub.add_parser("delete", help="Delete a task")
+    p_delete.add_argument("id")
+    
+    # spawn
+    p_spawn = sub.add_parser("spawn", help="Get agent spawn prompt for a task")
+    p_spawn.add_argument("id")
+    
+    # breakdown
+    p_breakdown = sub.add_parser("breakdown", help="AI-generate subtasks for a task")
+    p_breakdown.add_argument("id")
+    
+    # auto-archive
+    sub.add_parser("auto-archive", help="Auto-archive completed tasks")
+    
+    # complete-subtask (agent: marks in_review)
+    p_comp_sub = sub.add_parser("complete-subtask", help="Mark subtask as in_review (agent workflow)")
+    p_comp_sub.add_argument("task_id")
+    p_comp_sub.add_argument("index", help="0-based subtask index")
+    
+    # approve-subtask (orchestrator: marks completed)
+    p_approve_sub = sub.add_parser("approve-subtask", help="Approve subtask → completed (orchestrator)")
+    p_approve_sub.add_argument("task_id")
+    p_approve_sub.add_argument("index", help="0-based subtask index")
+    
+    # reject-subtask (orchestrator: back to new)
+    p_reject_sub = sub.add_parser("reject-subtask", help="Reject subtask → new with note (orchestrator)")
+    p_reject_sub.add_argument("task_id")
+    p_reject_sub.add_argument("index", help="0-based subtask index")
+    p_reject_sub.add_argument("--note", help="Rejection reason/feedback")
+    
+    # uncomplete-subtask (legacy)
+    p_uncomp_sub = sub.add_parser("uncomplete-subtask", help="Reset subtask to new (legacy)")
+    p_uncomp_sub.add_argument("task_id")
+    p_uncomp_sub.add_argument("index", help="0-based subtask index")
+    
+    # projects
+    p_projects = sub.add_parser("projects", help="List projects")
+    p_projects.add_argument("--include-stats", action="store_true", help="Include task stats for each project")
+    
+    # project subcommand
+    p_project = sub.add_parser("project", help="Project management commands")
+    project_sub = p_project.add_subparsers(dest="project_command")
+    
+    # project get
+    p_proj_get = project_sub.add_parser("get", help="Get project details")
+    p_proj_get.add_argument("id")
+    
+    # project create
+    p_proj_create = project_sub.add_parser("create", help="Create a project")
+    p_proj_create.add_argument("--name", required=True)
+    p_proj_create.add_argument("--description")
+    p_proj_create.add_argument("--status", default="active")
+    p_proj_create.add_argument("--nfs", action="store_true", help="Create NFS directory skeleton")
+    
+    # project update
+    p_proj_update = project_sub.add_parser("update", help="Update a project")
+    p_proj_update.add_argument("id")
+    p_proj_update.add_argument("--name")
+    p_proj_update.add_argument("--description")
+    p_proj_update.add_argument("--status")
+    
+    # project archive
+    p_proj_archive = project_sub.add_parser("archive", help="Archive a project (soft delete)")
+    p_proj_archive.add_argument("id")
+    
+    # project unarchive
+    p_proj_unarchive = project_sub.add_parser("unarchive", help="Restore a project from archive")
+    p_proj_unarchive.add_argument("id")
+    
+    # project delete
+    p_proj_delete = project_sub.add_parser("delete", help="Delete a project")
+    p_proj_delete.add_argument("id")
+    p_proj_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
+    p_proj_delete.add_argument("--hard", action="store_true", help="Permanent hard delete (with --confirm)")
+    
+    # project stats
+    p_proj_stats = project_sub.add_parser("stats", help="Get project statistics")
+    p_proj_stats.add_argument("id")
+    p_proj_stats.add_argument("--days", type=int, default=7)
+    
+    # project context
+    p_proj_context = project_sub.add_parser("context", help="Get project context for agents")
+    p_proj_context.add_argument("id")
+    p_proj_context.add_argument("--role", default="agent", help="Role: agent or orchestrator")
+    p_proj_context.add_argument("--task-id", help="Include task-specific context")
+    
+    # project set-repo
+    p_proj_setrepo = project_sub.add_parser("set-repo", help="Set project repository URL")
+    p_proj_setrepo.add_argument("id")
+    p_proj_setrepo.add_argument("--url", required=True)
+    
+    # project set-env
+    p_proj_setenv = project_sub.add_parser("set-env", help="Set project environment URLs")
+    p_proj_setenv.add_argument("id")
+    p_proj_setenv.add_argument("--prod", help="Production URL")
+    p_proj_setenv.add_argument("--dev", help="Development URL")
+    p_proj_setenv.add_argument("--staging", help="Staging URL")
+    
+    # project set-paths
+    p_proj_setpaths = project_sub.add_parser("set-paths", help="Set project local paths")
+    p_proj_setpaths.add_argument("id")
+    p_proj_setpaths.add_argument("--nfs", help="NFS root path")
+    p_proj_setpaths.add_argument("--ssd", help="SSD build path")
+    p_proj_setpaths.add_argument("--docker", help="Docker compose path")
+    
+    # project add-notebook
+    p_proj_addnb = project_sub.add_parser("add-notebook", help="Add a NotebookLM notebook to project")
+    p_proj_addnb.add_argument("id")
+    p_proj_addnb.add_argument("--type", required=True, help=f"Notebook type: {', '.join(VALID_NOTEBOOK_TYPES)}")
+    p_proj_addnb.add_argument("--id", dest="nb_id", required=True, help="NotebookLM notebook ID")
+    p_proj_addnb.add_argument("--url", required=True, help="NotebookLM URL")
+    p_proj_addnb.add_argument("--desc", help="Description of notebook contents")
+    p_proj_addnb.add_argument("--query-tips", help="Semicolon-separated query tips")
+    
+    # project add-link
+    p_proj_addlink = project_sub.add_parser("add-link", help="Add a link to a project")
+    p_proj_addlink.add_argument("id")
+    p_proj_addlink.add_argument("--type", required=True, help=f"Link type: {', '.join(VALID_LINK_TYPES)}")
+    p_proj_addlink.add_argument("--title", required=True)
+    p_proj_addlink.add_argument("--url", required=True)
+    p_proj_addlink.add_argument("--category", help=f"Link category: {', '.join(VALID_LINK_CATEGORIES)}")
+    
+    # project update-link
+    p_proj_updlink = project_sub.add_parser("update-link", help="Update a project link")
+    p_proj_updlink.add_argument("project_id")
+    p_proj_updlink.add_argument("link_id")
+    p_proj_updlink.add_argument("--type")
+    p_proj_updlink.add_argument("--title")
+    p_proj_updlink.add_argument("--url")
+    
+    # project delete-link
+    p_proj_dellink = project_sub.add_parser("delete-link", help="Delete a project link")
+    p_proj_dellink.add_argument("project_id")
+    p_proj_dellink.add_argument("link_id")
+    
+    # tools
+    p_tools = sub.add_parser("tools", help="Tools management commands")
+    tools_sub = p_tools.add_subparsers(dest="tools_command")
+    
+    # tools list
+    p_tools_list = tools_sub.add_parser("list", aliases=["ls"], help="List tools")
+    p_tools_list.add_argument("--category", "-c", help="Filter by category")
+    p_tools_list.add_argument("--tag", help="Filter by tag")
+    p_tools_list.add_argument("--search", "-s", help="Search by name/description")
+    p_tools_list.add_argument("--project", "-p", help="Show tools for a specific project")
+    p_tools_list.add_argument("--verbose", "-v", action="store_true", help="Show details")
+    
+    # tools get
+    p_tools_get = tools_sub.add_parser("get", help="Get full details of a tool")
+    p_tools_get.add_argument("tool", help="Tool name or ID (fuzzy match)")
+    p_tools_get.add_argument("--full", action="store_true", help="Show full instructions")
+
+    # tools search
+    p_tools_search = tools_sub.add_parser("search", help="Search tools by name/desc/tags/instructions")
+    p_tools_search.add_argument("query", help="Search query (substring match)")
+
+    # tools add
+    p_tools_add = tools_sub.add_parser("add", aliases=["create"], help="Create a new tool")
+    p_tools_add.add_argument("--name", required=True, help="Tool name")
+    p_tools_add.add_argument("--category", "-c", help="Tool category")
+    p_tools_add.add_argument("--description", "-d", help="Tool description")
+    p_tools_add.add_argument("--usage", help="Usage instructions (inline)")
+    p_tools_add.add_argument("--usage-file", help="Read usage instructions from file")
+    p_tools_add.add_argument("--tags", help="Comma-separated tags")
+    p_tools_add.add_argument("--global", dest="tool_global", action="store_true", default=False, help="Mark as global tool")
+    
+    # tools update
+    p_tools_update = tools_sub.add_parser("update", aliases=["edit"], help="Update a tool")
+    p_tools_update.add_argument("tool", help="Tool name or ID (fuzzy match)")
+    p_tools_update.add_argument("--name", help="New tool name")
+    p_tools_update.add_argument("--category", "-c", help="New category")
+    p_tools_update.add_argument("--description", "-d", help="New description")
+    p_tools_update.add_argument("--usage", help="New usage instructions (inline)")
+    p_tools_update.add_argument("--usage-file", help="Read usage instructions from file")
+    p_tools_update.add_argument("--tags", help="Comma-separated tags (replaces all)")
+    p_tools_update.add_argument("--global", dest="tool_global", action="store_true", default=None, help="Mark as global")
+    p_tools_update.add_argument("--no-global", dest="tool_global", action="store_false", help="Mark as not global")
+    
+    # tools delete
+    p_tools_delete = tools_sub.add_parser("delete", aliases=["rm"], help="Delete a tool")
+    p_tools_delete.add_argument("tool", help="Tool name or ID (fuzzy match)")
+    p_tools_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
+    
+    # tools link
+    p_tools_link = tools_sub.add_parser("link", help="Link tool to project")
+    p_tools_link.add_argument("project", help="Project name or ID")
+    p_tools_link.add_argument("tool", help="Tool name or ID")
+    p_tools_link.add_argument("--override", help="Custom override instructions (inline)")
+    p_tools_link.add_argument("--override-file", help="Read override instructions from file")
+    
+    # tools unlink
+    p_tools_unlink = tools_sub.add_parser("unlink", help="Unlink tool from project")
+    p_tools_unlink.add_argument("project", help="Project name or ID")
+    p_tools_unlink.add_argument("tool", help="Tool name or ID")
+    
+    # tools context
+    p_tools_context = tools_sub.add_parser("context", help="Preview effective tool context for project")
+    p_tools_context.add_argument("project", help="Project name or ID")
+    
+    # tools generate-md
+    p_tools_genmd = tools_sub.add_parser("generate-md", help="Generate TOOLS.md from database")
+    p_tools_genmd.add_argument("--output", "-o", help="Output file path (default: stdout)")
+    p_tools_genmd.add_argument("--no-header", action="store_true", help="Omit auto-generated header")
+    p_tools_genmd.add_argument("--json", action="store_true", help="Output raw JSON instead of markdown")
+    p_tools_genmd.add_argument("--slim", action="store_true", help="Generate compact index (~60-80 lines) without full instructions")
+    
+    # create-multiphase
+    p_multiphase = sub.add_parser("create-multiphase", help="Create a multi-phase job with tracker")
+    p_multiphase.add_argument("title", help="Job title")
+    p_multiphase.add_argument("--project", "-p", required=True, help="Project name")
+    p_multiphase.add_argument("--tag", required=True, help="Tag for all related tasks")
+    p_multiphase.add_argument("--phases", required=True, help="Semicolon-separated phase names")
+    p_multiphase.add_argument("--priority", default="normal", help="Priority for all tasks")
+    
+    # journal
+    p_journal = sub.add_parser("journal", help="Journal management commands")
+    journal_sub = p_journal.add_subparsers(dest="journal_command")
+    
+    # journal list
+    p_journal_list = journal_sub.add_parser("list", help="List journal entries")
+    p_journal_list.add_argument("--verbose", "-v", action="store_true", help="Show content preview")
+    
+    # journal create
+    p_journal_create = journal_sub.add_parser("create", help="Create a journal entry")
+    p_journal_create.add_argument("--content", required=True, help="Reflection text (markdown)")
+    p_journal_create.add_argument("--date", help="Entry date (YYYY-MM-DD, defaults to today)")
+    p_journal_create.add_argument("--mood", help="Mood (e.g., happy, sad, excited, calm, grateful)")
+    p_journal_create.add_argument("--highlights", help="Semicolon-separated highlights")
+    p_journal_create.add_argument("--image", help="Image path (relative, e.g. generated/journal-2026-02-07.png)")
+    
+    # journal get
+    p_journal_get = journal_sub.add_parser("get", help="Get a journal entry by ID")
+    p_journal_get.add_argument("id", help="Journal entry ID")
+    
+    # status
+    sub.add_parser("status", help="Show API status and system health")
+    
+    # completion
+    p_completion = sub.add_parser("completion", help="Generate shell completion scripts")
+    p_completion.add_argument("shell", choices=["bash", "zsh"], help="Shell type")
+    
+    args = parser.parse_args()
+    
+    # Apply global overrides
+    global _CLI_TOKEN, _CLI_API, API
+    if args.api:
+        _CLI_API = args.api
+    if args.token:
+        _CLI_TOKEN = args.token
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(0)
+    
+    cmd = args.command
+    if cmd == "login":
+        cmd_login(args)
+    elif cmd in ("list", "ls"):
+        cmd_list(args)
+    elif cmd == "next":
+        cmd_next(args)
+    elif cmd == "current":
+        cmd_current(args)
+    elif cmd == "get":
+        cmd_get(args)
+    elif cmd in ("create", "new"):
+        cmd_create(args)
+    elif cmd in ("update", "edit"):
+        cmd_update(args)
+    elif cmd == "move":
+        cmd_move(args)
+    elif cmd == "review":
+        cmd_review(args)
+    elif cmd == "archive":
+        cmd_archive(args)
+    elif cmd == "delete":
+        cmd_delete(args)
+    elif cmd == "spawn":
+        cmd_spawn(args)
+    elif cmd == "breakdown":
+        cmd_breakdown(args)
+    elif cmd == "auto-archive":
+        cmd_auto_archive(args)
+    elif cmd == "complete-subtask":
+        cmd_complete_subtask(args)
+    elif cmd == "approve-subtask":
+        cmd_approve_subtask(args)
+    elif cmd == "reject-subtask":
+        cmd_reject_subtask(args)
+    elif cmd == "uncomplete-subtask":
+        cmd_uncomplete_subtask(args)
+    elif cmd == "projects":
+        cmd_projects(args)
+    elif cmd == "create-multiphase":
+        cmd_create_multiphase(args)
+    elif cmd == "tools":
+        if not args.tools_command:
+            p_tools.print_help()
+            sys.exit(0)
+        tc = args.tools_command
+        if tc in ("list", "ls"):
+            cmd_tools_list(args)
+        elif tc == "get":
+            cmd_tools_get(args)
+        elif tc == "search":
+            cmd_tools_search(args)
+        elif tc in ("add", "create"):
+            cmd_tools_add(args)
+        elif tc in ("update", "edit"):
+            cmd_tools_update(args)
+        elif tc in ("delete", "rm"):
+            cmd_tools_delete(args)
+        elif tc == "link":
+            cmd_tools_link(args)
+        elif tc == "unlink":
+            cmd_tools_unlink(args)
+        elif tc == "context":
+            cmd_tools_context(args)
+        elif tc == "generate-md":
+            cmd_tools_generate_md(args)
+    elif cmd == "journal":
+        if not args.journal_command:
+            p_journal.print_help()
+            sys.exit(0)
+        if args.journal_command == "list":
+            cmd_journal_list(args)
+        elif args.journal_command == "create":
+            cmd_journal_create(args)
+        elif args.journal_command == "get":
+            cmd_journal_get(args)
+    elif cmd == "status":
+        cmd_status(args)
+    elif cmd == "completion":
+        cmd_completion(args)
+    elif cmd == "project":
+        if not args.project_command:
+            p_project.print_help()
+            sys.exit(0)
+        if args.project_command == "get":
+            cmd_project_get(args)
+        elif args.project_command == "create":
+            cmd_project_create(args)
+        elif args.project_command == "update":
+            cmd_project_update(args)
+        elif args.project_command == "archive":
+            cmd_project_archive(args)
+        elif args.project_command == "unarchive":
+            cmd_project_unarchive(args)
+        elif args.project_command == "delete":
+            cmd_project_delete(args)
+        elif args.project_command == "stats":
+            cmd_project_stats(args)
+        elif args.project_command == "context":
+            cmd_project_context(args)
+        elif args.project_command == "set-repo":
+            cmd_project_set_repo(args)
+        elif args.project_command == "set-env":
+            cmd_project_set_env(args)
+        elif args.project_command == "set-paths":
+            cmd_project_set_paths(args)
+        elif args.project_command == "add-notebook":
+            cmd_project_add_notebook(args)
+        elif args.project_command == "add-link":
+            cmd_project_add_link(args)
+        elif args.project_command == "update-link":
+            cmd_project_update_link(args)
+        elif args.project_command == "delete-link":
+            cmd_project_delete_link(args)
+
+def run_tests():
+    """Run workflow guardrail tests."""
+    print("🧪 Running clawboard workflow guardrail tests...\n")
+    
+    passed = 0
+    failed = 0
+    
+    # Test 1: is_agent_context detection
+    print("Test 1: Agent context detection")
+    original_env = os.environ.get("CLAWBOARD_AGENT")
+    os.environ["CLAWBOARD_AGENT"] = "1"
+    if is_agent_context():
+        print("  ✅ PASS: Detected agent context via env var")
+        passed += 1
+    else:
+        print("  ❌ FAIL: Failed to detect agent context via env var")
+        failed += 1
+    if original_env:
+        os.environ["CLAWBOARD_AGENT"] = original_env
+    else:
+        del os.environ["CLAWBOARD_AGENT"]
+    
+    # Test 2: Review status validation
+    print("\nTest 2: Review status validation")
+    try:
+        result = validate_status("review")
+        if result == "review":
+            print("  ✅ PASS: Review status is valid")
+            passed += 1
+        else:
+            print(f"  ❌ FAIL: Expected 'review', got '{result}'")
+            failed += 1
+    except SystemExit:
+        print("  ❌ FAIL: Review status rejected as invalid")
+        failed += 1
+    
+    # Test 3: format_subtask_status for all states
+    print("\nTest 3: Subtask status formatting")
+    test_cases = [
+        ({"status": "new"}, "⬜"),
+        ({"status": "in_review"}, "🔄"),
+        ({"status": "completed"}, "✅"),
+    ]
+    for subtask, expected_icon in test_cases:
+        icon = format_subtask_status(subtask)
+        if icon == expected_icon:
+            print(f"  ✅ PASS: {subtask['status']} → {icon}")
+            passed += 1
+        else:
+            print(f"  ❌ FAIL: {subtask['status']} → expected {expected_icon}, got {icon}")
+            failed += 1
+    
+    # Test 4: Status icons include review
+    print("\nTest 4: Task status icons")
+    task = {"status": "review", "title": "Test", "id": "test123", "subtasks": []}
+    formatted = format_task(task)
+    if "🔍" in formatted:
+        print("  ✅ PASS: Review status shows 🔍 icon")
+        passed += 1
+    else:
+        print(f"  ❌ FAIL: Review icon not found in: {formatted}")
+        failed += 1
+    
+    print(f"\n{'='*50}")
+    print(f"Tests: {passed + failed} | Passed: {passed} | Failed: {failed}")
+    if failed == 0:
+        print("✅ All tests passed!")
+    else:
+        print(f"❌ {failed} test(s) failed")
+    print(f"{'='*50}\n")
+    
+    sys.exit(0 if failed == 0 else 1)
+
+if __name__ == "__main__":
+    # Check if --test flag is passed
+    if "--test" in sys.argv:
+        run_tests()
+    else:
+        main()
