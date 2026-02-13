@@ -1,6 +1,6 @@
 {
   "name": "clawboard-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Frontend for ClawBoard",
   "private": true,
   "dependencies": {
