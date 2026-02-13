@@ -174,8 +174,20 @@ echo "   Password to access the dashboard UI"
 read -sp "   Enter password [changeme]: " LOGIN_PASS
 echo ""
 LOGIN_PASS=${LOGIN_PASS:-changeme}
-sed -i.bak "s|LOGIN_PASSWORD=.*|LOGIN_PASSWORD=$LOGIN_PASS|" .env
-echo -e "${GREEN}   ✅ Login password set${NC}"
+
+# Generate bcrypt hash using the backend container
+echo -e "${BLUE}   Generating password hash...${NC}"
+HASH_SCRIPT="const bcrypt = require('bcrypt'); bcrypt.hash('$LOGIN_PASS', 10).then(h => console.log(h)).catch(e => { console.error(e); process.exit(1); });"
+PASSWORD_HASH=$(docker run --rm -i node:18-alpine sh -c "npm install -g bcrypt >/dev/null 2>&1 && node -e \"$HASH_SCRIPT\"")
+
+if [ $? -eq 0 ] && [ ! -z "$PASSWORD_HASH" ]; then
+    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$PASSWORD_HASH|" .env
+    echo -e "${GREEN}   ✅ Login password hash generated${NC}"
+else
+    echo -e "${YELLOW}   ⚠️  Failed to generate hash, storing plain password${NC}"
+    echo -e "${YELLOW}   The backend will hash it on first use${NC}"
+    sed -i.bak "s|DASHBOARD_PASSWORD_HASH=.*|DASHBOARD_PASSWORD_HASH=$LOGIN_PASS|" .env
+fi
 echo ""
 
 # Frontend port
