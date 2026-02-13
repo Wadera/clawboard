@@ -254,6 +254,63 @@ docker compose ps
 docker compose -f docker-compose.dev.yml up
 ```
 
+## 🖥️ CLI Tool
+
+ClawBoard includes a command-line tool for managing tasks, projects, tools, and journals.
+
+### Setup
+
+```bash
+# Make executable and add to PATH
+chmod +x cli/clawboard
+export PATH="$(pwd)/cli:$PATH"
+
+# Or create a symlink
+ln -s "$(pwd)/cli/clawboard" /usr/local/bin/clawboard
+
+# Configure API URL (default: http://localhost:8080/api)
+export CLAWBOARD_API_URL="http://localhost:8080/api"
+```
+
+### Authentication
+
+```bash
+# Login (stores token in ~/.config/clawboard/token.json)
+clawboard login
+
+# Or use environment variables
+export CLAWBOARD_PASSWORD="your-dashboard-password"
+```
+
+### Quick Start
+
+```bash
+clawboard list                          # List all tasks
+clawboard create "My first task"        # Create a task
+clawboard projects                      # List projects
+clawboard tools list                    # List tools
+clawboard tools generate-md --slim      # Generate TOOLS.md
+clawboard journal list                  # List journal entries
+clawboard status                        # Dashboard overview
+```
+
+### TOOLS.md Bootstrapping
+
+After deploying ClawBoard, bootstrap the tool registry so your bot knows how to use the dashboard:
+
+```bash
+# 1. Login to the CLI
+clawboard login
+
+# 2. Add your tools (or import from a template)
+clawboard tools list
+
+# 3. Generate TOOLS.md for your bot's workspace
+clawboard tools generate-md --slim -o /path/to/bot/workspace/TOOLS.md
+```
+
+The generated `TOOLS.md` gives your OpenClaw bot context about available tools and how to use them.
+
 ## ⚙️ Configuration
 
 ### Environment Variables (`.env`)
