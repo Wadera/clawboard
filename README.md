@@ -8,6 +8,8 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.yml)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue)](https://www.postgresql.org/)
 
+> **Primary repository:** [git.skyday.eu/Homelab/ClawBoard](https://git.skyday.eu/Homelab/ClawBoard) — GitHub mirror coming soon.
+
 ## ✨ Features
 
 - **📋 Task Board** — Kanban-style task management with drag-and-drop, subtasks, priorities, and dependencies
@@ -64,32 +66,15 @@ open http://localhost:8082
 
 ## 📚 Documentation
 
-Complete documentation available in the [Wiki](https://git.skyday.eu/Homelab/ClawBoard/wiki/):
+Documentation lives in [`docs/`](docs/):
 
-### Getting Started
-- **[Requirements](https://git.skyday.eu/Homelab/ClawBoard/wiki/Requirements)** — What you need to run ClawBoard
-- **[Getting Started](https://git.skyday.eu/Homelab/ClawBoard/wiki/Getting-Started)** — 5-minute quick start guide
-- **[Installation](https://git.skyday.eu/Homelab/ClawBoard/wiki/Installation)** — Detailed installation instructions
-
-### Configuration & Deployment
-- **[Configuration](https://git.skyday.eu/Homelab/ClawBoard/wiki/Configuration)** — Complete config reference
-- **[Deployment (Docker)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Docker)** — Production deployment
-- **[Deployment (Traefik)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Traefik)** — Auto-SSL with Traefik
-- **[Deployment (Nginx)](https://git.skyday.eu/Homelab/ClawBoard/wiki/Deployment-Nginx)** — Nginx reverse proxy
-
-### Integration & Usage
-- **[OpenClaw Integration](https://git.skyday.eu/Homelab/ClawBoard/wiki/OpenClaw-Integration)** — Connecting to OpenClaw
-- **[Features](https://git.skyday.eu/Homelab/ClawBoard/wiki/Features)** — Feature overview and usage
-- **[Customization](https://git.skyday.eu/Homelab/ClawBoard/wiki/Customization)** — Make it yours
-
-### Reference
-- **[CLI Reference](https://git.skyday.eu/Homelab/ClawBoard/wiki/CLI-Reference)** — Task management CLI
-- **[API Reference](https://git.skyday.eu/Homelab/ClawBoard/wiki/API-Reference)** — REST API documentation
-- **[Database](https://git.skyday.eu/Homelab/ClawBoard/wiki/Database)** — Database management
-
-### Help & Contributing
-- **[Troubleshooting](https://git.skyday.eu/Homelab/ClawBoard/wiki/Troubleshooting)** — Common issues and solutions
-- **[Contributing](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing)** — How to contribute
+- **[Getting Started](docs/getting-started.md)** — 5-minute quick start guide
+- **[Plugin Development](docs/plugin-development.md)** — Build your own plugins
+- **[Example Plugin](docs/example-plugin/)** — Minimal hello-world plugin to learn from
+- **[Project Overview](docs/PROJECT-OVERVIEW.md)** — Architecture deep dive
+- **[Deployment Guide](DEPLOYMENT.md)** — Production deployment (Traefik, Nginx, Docker)
+- **[Database Guide](database/README.md)** — Schema, backup, restore
+- **[Contributing](CONTRIBUTING.md)** — How to contribute
 
 ## 🏗️ Architecture
 
@@ -235,7 +220,7 @@ DOMAIN=localhost
 }
 ```
 
-See [Configuration Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Configuration) for complete reference.
+See [Getting Started](docs/getting-started.md) for complete reference.
 
 ## 🔌 Plugins
 
@@ -305,7 +290,7 @@ docker compose exec clawboard-db psql -U clawboard -d clawboard
 - `bot_status` — Agent status updates
 - `audit_log` — Complete audit trail
 
-See [Database Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Database) for schema and management.
+See [Database Guide](database/README.md) for schema and management.
 
 ## 🔄 Updates
 
@@ -364,11 +349,11 @@ docker compose logs clawboard-db
 docker compose restart clawboard-db
 ```
 
-See [Troubleshooting Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Troubleshooting) for more solutions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for more deployment and troubleshooting guidance.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [Contributing Guide](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing).
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, including how to maintain a private fork (upstream/downstream workflow).
 
@@ -390,7 +375,7 @@ docker compose -f docker-compose.dev.yml up
 
 | Who | Role | Contact |
 |-----|------|---------|
-| **Paulina Stopa** (Wadera) | Creator & Architect | pstopa@skyday.eu |
+| **Paulina Stopa** | Creator & Architect | pstopa@skyday.eu |
 | **Nim** 🌀 | AI Co-Creator & Lead Engineer | nim@skyday.eu |
 
 *Yes, an AI co-wrote this dashboard. The future is collaborative.* ✨
@@ -438,4 +423,4 @@ Special thanks to the open-source community!
 
 **Built with ❤️ for the OpenClaw community**
 
-[Get Started](https://git.skyday.eu/Homelab/ClawBoard/wiki/Getting-Started) | [Documentation](https://git.skyday.eu/Homelab/ClawBoard/wiki/) | [Contributing](https://git.skyday.eu/Homelab/ClawBoard/wiki/Contributing)
+[Get Started](docs/getting-started.md) | [Documentation](docs/) | [Contributing](CONTRIBUTING.md)
