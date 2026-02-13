@@ -404,6 +404,10 @@ export const TasksPage: React.FC = () => {
     return tasks
       .filter(t => t.status === column && matchesFilters(t))
       .sort((a, b) => {
+        // Blocked tasks sink to bottom
+        if (a.blocked && !b.blocked) return 1;
+        if (!a.blocked && b.blocked) return -1;
+        // Within same blocked group: sort by priority then date
         const pa = PRIORITY_ORDER[a.priority] ?? 99;
         const pb = PRIORITY_ORDER[b.priority] ?? 99;
         if (pa !== pb) return pa - pb;
