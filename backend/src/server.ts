@@ -60,10 +60,10 @@ const wsService = new WebSocketService(server, '/ws');
 
 // Initialize Session Monitor
 // In Docker: /clawdbot/sessions is mounted from host ~/.clawdbot/agents/main/sessions
-const SESSIONS_PATH = process.env.CLAWDBOT_SESSIONS_PATH || '/clawdbot/sessions/sessions.json';
-const TRANSCRIPTS_DIR = process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
+const SESSIONS_PATH = process.env.OPENCLAW_SESSIONS_PATH || '/clawdbot/sessions/sessions.json';
+const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || '/clawdbot/sessions';
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH || '/workspace';
-const CONFIG_PATH = process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
+const CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
 const sessionMonitor = new SessionMonitor(SESSIONS_PATH, TRANSCRIPTS_DIR, wsService);
 
 // Initialize new Phase 3 services
