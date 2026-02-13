@@ -6,7 +6,7 @@ Complete infrastructure is now in place for deploying ClawBoard from scratch.
 
 ```bash
 # 1. Clone repository
-git clone ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git
+git clone https://github.com/yourusername/clawboard.git
 cd ClawBoard
 
 # 2. Run interactive setup

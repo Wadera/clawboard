@@ -8,7 +8,7 @@ VALUES
     'homelab-snapshots',
     'devops',
     'Proxmox VM snapshot automation via Ansible for safe rollbacks before risky changes.',
-    E'## Homelab Snapshots\n\n**⚠️ ALWAYS snapshot before risky system changes!**\n\n**Location:** `/home/ai/workspace/projects/HomeLab-Automation/ansible`\n\n### Command (run AS user ai, not sudo)\n```bash\nsudo su - ai\ncd /home/ai/workspace/projects/HomeLab-Automation/ansible\nansible-playbook -i inventory create_snapshot_ai.yml \\\n  --vault-password-file=/home/ai/.ansible/vault_pass \\\n  -e "snapshot_description=''Before disk resize''"\n```\n\n### Details\n- VM ID: 4114 (AI VM on Proxmox)\n- Auto-named: `ans-YYYYMMDDHHMMSS`\n- Handles vGPU safely (stops Ollama, unloads drivers, takes snapshot, restores)\n- Takes ~2-5 minutes\n- Discord notifications on start/failure\n\n### When to Snapshot\n- Before disk operations (resize, mount changes, fstab edits)\n- Before major package installations\n- Before config changes that might break boot\n- Before kernel or driver updates',
+    E'## Homelab Snapshots\n\n**⚠️ ALWAYS snapshot before risky system changes!**\n\n**Location:** Configure your Ansible playbook path\n\n### Command\n```bash\nansible-playbook -i inventory create_snapshot.yml \\\n  --vault-password-file=~/.ansible/vault_pass \\\n  -e "snapshot_description=''Before changes''"\n```\n\n### Details\n- Configure your VM ID in the playbook\n- Auto-named: `ans-YYYYMMDDHHMMSS`\n- Takes ~2-5 minutes\n\n### When to Snapshot\n- Before disk operations (resize, mount changes, fstab edits)\n- Before major package installations\n- Before config changes that might break boot\n- Before kernel or driver updates',
     ARRAY['proxmox', 'ansible', 'backup', 'infrastructure'],
     TRUE,
     1
