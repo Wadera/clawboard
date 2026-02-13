@@ -19,7 +19,7 @@
 ### Setup
 
 ```bash
-git clone https://git.skyday.eu/Homelab/ClawBoard.git clawboard-test
+git clone https://github.com/Wadera/clawboard.git clawboard-test
 cd clawboard-test
 cp .env.example .env
 # Edit .env with your credentials

@@ -8,7 +8,7 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.yml)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue)](https://www.postgresql.org/)
 
-> **Primary repository:** [git.skyday.eu/Homelab/ClawBoard](https://git.skyday.eu/Homelab/ClawBoard) — GitHub mirror coming soon.
+> ****Repository:** [github.com/Wadera/clawboard](https://github.com/Wadera/clawboard)
 
 ## ✨ Features
 
@@ -46,7 +46,7 @@ Get ClawBoard running in **5 minutes**:
 
 ```bash
 # 1. Clone repository
-git clone ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git
+git clone https://github.com/Wadera/clawboard.git
 cd ClawBoard
 
 # 2. Run setup script (generates .env with password hash)
@@ -509,8 +509,8 @@ Special thanks to the open-source community!
 ## 📧 Contact
 
 - **Email:** pstopa@skyday.eu
-- **Repository:** [ClawBoard on Gitea](https://git.skyday.eu/Homelab/ClawBoard)
-- **Wiki:** [Documentation](https://git.skyday.eu/Homelab/ClawBoard/wiki/)
+- **Repository:** [ClawBoard on GitHub](https://github.com/Wadera/clawboard)
+- **Wiki:** [Documentation](https://github.com/Wadera/clawboard/wiki/)
 
 ## 🗺️ Roadmap
 
