@@ -143,10 +143,11 @@ router.get('/session/:sessionId/tools', (req: Request, res: Response) => {
     }
 
     const allTools = Array.from(toolCalls.values())
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
     const total = allTools.length;
-    const tools = all ? allTools : allTools.slice(0, limit);
+    // Use slice(-limit) to get the NEWEST N tools, still in oldest-first order
+    const tools = all ? allTools : allTools.slice(-limit);
 
     res.json({ success: true, tools, total });
   } catch (err: any) {
@@ -159,7 +160,8 @@ router.get('/session/:sessionId/tools', (req: Request, res: Response) => {
 router.get('/session/:sessionId/messages', (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit as string) || 5, 50);
+    const all = req.query.all === 'true';
+    const limit = all ? 9999 : Math.min(parseInt(req.query.limit as string) || 5, 200);
     
     // Allow UUIDs (36 chars with dashes) and also runIds or other hex identifiers
     if (!/^[0-9a-fA-F-]{36}$/.test(sessionId)) {
@@ -173,7 +175,8 @@ router.get('/session/:sessionId/messages', (req: Request, res: Response) => {
     
     let rawLines: string;
     try {
-      rawLines = execSync(`tail -500 "${transcriptPath}"`, { encoding: 'utf-8', timeout: 5000, maxBuffer: 10 * 1024 * 1024 });
+      const tailLines = all ? 5000 : 500;
+      rawLines = execSync(all ? `cat "${transcriptPath}"` : `tail -${tailLines} "${transcriptPath}"`, { encoding: 'utf-8', timeout: 10000, maxBuffer: 20 * 1024 * 1024 });
     } catch {
       console.log(`[messages] No transcript file found for sessionId: ${sessionId}`);
       res.json({ success: true, messages: [] });
@@ -256,6 +259,7 @@ router.get('/sessions/archive', (req: Request, res: Response) => {
       fileSize: number;
       firstActivity: string | null;
       lastActivity: string | null;
+      label?: string;
     }
 
     // Gather file info
@@ -315,6 +319,47 @@ router.get('/sessions/archive', (req: Request, res: Response) => {
 
     const total = sessions.length;
     const paginated = sessions.slice(offset, offset + limit);
+
+    // Extract labels from first user message (only for paginated results, perf-safe)
+    for (const session of paginated) {
+      try {
+        const filePath = path.join(TRANSCRIPTS_DIR, session.fileName);
+        const head = execSync(`head -30 "${filePath}"`, { encoding: 'utf-8', timeout: 2000, maxBuffer: 1024 * 1024 });
+        const headLines = head.split('\n').filter(l => l.trim());
+        for (const line of headLines) {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.type === 'message' && parsed.message?.role === 'user') {
+              let content = parsed.message.content;
+              if (Array.isArray(content)) {
+                content = content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join(' ');
+              }
+              if (typeof content === 'string' && content.length > 0) {
+                // Skip heartbeat prompts and system event messages
+                if (content.includes('HEARTBEAT') || content.startsWith('System:') || content.startsWith('Read HEARTBEAT')) continue;
+
+                // Extract task name from "## Task: <name>" pattern
+                const taskMatch = content.match(/##\s*Task:\s*(.+?)(?:\n|$)/i);
+                if (taskMatch) {
+                  session.label = taskMatch[1].trim().slice(0, 60);
+                  break;
+                }
+                // Otherwise use first meaningful line (skip timestamps/metadata)
+                const contentLines = content.split('\n');
+                const firstLine = contentLines.find((l: string) => {
+                  const t = l.trim();
+                  return t.length > 5 && !t.startsWith('[') && !t.startsWith('System:') && !t.startsWith('#');
+                });
+                if (firstLine) {
+                  session.label = firstLine.trim().slice(0, 60);
+                  break;
+                }
+              }
+            }
+          } catch { /* skip line */ }
+        }
+      } catch { /* skip label extraction */ }
+    }
 
     res.json({ success: true, sessions: paginated, total });
   } catch (err: any) {
