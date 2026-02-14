@@ -1,0 +1,132 @@
+/* Message Queue Card - Compact Dashboard Card */
+
+.mq-card {
+  background: var(--bg-surface);
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all var(--transition-base) var(--ease-out);
+  position: relative;
+}
+
+.mq-card:hover {
+  border-color: var(--orange-500);
+  background: var(--bg-surface-hover);
+  box-shadow: var(--shadow-glow-orange);
+  transform: translateY(-2px);
+}
+
+.mq-card.has-active {
+  border-color: var(--orange-500);
+  box-shadow: 0 0 0 1px var(--orange-500);
+}
+
+.mq-card.has-active:hover {
+  box-shadow: var(--shadow-glow-orange-strong);
+}
+
+.mq-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.mq-card-title h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mq-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mq-card-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--orange-500);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  animation: mq-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes mq-card-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.mq-card-arrow {
+  color: var(--text-tertiary);
+  transition: all var(--transition-base) var(--ease-out);
+}
+
+.mq-card:hover .mq-card-arrow {
+  color: var(--orange-500);
+  transform: translateX(4px);
+}
+
+.mq-card-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.mq-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mq-card-dot.connected {
+  background: var(--green-500);
+  box-shadow: 0 0 8px var(--green-glow);
+}
+
+.mq-card-dot.disconnected {
+  background: var(--red-500);
+  box-shadow: 0 0 8px var(--red-glow);
+}
+
+.mq-card-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.mq-card-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--orange-500);
+  border-radius: 50%;
+  animation: mq-card-spin 0.6s linear infinite;
+}
+
+@keyframes mq-card-spin {
+  to { transform: rotate(360deg); }
+}

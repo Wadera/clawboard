@@ -26,6 +26,7 @@ export interface FeaturesConfig {
   taskBoard: boolean;
   projects: boolean;
   tools: boolean;
+  sessions: boolean;
   auditLog: boolean;
   stats: boolean;
   botStatus: boolean;
@@ -100,6 +101,7 @@ const DEFAULT_CONFIG: ClawBoardConfig = {
     taskBoard: true,
     projects: true,
     tools: true,
+    sessions: true,
     auditLog: true,
     stats: true,
     botStatus: true,
@@ -113,8 +115,8 @@ const DEFAULT_CONFIG: ClawBoardConfig = {
   },
   services: {
     taskApiUrl: 'http://localhost:3001/api',
-    openclawGatewayWs: 'ws://localhost:3120',
-    openclawApiUrl: 'http://localhost:3120',
+    openclawGatewayWs: 'ws://localhost:18789',
+    openclawApiUrl: 'http://localhost:18789',
     imageGenEndpoint: '',
     imageGenProvider: 'none',
   },

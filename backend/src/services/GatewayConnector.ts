@@ -101,9 +101,9 @@ export class GatewayConnector {
       try {
         const configPath = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
         const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-        this.gatewayPassword = config?.gateway?.auth?.password || '';
+        this.gatewayPassword = config?.gateway?.auth?.password || config?.gateway?.auth?.token || '';
         if (this.gatewayPassword) {
-          console.log('🔑 GatewayConnector: Read gateway password from config');
+          console.log('🔑 GatewayConnector: Read gateway auth from config');
         }
       } catch (err) {
         console.warn('⚠️  GatewayConnector: Could not read gateway password from config');
@@ -315,7 +315,7 @@ export class GatewayConnector {
         caps: [],
         commands: [],
         permissions: {},
-        auth: { password: this.gatewayPassword },
+        auth: { password: this.gatewayPassword, token: this.gatewayPassword },
         locale: 'en-US',
         userAgent: 'clawboard-backend/1.0.0',
       },

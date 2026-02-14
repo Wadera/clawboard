@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { getSidebarNavItems } from '../config/navigation';
 import './Sidebar.css';
 import { ModelStatusBadge } from './ModelStatusBadge';
@@ -9,19 +9,13 @@ import { WorkspaceFiles } from './WorkspaceFiles';
 import { AgentDetailCard } from './AgentDetailCard';
 import { useBotStatus } from '../hooks/useBotStatus';
 import { auth, authenticatedFetch } from '../utils/auth';
-import { useClawBoardConfig } from '../contexts/ClawBoardConfigContext';
+import { StatusOrb } from './StatusOrb';
+// NotificationBadge removed — not needed
 
 interface UsageStats {
   session: { percentLeft: number; timeLeft: string };
   weekly: { percentLeft: number; timeLeft: string };
   stale: boolean;
-}
-
-interface PluginSidebarItem {
-  label: string;
-  icon: string;
-  path: string;
-  badge?: string | null;
 }
 
 interface SidebarProps {
@@ -48,12 +42,15 @@ interface SidebarProps {
 
 export function Sidebar({ status, connected }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    // Persist collapse state in localStorage
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
-  const [pluginSidebarItems, setPluginSidebarItems] = useState<PluginSidebarItem[]>([]);
   const { status: botStatus } = useBotStatus();
-  const { config } = useClawBoardConfig();
   const navigate = useNavigate();
 
   // Listen for model:status events to get OpenClaw version + usage stats
@@ -79,29 +76,6 @@ export function Sidebar({ status, connected }: SidebarProps) {
       .catch(() => {});
 
     return () => window.removeEventListener('model:status' as any, handler);
-  }, []);
-
-  // Fetch plugin sidebar items
-  useEffect(() => {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-    authenticatedFetch(`${API_BASE}/plugins`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.plugins) {
-          const items: PluginSidebarItem[] = [];
-          for (const plugin of data.plugins) {
-            if (plugin.healthy && plugin.sidebar) {
-              for (const item of plugin.sidebar) {
-                items.push(item);
-              }
-            }
-          }
-          setPluginSidebarItems(items);
-        }
-      })
-      .catch(() => {
-        // Plugin system is optional — no plugins is fine
-      });
   }, []);
 
   // Global keyboard shortcuts: Ctrl+Shift+X and Escape (when working) to stop bot
@@ -136,7 +110,14 @@ export function Sidebar({ status, connected }: SidebarProps) {
   // Get status message from database or use default
   const statusMessage = botStatus?.status_text || "Building something amazing...";
   const [statusExpanded, _setStatusExpanded] = useState(false);
-  // Nav menu always expanded (collapse toggle removed)
+  const [navExpanded, setNavExpanded] = useState(false); // Navigation menu collapsed by default
+
+  // Persist collapse state and notify other components
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(collapsed));
+    // Dispatch custom event for same-tab listeners
+    window.dispatchEvent(new Event('sidebar-collapse-change'));
+  }, [collapsed]);
 
   // Get state emoji and color
   const getStateDisplay = (state: string) => {
@@ -175,23 +156,34 @@ export function Sidebar({ status, connected }: SidebarProps) {
         onClick={() => setMobileOpen(false)}
       />
 
-      <div className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
-        {/* 1. Avatar Section - Always at top */}
+      <div className={`sidebar ${mobileOpen ? 'sidebar-open' : ''} ${collapsed ? 'sidebar-collapsed' : ''}`}>
+        {/* Collapse Toggle Button */}
+        <button 
+          className="sidebar-collapse-toggle"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+
+        {/* 1. Status Orb Section - Always at top */}
         <div className="sidebar-avatar-section">
           <div className="avatar-container">
-            <div className="avatar-placeholder">
-              <span className="avatar-emoji">{config.bot.emoji}</span>
-            </div>
+            <StatusOrb
+              state={status?.main.state || 'idle'}
+              size={collapsed ? 56 : 120}
+            />
           </div>
         </div>
 
         {/* 2. Model name + context window bar */}
         <div className="sidebar-model-section">
-          <ModelStatusBadge compact={false} />
+          <ModelStatusBadge compact={collapsed} />
         </div>
 
         {/* 2b. Usage bars - only shown when fresh data available (hide when stale >20min) */}
-        {usageStats && !usageStats.stale && (
+        {!collapsed && usageStats && !usageStats.stale && (
           <div className="sidebar-usage-bars">
             <UsageBarRow
               label="Session"
@@ -215,24 +207,28 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 4. Divider */}
         <div className="sidebar-divider" />
 
-        {/* 5. Navigation Menu - Always expanded */}
+        {/* 5. Navigation Menu - Collapsible */}
         <div className="sidebar-nav-section">
-          <nav className="sidebar-nav nav-expanded" aria-label="Main navigation">
+          <button 
+            className="sidebar-nav-toggle"
+            onClick={() => setNavExpanded(!navExpanded)}
+            aria-expanded={navExpanded}
+            aria-label={navExpanded ? 'Collapse menu' : 'Expand menu'}
+          >
+            <span className="nav-toggle-icon">🧭</span>
+            <span className="nav-toggle-label">Menu</span>
+            <span className="nav-toggle-chevron">
+              {navExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          <nav className={`sidebar-nav ${navExpanded ? 'nav-expanded' : 'nav-collapsed'}`} aria-label="Main navigation">
             {getSidebarNavItems().map((item) => (
               <SidebarNavLink 
                 key={item.id}
                 to={item.path} 
                 icon={<item.icon size={18} />} 
                 label={item.label} 
-              />
-            ))}
-            {/* Plugin sidebar items */}
-            {pluginSidebarItems.map((item) => (
-              <SidebarNavLink
-                key={`plugin-${item.path}`}
-                to={`/plugins${item.path}`}
-                icon={<span className="plugin-nav-icon">{item.icon === 'book' ? '📖' : item.icon === 'activity' ? '📊' : '🔌'}</span>}
-                label={item.label}
+                collapsed={collapsed} 
               />
             ))}
           </nav>
@@ -280,14 +276,15 @@ export function Sidebar({ status, connected }: SidebarProps) {
                   className="agent-item"
                   onClick={() => setExpandedAgent(expandedAgent === agent.key ? null : agent.key)}
                   style={{ cursor: 'pointer' }}
+                  title={collapsed ? agent.label : undefined}
                 >
                   <span className={`agent-status ${agent.state}`}></span>
                   <span className="agent-label">{agent.label}</span>
-                  {agent.state === 'running' && (
+                  {agent.state === 'running' && !collapsed && (
                     <StopButton variant="agent" agentKey={agent.key} />
                   )}
                 </div>
-                {expandedAgent === agent.key && (
+                {expandedAgent === agent.key && !collapsed && (
                   <AgentDetailCard 
                     agentKey={agent.key} 
                     onClose={() => setExpandedAgent(null)} 
@@ -312,8 +309,8 @@ export function Sidebar({ status, connected }: SidebarProps) {
           </p>
         </div>
 
-        {/* 10. Workspace Files */}
-        <WorkspaceFiles />
+        {/* 10. Workspace Files - Only when expanded */}
+        {!collapsed && <WorkspaceFiles />}
 
         {/* 11. Session Stats */}
         <div className="sidebar-section stats-section">
@@ -334,6 +331,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
           <button 
             className="sidebar-logout-button" 
             onClick={() => auth.logout()}
+            title={collapsed ? 'Logout' : undefined}
           >
             <LogOut size={18} />
             <span className="logout-text">Logout</span>
@@ -343,8 +341,9 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* Footer */}
         <div className="sidebar-footer">
           <p className="sidebar-version">
-            v2.0.0{openclawVersion ? ` · OC ${openclawVersion}` : ''}
+            v1.2.0{openclawVersion ? ` · OC ${openclawVersion}` : ''}
           </p>
+          <p className="sidebar-tagline">🌀 Always curious</p>
         </div>
       </div>
     </>
@@ -355,15 +354,17 @@ interface SidebarNavLinkProps {
   to: string;
   icon: React.ReactNode;
   label: string;
+  collapsed: boolean;
 }
 
-function SidebarNavLink({ to, icon, label }: SidebarNavLinkProps) {
+function SidebarNavLink({ to, icon, label, collapsed }: SidebarNavLinkProps) {
   const location = useLocation();
   const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
   return (
     <Link 
       to={to} 
       className={`sidebar-nav-link ${isActive ? 'active' : ''}`}
+      title={collapsed ? label : undefined}
     >
       <span className="nav-icon">{icon}</span>
       <span className="nav-label">{label}</span>

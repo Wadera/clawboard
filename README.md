@@ -8,7 +8,7 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.yml)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue)](https://www.postgresql.org/)
 
-> **Primary repository:** [git.skyday.eu/Homelab/ClawBoard](https://git.skyday.eu/Homelab/ClawBoard) — GitHub mirror coming soon.
+> ****Repository:** [github.com/Wadera/clawboard](https://github.com/Wadera/clawboard)
 
 ## ✨ Features
 
@@ -46,7 +46,7 @@ Get ClawBoard running in **5 minutes**:
 
 ```bash
 # 1. Clone repository
-git clone ssh://git@git.skyday.eu:222/Homelab/ClawBoard.git
+git clone https://github.com/Wadera/clawboard.git
 cd ClawBoard
 
 # 2. Run setup script (generates .env with password hash)
@@ -157,23 +157,24 @@ Documentation lives in [`docs/`](docs/):
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     ClawBoard Core                          │
-│                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
-│  │  Auth &   │  │  Tasks & │  │  Agent   │  │  Plugin   │  │
-│  │  Users    │  │ Projects │  │ Sessions │  │  Loader   │  │
-│  └──────────┘  └──────────┘  └──────────┘  └─────┬─────┘  │
-│                                                   │        │
-└───────────────────────────────────────────────────┼────────┘
-                                                    │
-          ┌─────────────────────────────────────────┤
-          │              │              │            │
-    ┌─────▼─────┐  ┌────▼──────┐  ┌───▼────┐  ┌───▼────────┐
-    │   claw-   │  │   claw-   │  │  claw- │  │  your-own  │
-    │  journal  │  │  monitor  │  │  blog  │  │  plugin    │
-    │ (Docker)  │  │ (Docker)  │  │(Docker)│  │  (Docker)  │
-    └───────────┘  └───────────┘  └────────┘  └────────────┘
+┌─────────────────────────────────────────┐
+│         ClawBoard Frontend              │
+│      React + TypeScript + Vite          │
+│         Port: 8080 → 80                 │
+└────────────┬────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────┐
+│         ClawBoard Backend               │
+│      Node.js + Express + TypeScript     │
+│         Port: 3001 (internal)           │
+└──────┬──────────────────────────────────┘
+       │
+       ├──────────► OpenClaw Gateway
+       │            (WebSocket: ws://host.docker.internal:18789)
+       │
+       └──────────► PostgreSQL 16
+                    (Internal only)
 ```
 
 **Components:**
@@ -253,6 +254,63 @@ docker compose ps
 docker compose -f docker-compose.dev.yml up
 ```
 
+## 🖥️ CLI Tool
+
+ClawBoard includes a command-line tool for managing tasks, projects, tools, and journals.
+
+### Setup
+
+```bash
+# Make executable and add to PATH
+chmod +x cli/clawboard
+export PATH="$(pwd)/cli:$PATH"
+
+# Or create a symlink
+ln -s "$(pwd)/cli/clawboard" /usr/local/bin/clawboard
+
+# Configure API URL (default: http://localhost:8080/api)
+export CLAWBOARD_API_URL="http://localhost:8080/api"
+```
+
+### Authentication
+
+```bash
+# Login (stores token in ~/.config/clawboard/token.json)
+clawboard login
+
+# Or use environment variables
+export CLAWBOARD_PASSWORD="your-dashboard-password"
+```
+
+### Quick Start
+
+```bash
+clawboard list                          # List all tasks
+clawboard create "My first task"        # Create a task
+clawboard projects                      # List projects
+clawboard tools list                    # List tools
+clawboard tools generate-md --slim      # Generate TOOLS.md
+clawboard journal list                  # List journal entries
+clawboard status                        # Dashboard overview
+```
+
+### TOOLS.md Bootstrapping
+
+After deploying ClawBoard, bootstrap the tool registry so your bot knows how to use the dashboard:
+
+```bash
+# 1. Login to the CLI
+clawboard login
+
+# 2. Add your tools (or import from a template)
+clawboard tools list
+
+# 3. Generate TOOLS.md for your bot's workspace
+clawboard tools generate-md --slim -o /path/to/bot/workspace/TOOLS.md
+```
+
+The generated `TOOLS.md` gives your OpenClaw bot context about available tools and how to use them.
+
 ## ⚙️ Configuration
 
 ### Environment Variables (`.env`)
@@ -267,7 +325,7 @@ LOGIN_PASSWORD=your-dashboard-password
 
 # OpenClaw Integration
 OPENCLAW_DIR=~/.openclaw
-OPENCLAW_GATEWAY_URL=ws://localhost:3120
+OPENCLAW_GATEWAY_URL=ws://host.docker.internal:18789
 
 # Deployment
 FRONTEND_PORT=8082
@@ -389,6 +447,50 @@ docker compose up -d
 docker compose ps
 ```
 
+## 🔌 OpenClaw Gateway Connection
+
+ClawBoard connects to your OpenClaw agent via the **Gateway WebSocket**. This is how it reads sessions, monitors agent status, and sends control commands.
+
+### How It Works
+
+1. **OpenClaw Gateway** runs on your host machine (default port: `18789`)
+2. **ClawBoard backend** (inside Docker) connects to it via WebSocket
+3. The `extra_hosts` Docker setting maps `host.docker.internal` → your host machine
+4. Session data and config files are mounted read-only into the container
+
+### Required Mounts
+
+The backend container needs access to these OpenClaw files:
+
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| `~/.openclaw/agents/main/sessions/` | `/clawdbot/sessions/` | Session transcripts & sessions.json |
+| `~/.openclaw/openclaw.json` | `/clawdbot/clawdbot.json` | OpenClaw configuration |
+| `~/.openclaw/workspace/` | `/workspace/` | Bot workspace (SOUL.md, memory/, etc.) |
+
+### Required Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPENCLAW_DIR` | `~/.openclaw` | Host path to OpenClaw data directory |
+| `OPENCLAW_GATEWAY_URL` | `ws://host.docker.internal:18789` | Gateway WebSocket URL |
+| `OPENCLAW_WORKSPACE` | `~/.openclaw/workspace` | Bot workspace directory |
+
+> **Note:** Inside the container, these are mapped to `CLAWDBOT_*` env vars that the backend reads. The `docker-compose.yml` handles this mapping automatically.
+
+### Verifying the Connection
+
+```bash
+# 1. Check OpenClaw gateway is running
+openclaw gateway status
+
+# 2. Check the backend can reach it
+docker compose logs clawboard-backend | grep -i gateway
+
+# 3. Look for "Gateway connected" in logs
+docker compose logs clawboard-backend | grep -i "connected"
+```
+
 ## ✅ Functional Tests
 
 After deployment, verify that everything works:
@@ -422,7 +524,37 @@ open http://localhost:8080/dashboard/
 - **Login fails:** Password hash mismatch. Regenerate: `./setup.sh` (reconfigure)
 - **Dashboard blank:** Check browser console for API errors. Verify `/api/` proxy in nginx
 
+
 ## 🐛 Troubleshooting
+
+### "Gateway Disconnected" in Dashboard
+
+This means the backend can't reach the OpenClaw gateway. Check:
+
+```bash
+# 1. Is OpenClaw gateway running?
+openclaw gateway status
+# If not: openclaw gateway start
+
+# 2. Is the WebSocket URL correct in .env?
+grep OPENCLAW_GATEWAY_URL .env
+# Should be: ws://host.docker.internal:18789
+
+# 3. Can the container reach the host?
+docker compose exec clawboard-backend sh -c "wget -qO- http://host.docker.internal:18789 || echo 'Cannot reach gateway'"
+
+# 4. Check backend logs for connection errors
+docker compose logs clawboard-backend | grep -i "gateway\|websocket\|error"
+
+# 5. Restart the backend
+docker compose restart clawboard-backend
+```
+
+**Common causes:**
+- OpenClaw gateway not running → `openclaw gateway start`
+- Wrong port in `.env` → default is `18789`
+- Docker networking issue → ensure `extra_hosts` is in docker-compose.yml
+- Firewall blocking localhost connections → check iptables/firewalld rules
 
 ### Dashboard Won't Load
 
@@ -437,17 +569,15 @@ docker compose logs -f
 docker compose restart
 ```
 
-### OpenClaw Connection Failed
+### Blank Pages or Missing Features
 
 ```bash
-# Verify OpenClaw is running
-openclaw status
+# Rebuild frontend with latest config
+docker compose build clawboard-frontend
+docker compose up -d clawboard-frontend
 
-# Check gateway URL
-grep OPENCLAW_GATEWAY_URL .env
-
-# Restart backend
-docker compose restart clawboard-backend
+# Check clawboard.config.json has features enabled
+cat clawboard.config.json | grep -A 20 '"features"'
 ```
 
 ### Database Issues
@@ -509,8 +639,8 @@ Special thanks to the open-source community!
 ## 📧 Contact
 
 - **Email:** pstopa@skyday.eu
-- **Repository:** [ClawBoard on Gitea](https://git.skyday.eu/Homelab/ClawBoard)
-- **Wiki:** [Documentation](https://git.skyday.eu/Homelab/ClawBoard/wiki/)
+- **Repository:** [ClawBoard on GitHub](https://github.com/Wadera/clawboard)
+- **Wiki:** [Documentation](https://github.com/Wadera/clawboard/wiki/)
 
 ## 🗺️ Roadmap
 
