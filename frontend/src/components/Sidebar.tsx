@@ -253,15 +253,14 @@ export function Sidebar({ status, connected }: SidebarProps) {
                   className="agent-item"
                   onClick={() => setExpandedAgent(expandedAgent === agent.key ? null : agent.key)}
                   style={{ cursor: 'pointer' }}
-                  title={collapsed ? agent.label : undefined}
                 >
                   <span className={`agent-status ${agent.state}`}></span>
                   <span className="agent-label">{agent.label}</span>
-                  {agent.state === 'running' && !collapsed && (
+                  {agent.state === 'running' && (
                     <StopButton variant="agent" agentKey={agent.key} />
                   )}
                 </div>
-                {expandedAgent === agent.key && !collapsed && (
+                {expandedAgent === agent.key && (
                   <AgentDetailCard 
                     agentKey={agent.key} 
                     onClose={() => setExpandedAgent(null)} 
@@ -308,7 +307,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
           <button 
             className="sidebar-logout-button" 
             onClick={() => auth.logout()}
-            title={collapsed ? 'Logout' : undefined}
+            title="Logout"
           >
             <LogOut size={18} />
             <span className="logout-text">Logout</span>
