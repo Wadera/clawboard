@@ -250,7 +250,7 @@ http:
     whitelist:
       ipWhiteList:
         sourceRange:
-          - "192.168.1.0/24"
+          - "192.168.0.0/24"
           - "10.0.0.0/8"
 ```
 
