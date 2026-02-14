@@ -39,6 +39,19 @@ export function ClawBoardConfigProvider({ children }: ClawBoardConfigProviderPro
           document.documentElement.style.setProperty('--config-bg', fetchedConfig.branding.backgroundColor);
           document.documentElement.style.setProperty('--config-surface', fetchedConfig.branding.surfaceColor);
           document.documentElement.style.setProperty('--config-text', fetchedConfig.branding.textColor);
+          
+          // Update favicon if configured
+          if (fetchedConfig.branding.faviconUrl) {
+            const iconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+            if (iconLink) {
+              iconLink.href = fetchedConfig.branding.faviconUrl;
+            } else {
+              const newIconLink = document.createElement('link');
+              newIconLink.rel = 'icon';
+              newIconLink.href = fetchedConfig.branding.faviconUrl;
+              document.head.appendChild(newIconLink);
+            }
+          }
         }
         
         setLoading(false);

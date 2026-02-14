@@ -18,6 +18,7 @@ export interface BrandingConfig {
   sidebarTitle: string;
   loginTitle: string;
   loginSubtitle: string;
+  faviconUrl: string;
 }
 
 export interface FeaturesConfig {
@@ -94,6 +95,7 @@ const DEFAULT_CONFIG: ClawBoardConfig = {
     sidebarTitle: 'ClawBoard',
     loginTitle: 'Welcome to ClawBoard',
     loginSubtitle: 'Your AI Dashboard',
+    faviconUrl: '/favicon.svg',
   },
   features: {
     journal: true,
