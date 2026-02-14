@@ -41,26 +41,6 @@ function App() {
 function AuthenticatedApp() {
   const { config } = useClawBoardConfig();
   const { status: realtimeStatus, connected: wsConnected, error: wsError } = useRealtimeStatus();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('sidebar-collapsed') === 'true';
-  });
-
-  // Listen for sidebar collapse changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setSidebarCollapsed(localStorage.getItem('sidebar-collapsed') === 'true');
-    };
-    
-    // Custom event for same-tab updates
-    window.addEventListener('sidebar-collapse-change', handleStorageChange);
-    // Storage event for cross-tab sync
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('sidebar-collapse-change', handleStorageChange);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
 
   // Global keyboard shortcut: Ctrl+Shift+X to stop
   useEffect(() => {
@@ -83,7 +63,7 @@ function AuthenticatedApp() {
       <ToastProvider>
       <ModelSwitchProvider>
       <FileViewerProvider>
-      <div className={`app-container ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
+      <div className="app-container">
         <Sidebar status={realtimeStatus} connected={wsConnected} />
 
         <div className="app">

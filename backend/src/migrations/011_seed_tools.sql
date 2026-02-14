@@ -5,10 +5,10 @@ INSERT INTO tools (id, name, category, description, usage_instructions, tags, is
 VALUES
   (
     gen_random_uuid(),
-    'nimtasks',
+    'clawboard',
     'task-management',
     'CLI tool for managing tasks, projects, subtasks, and journals via the ClawBoard Dashboard API.',
-    E'## nimtasks CLI\n\n**Location:** `tools/nimtasks` (or `python3 tools/nimtasks`)\n**API:** Wraps your dashboard API at `/api/tasks`\n\n### Key Commands\n```bash\nnimtasks list                          # all non-archived\nnimtasks list --status todo -v         # verbose with subtasks\nnimtasks next                          # next auto-pickup task\nnimtasks get <id>                      # by short ID prefix\nnimtasks create "Title" --project X    # create task\nnimtasks move <id> in-progress         # change status\nnimtasks complete-subtask <id> <idx>   # mark subtask in_review\n```\n\n### Subtask Workflow (Tri-State)\n- `new` ⬜ → `in_review` 🔄 (agent) → `completed` ✅ (orchestrator)\n- Agents use `complete-subtask`, orchestrator uses `approve-subtask` / `reject-subtask`',
+    E'## clawboard CLI\n\n**Location:** `cli/clawboard` (or `python3 cli/clawboard`)\n**API:** Wraps your dashboard API at `/api/tasks`\n\n### Key Commands\n```bash\nclawboard list                          # all non-archived\nclawboard list --status todo -v         # verbose with subtasks\nclawboard next                          # next auto-pickup task\nclawboard get <id>                      # by short ID prefix\nclawboard create "Title" --project X    # create task\nclawboard move <id> in-progress         # change status\nclawboard complete-subtask <id> <idx>   # mark subtask in_review\n```\n\n### Subtask Workflow (Tri-State)\n- `new` ⬜ → `in_review` 🔄 (agent) → `completed` ✅ (orchestrator)\n- Agents use `complete-subtask`, orchestrator uses `approve-subtask` / `reject-subtask`',
     ARRAY['cli', 'tasks', 'project-management'],
     TRUE,
     1

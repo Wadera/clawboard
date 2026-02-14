@@ -21,54 +21,9 @@
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
 }
 
-/* Collapsed State */
-.sidebar.sidebar-collapsed {
-  width: 80px;
-  padding: 16px 8px 24px;
-  align-items: center;
-  overflow-x: hidden;
-}
+/* Sidebar always expanded on desktop */
 
-/* ========================================
-   COLLAPSE TOGGLE BUTTON
-   ======================================== */
-
-.sidebar-collapse-toggle {
-  position: absolute;
-  top: 16px;
-  right: 4px;
-  width: 28px;
-  height: 28px;
-  background: var(--bg-surface, #131826);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
-  border-radius: 50%;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 220;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.sidebar-collapse-toggle:hover {
-  background: var(--accent-primary, #6366f1);
-  color: white;
-  border-color: var(--accent-primary, #6366f1);
-  transform: scale(1.1);
-}
-
-.sidebar-collapsed .sidebar-collapse-toggle {
-  right: 4px;
-}
-
-/* Hide toggle on mobile */
-@media (max-width: 1023px) {
-  .sidebar-collapse-toggle {
-    display: none;
-  }
-}
+/* Collapse toggle removed - sidebar always fully visible on desktop */
 
 /* ========================================
    AVATAR SECTION - Top Priority

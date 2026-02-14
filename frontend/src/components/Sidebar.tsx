@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Menu, X, LogOut, ChevronDown, ChevronUp } from 'lucide-react';
 import { getSidebarNavItems } from '../config/navigation';
 import './Sidebar.css';
 import { ModelStatusBadge } from './ModelStatusBadge';
@@ -42,11 +42,6 @@ interface SidebarProps {
 
 export function Sidebar({ status, connected }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => {
-    // Persist collapse state in localStorage
-    const saved = localStorage.getItem('sidebar-collapsed');
-    return saved === 'true';
-  });
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
@@ -112,13 +107,6 @@ export function Sidebar({ status, connected }: SidebarProps) {
   const [statusExpanded, _setStatusExpanded] = useState(false);
   const [navExpanded, setNavExpanded] = useState(false); // Navigation menu collapsed by default
 
-  // Persist collapse state and notify other components
-  useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', String(collapsed));
-    // Dispatch custom event for same-tab listeners
-    window.dispatchEvent(new Event('sidebar-collapse-change'));
-  }, [collapsed]);
-
   // Get state emoji and color
   const getStateDisplay = (state: string) => {
     switch (state) {
@@ -156,34 +144,24 @@ export function Sidebar({ status, connected }: SidebarProps) {
         onClick={() => setMobileOpen(false)}
       />
 
-      <div className={`sidebar ${mobileOpen ? 'sidebar-open' : ''} ${collapsed ? 'sidebar-collapsed' : ''}`}>
-        {/* Collapse Toggle Button */}
-        <button 
-          className="sidebar-collapse-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-
+      <div className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         {/* 1. Status Orb Section - Always at top */}
         <div className="sidebar-avatar-section">
           <div className="avatar-container">
             <StatusOrb
               state={status?.main.state || 'idle'}
-              size={collapsed ? 56 : 120}
+              size={120}
             />
           </div>
         </div>
 
         {/* 2. Model name + context window bar */}
         <div className="sidebar-model-section">
-          <ModelStatusBadge compact={collapsed} />
+          <ModelStatusBadge compact={false} />
         </div>
 
         {/* 2b. Usage bars - only shown when fresh data available (hide when stale >20min) */}
-        {!collapsed && usageStats && !usageStats.stale && (
+        {usageStats && !usageStats.stale && (
           <div className="sidebar-usage-bars">
             <UsageBarRow
               label="Session"
@@ -228,7 +206,6 @@ export function Sidebar({ status, connected }: SidebarProps) {
                 to={item.path} 
                 icon={<item.icon size={18} />} 
                 label={item.label} 
-                collapsed={collapsed} 
               />
             ))}
           </nav>
@@ -309,8 +286,8 @@ export function Sidebar({ status, connected }: SidebarProps) {
           </p>
         </div>
 
-        {/* 10. Workspace Files - Only when expanded */}
-        {!collapsed && <WorkspaceFiles />}
+        {/* 10. Workspace Files */}
+        <WorkspaceFiles />
 
         {/* 11. Session Stats */}
         <div className="sidebar-section stats-section">
@@ -341,9 +318,9 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* Footer */}
         <div className="sidebar-footer">
           <p className="sidebar-version">
-            v1.2.0{openclawVersion ? ` · OC ${openclawVersion}` : ''}
+            v2.0.0{openclawVersion ? ` · OC ${openclawVersion}` : ''}
           </p>
-          <p className="sidebar-tagline">🌀 Always curious</p>
+          <p className="sidebar-tagline">Powered by ClawBoard</p>
         </div>
       </div>
     </>
@@ -354,17 +331,15 @@ interface SidebarNavLinkProps {
   to: string;
   icon: React.ReactNode;
   label: string;
-  collapsed: boolean;
 }
 
-function SidebarNavLink({ to, icon, label, collapsed }: SidebarNavLinkProps) {
+function SidebarNavLink({ to, icon, label }: SidebarNavLinkProps) {
   const location = useLocation();
   const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
   return (
     <Link 
       to={to} 
       className={`sidebar-nav-link ${isActive ? 'active' : ''}`}
-      title={collapsed ? label : undefined}
     >
       <span className="nav-icon">{icon}</span>
       <span className="nav-label">{label}</span>
