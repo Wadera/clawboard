@@ -93,8 +93,8 @@ export class GatewayConnector {
     this.wsService = wsService;
 
     // Read gateway config
-    this.gatewayUrl = process.env.OPENCLAW_GATEWAY_WS_URL || 'ws://127.0.0.1:18789';
-    this.gatewayPassword = process.env.OPENCLAW_GATEWAY_PASSWORD || '';
+    this.gatewayUrl = process.env.OPENCLAW_GATEWAY_WS_URL || process.env.CLAWDBOT_GATEWAY_WS_URL || 'ws://127.0.0.1:18789';
+    this.gatewayPassword = process.env.OPENCLAW_GATEWAY_PASSWORD || process.env.CLAWDBOT_GATEWAY_PASSWORD || '';
 
     // Try to read password from config file if not in env
     if (!this.gatewayPassword) {
