@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: clawboard_dev
       POSTGRES_PASSWORD: ${DB_PASSWORD_DEV:-dev_password_change_me}
     ports:
-      - "5433:5432"  # Different port for dev
+      - "5435:5432"  # Different port for dev
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -33,7 +33,7 @@ services:
     environment:
       NODE_ENV: development
       NODE_OPTIONS: "--max-old-space-size=512"
-      PORT: 3001
+      PORT: 3006
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: clawboard_dev
@@ -41,7 +41,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD_DEV:-dev_password_change_me}
       JWT_SECRET: ${JWT_SECRET_DEV:-dev_secret_change_me}
       DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
-      CORS_ORIGIN: http://localhost:8082
+      CORS_ORIGIN: http://localhost:8085
       CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
       CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
       CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
@@ -51,17 +51,17 @@ services:
       TASKS_FILE: /workspace/memory/tasks.json
       AGENT_HISTORY_FILE: /workspace/memory/agent-history.json
     ports:
-      - "3001:3001"
+      - "3006:3006"
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - ./clawboard.config.json:/app/clawboard.config.json:ro
       - /home/clawd/.openclaw/agents/main/sessions:/clawdbot/sessions:ro
       - /home/clawd/.openclaw/openclaw.json:/clawdbot/clawdbot.json:ro
       - /home/clawd/.openclaw/agents/main/agent/models.json:/clawdbot/models.json:ro
       - /home/clawd/.openclaw/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
       - /home/clawd/.openclaw/media:/clawdbot/media:ro
       - /home/clawd/clawd:/workspace:rw
-      - 
       - /home/clawd/clawd/media/generated:/clawd-media/generated:rw
       - /home/clawd/clawd/media/projects:/clawd-media/projects:rw
       - /mnt/nfs/NimsProjects:/nfs-projects:rw
@@ -86,7 +86,7 @@ services:
       NODE_ENV: development
       VITE_API_BASE_URL: /api/dev
     ports:
-      - "3002:3000"
+      - "3007:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -102,7 +102,7 @@ services:
     container_name: clawboard-dev-nginx
     restart: unless-stopped
     ports:
-      - "8082:80"  # Development port
+      - "8085:80"  # Development port
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
     depends_on:

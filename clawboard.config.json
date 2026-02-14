@@ -1,20 +1,20 @@
 {
   "bot": {
-    "name": "ClawBot",
-    "displayName": "My ClawBoard",
+    "name": "Nim",
+    "displayName": "Nim Dashboard",
     "emoji": "🤖",
-    "description": "My OpenClaw Dashboard",
+    "description": "NimSpace AI Dashboard - Development Environment",
     "avatarUrl": "/assets/avatar-placeholder.png"
   },
   "branding": {
-    "primaryColor": "#6366f1",
-    "accentColor": "#8b5cf6",
+    "primaryColor": "#06b6d4",
+    "accentColor": "#0891b2",
     "backgroundColor": "#0f172a",
     "surfaceColor": "#1e293b",
     "textColor": "#e2e8f0",
-    "sidebarTitle": "ClawBoard",
-    "loginTitle": "Welcome to ClawBoard",
-    "loginSubtitle": "Your AI Dashboard"
+    "sidebarTitle": "Nim",
+    "loginTitle": "Welcome to NimSpace",
+    "loginSubtitle": "Development Dashboard"
   },
   "features": {
     "journal": true,
@@ -42,9 +42,9 @@
   },
   "deployment": {
     "domain": "localhost",
-    "port": 8082,
+    "port": 8085,
     "useHttps": false,
-    "corsOrigin": "http://localhost:8082"
+    "corsOrigin": "http://localhost:8085"
   },
   "plugins": {
     "configFile": "./clawboard.plugins.json",
