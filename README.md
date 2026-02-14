@@ -142,6 +142,117 @@ docker compose restart clawboard-backend
 
 The workspace is mounted read-only, so ClawBoard cannot modify your files. If you need to edit them, use your preferred editor on the host system.
 
+## 💓 Heartbeat Watchdog
+
+ClawBoard includes **clawbeat** — a proactive monitoring tool that checks task status, agent activity, and orchestration needs.
+
+### What It Does
+
+Clawbeat runs periodically (e.g., every 15 minutes) to:
+
+1. **Check Active Sub-agents** — Avoids interrupting ongoing work
+2. **Monitor Stuck Tasks** — Detects tasks awaiting subtask review with retry tracking
+3. **Track In-Progress Tasks** — Identifies stalled or crashed processes
+4. **Auto-Start Ready Tasks** — Generates spawn-ready prompts for tasks marked `autoStart=true`
+
+### Configuration
+
+Set up environment variables or config file:
+
+```bash
+# Environment variables
+export CLAWBOARD_API_URL="http://localhost:3001/api"
+export CLAWBOARD_TOKEN="your-api-token"
+
+# Or use config file
+mkdir -p ~/.config/clawboard
+echo '{"api_token": "your-token"}' > ~/.config/clawboard/config.json
+```
+
+### Usage
+
+```bash
+# Normal run (outputs JSON)
+python3 cli/clawbeat.py
+
+# Debug mode
+python3 cli/clawbeat.py --verbose
+
+# Dry run (no side effects)
+python3 cli/clawbeat.py --dry-run
+
+# Override API URL
+python3 cli/clawbeat.py --api http://custom-host:3001/api
+```
+
+### Example Output
+
+```json
+{"action": "HEARTBEAT_OK", "reason": "All systems nominal"}
+
+{"action": "WAKE", 
+ "message": "ORCHESTRATE: Stuck Task [abc123] Needs Review\n...", 
+ "reason": "Task abc123 stuck — needs subtask review",
+ "task_id": "abc123", 
+ "attempt": 1, 
+ "recommended_action": "review"}
+```
+
+### Integration with HEARTBEAT.md
+
+Run via cron or OpenClaw heartbeat polling:
+
+**Option 1: Cron (runs every 15 minutes)**
+```bash
+*/15 * * * * cd /path/to/clawboard && python3 cli/clawbeat.py
+```
+
+**Option 2: HEARTBEAT.md in OpenClaw workspace**
+```markdown
+# HEARTBEAT.md
+
+Every heartbeat (15 min interval):
+1. Check clawbeat status
+2. If WAKE action, follow orchestration instructions
+3. Log actions to /tmp/orchestration-actions.log
+
+Command:
+```bash
+cd /path/to/clawboard && python3 cli/clawbeat.py
+```
+```
+
+### Features
+
+- **Context-Rich Prompts** — Full task details, subtasks, project context
+- **Retry Tracking** — Escalates after 3 failed attempts (`/tmp/clawbeat-retries.json`)
+- **Deduplication** — Won't re-wake for same task within 30 minutes (`/tmp/orchestration-actions.log`)
+- **Process Monitoring** — Checks external process health via `/tmp/task-*-status.json`
+- **Zero Dependencies** — Python 3 stdlib only (requests optional)
+
+### How It Works
+
+1. **Active Sub-agent Check** — Scans `~/.openclaw/agents/main/sessions/` for recently active subagent sessions
+2. **API Queries** — Fetches tasks via ClawBoard API (`/api/tasks?status=stuck`, etc.)
+3. **Context Gathering** — Uses `clawboard` CLI to get full task details, subtasks, and project info
+4. **Decision Tree** — Outputs `HEARTBEAT_OK` if all clear, or `WAKE` with detailed orchestration instructions
+
+### Retry Escalation
+
+Tasks are retried automatically with escalation:
+- **Attempt 1-2:** Normal retry with context
+- **Attempt 3+:** Escalation warning — approach may be wrong, consider human review
+
+### Recommended Actions
+
+The `recommended_action` field guides the orchestrator:
+- `review` — Check subtasks and approve/reject
+- `spawn_agent` — Ready to spawn agent for new task
+- `restart_process` — External process crashed, needs restart
+- `escalate` — 3+ failures, needs human intervention
+
+See the [heartbeat-monitoring tool](database/init.sql) for full details.
+
 ## 📚 Documentation
 
 Documentation lives in [`docs/`](docs/):
