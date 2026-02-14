@@ -98,6 +98,10 @@ export interface PluginRegistryEntry {
     path: string;
     badge?: string | null;
   }>;
+  routes: Array<{
+    path: string;
+    proxy_to: string;
+  }>;
   api_base: string;
   internal_port: number;
   category?: string;
@@ -334,6 +338,9 @@ export class PluginLoader {
         healthy: plugin.healthy,
         sidebar: plugin.manifest.ui?.enabled && plugin.manifest.ui?.sidebar 
           ? plugin.manifest.ui.sidebar 
+          : [],
+        routes: plugin.manifest.ui?.enabled && plugin.manifest.ui?.routes
+          ? plugin.manifest.ui.routes
           : [],
         api_base: plugin.manifest.api.base_path,
         internal_port: plugin.manifest.api.internal_port,
