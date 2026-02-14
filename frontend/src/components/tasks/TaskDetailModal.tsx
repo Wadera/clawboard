@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Pencil, Clock, Tag, Cpu, Calendar, Zap, AlertTriangle, FileText, Bot, Play, CheckCircle } from 'lucide-react';
+import { X, Pencil, Clock, Tag, Cpu, Calendar, Zap, AlertTriangle, FileText, Bot, Play, CheckCircle, Copy, Check } from 'lucide-react';
 import { Task, SubtaskStatus } from '../../types/task';
 import { SubtaskList } from './SubtaskList';
 import { TaskLinks } from './TaskLinks';
@@ -33,6 +33,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onSubtaskEdit,
   onSubtaskReorder,
 }) => {
+  const [copied, setCopied] = useState(false);
+
+  const shortId = task.id.substring(0, 8);
+
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(shortId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy task ID:', err);
+    }
+  };
+
   const getPriorityLabel = (): string => {
     switch (task.priority) {
       case 'urgent': return '🔴 Urgent';
@@ -121,6 +135,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="task-detail-meta-item">
               <span className="task-detail-meta-label">Status:</span>
               <span className="task-detail-status">{getStatusLabel()}</span>
+            </div>
+            <div className="task-detail-meta-item task-detail-id-container">
+              <span className="task-detail-meta-label">ID:</span>
+              <code className="task-detail-id">{shortId}</code>
+              <button
+                onClick={handleCopyId}
+                className="task-detail-copy-btn"
+                aria-label={copied ? 'Copied!' : 'Copy task ID'}
+                title={copied ? 'Copied!' : 'Copy task ID'}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
             </div>
           </div>
 

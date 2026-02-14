@@ -371,7 +371,8 @@ export const TasksPage: React.FC = () => {
       const query = filters.searchQuery.toLowerCase();
       const titleMatch = task.title.toLowerCase().includes(query);
       const descMatch = task.description?.toLowerCase().includes(query);
-      if (!titleMatch && !descMatch) return false;
+      const idMatch = task.id.toLowerCase().includes(query);
+      if (!titleMatch && !descMatch && !idMatch) return false;
     }
 
     // Priority filter
