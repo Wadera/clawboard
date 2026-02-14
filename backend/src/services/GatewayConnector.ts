@@ -99,7 +99,7 @@ export class GatewayConnector {
     // Try to read password from config file if not in env
     if (!this.gatewayPassword) {
       try {
-        const configPath = process.env.OPENCLAW_CONFIG_PATH || '/clawdbot/clawdbot.json';
+        const configPath = process.env.OPENCLAW_CONFIG_PATH || process.env.CLAWDBOT_CONFIG_PATH || '/clawdbot/clawdbot.json';
         const config = JSON.parse(readFileSync(configPath, 'utf-8'));
         this.gatewayPassword = config?.gateway?.auth?.password || config?.gateway?.auth?.token || '';
         if (this.gatewayPassword) {
