@@ -127,6 +127,65 @@ services:
     #   - "traefik.http.routers.clawboard.tls.certresolver=letsencrypt"
     #   - "traefik.http.services.clawboard.loadbalancer.server.port=80"
 
+  # ========================================
+  # EXAMPLE PLUGIN SERVICE
+  # ========================================
+  # To add a plugin, create a service like this and add it to clawboard.plugins.json
+  # 
+  # claw-myplugin:
+  #   build:
+  #     context: ./plugins/claw-myplugin
+  #     dockerfile: Dockerfile
+  #   container_name: claw-myplugin
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3020
+  #     # Plugin receives the ClawBoard API URL for internal communication
+  #     CLAWBOARD_CORE_URL: http://clawboard-backend:3001
+  #   networks:
+  #     - clawboard-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3020/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   # Note: Plugins don't expose ports directly - they're accessed via the backend proxy
+  #   # The backend proxies /api/plugins/{name}/* to the plugin container
+  #
+  # Then register in clawboard.plugins.json:
+  # {
+  #   "plugins": [
+  #     {
+  #       "name": "claw-myplugin",
+  #       "source": "./plugins/claw-myplugin",
+  #       "enabled": true
+  #     }
+  #   ]
+  # }
+  #
+  # The backend automatically:
+  # - Proxies /api/plugins/{name}/* to the plugin's internal_port
+  # - Proxies /plugins/{name}/ui/* to the plugin's UI route
+  # - Performs health checks every 60 seconds
+  # - Reports plugin status via GET /api/plugins
+  #
+  # For nginx reverse proxy setups, ensure these locations pass through:
+  #   location /api/plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Upgrade $http_upgrade;
+  #     proxy_set_header Connection 'upgrade';
+  #     proxy_set_header Host $host;
+  #     proxy_cache_bypass $http_upgrade;
+  #   }
+  #
+  #   location /plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Host $host;
+  #   }
+
 volumes:
   postgres_data:
     name: clawboard_postgres_data
