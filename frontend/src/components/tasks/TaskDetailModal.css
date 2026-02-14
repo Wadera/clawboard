@@ -522,3 +522,52 @@
 .subtask-count-new {
   color: rgba(255, 255, 255, 0.5);
 }
+
+/* Task ID & Copy Button */
+.task-detail-id-container {
+  position: relative;
+}
+
+.task-detail-id {
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.05em;
+}
+
+.task-detail-copy-btn {
+  margin-left: var(--space-2);
+  padding: var(--space-1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all var(--transition-base) ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.task-detail-copy-btn:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: var(--purple-300);
+  transform: translateY(-1px);
+}
+
+.task-detail-copy-btn:active {
+  transform: translateY(0);
+}
+
+.task-detail-copy-btn[aria-label="Copied!"] {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
