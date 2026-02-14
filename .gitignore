@@ -36,3 +36,7 @@ postgres_data_*/
 # Temporary files
 tmp/
 temp/
+
+# Config files (use .example as template)
+clawboard.config.json
+clawboard.plugins.json

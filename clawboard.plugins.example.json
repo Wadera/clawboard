@@ -1,11 +1,3 @@
 {
-  "_comment": "ClawBoard Plugin Configuration — list plugins to enable for your deployment",
-  "plugins": [
-    {
-      "name": "example-plugin",
-      "source": "./plugins/example-plugin",
-      "enabled": false,
-      "config_override": {}
-    }
-  ]
+  "plugins": []
 }

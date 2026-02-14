@@ -160,7 +160,7 @@ interface SmartFileIndex {
   structure: {
     frontend: ['src/', 'public/', 'index.html'],
     backend: ['src/', 'routes/', 'services/'],
-    config: ['package.json', 'tsconfig.json', 'docker-compose.yml'],
+    config: ['package.json', 'tsconfig.json', 'docker-compose.prod.yml'],
     docs: ['README.md', 'docs/'],
   };
   stats: {

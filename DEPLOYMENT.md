@@ -22,7 +22,7 @@ docker compose up -d
 ## What's Included
 
 ### Core Files
-- ✅ `docker-compose.yml` - Production stack (clean, env-var based)
+- ✅ `docker-compose.prod.yml` - Production stack (clean, env-var based)
 - ✅ `docker-compose.dev.yml` - Development stack (HMR, bind mounts)
 - ✅ `setup.sh` - Interactive configuration wizard
 - ✅ `.env.example` - All environment variables documented
@@ -74,7 +74,7 @@ Access: `http://localhost:8080/dashboard/`
 
 ClawBoard works seamlessly behind Traefik with automatic SSL certificates.
 
-**Step 1: Add Traefik labels to docker-compose.yml**
+**Step 1: Add Traefik labels to docker-compose.prod.yml**
 
 ```yaml
 services:
@@ -292,7 +292,7 @@ ClawBoard is a fork with no personal references. Key differences:
 |--------------|-----------|
 | `/clawdbot/sessions` | `/openclaw/sessions` |
 | Hardcoded paths | Environment variables |
-| `docker-compose.prod.yml` | `docker-compose.yml` |
+| `docker-compose.prod.yml` | `docker-compose.prod.yml` |
 | No setup script | Interactive `setup.sh` |
 | Manual backup | Automated scripts |
 
