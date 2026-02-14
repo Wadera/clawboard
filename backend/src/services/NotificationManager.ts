@@ -3,8 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-const SESSIONS_DIR = process.env.OPENCLAW_SESSIONS_PATH 
-  ? path.dirname(process.env.OPENCLAW_SESSIONS_PATH) 
+const sessionsPath = process.env.OPENCLAW_SESSIONS_PATH || process.env.CLAWDBOT_SESSIONS_PATH;
+const SESSIONS_DIR = sessionsPath
+  ? path.dirname(sessionsPath) 
   : '/clawdbot/sessions';
 const NOTIFICATIONS_FILE = path.join(SESSIONS_DIR, 'task-notifications.json');
 const MAX_NOTIFICATIONS = 50;
