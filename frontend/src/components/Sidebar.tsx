@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, ChevronDown, ChevronUp } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { getSidebarNavItems } from '../config/navigation';
 import './Sidebar.css';
 import { ModelStatusBadge } from './ModelStatusBadge';
@@ -105,7 +105,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
   // Get status message from database or use default
   const statusMessage = botStatus?.status_text || "Building something amazing...";
   const [statusExpanded, _setStatusExpanded] = useState(false);
-  const [navExpanded, setNavExpanded] = useState(false); // Navigation menu collapsed by default
+  const navExpanded = true; // Navigation always visible
 
   // Get state emoji and color
   const getStateDisplay = (state: string) => {
@@ -185,21 +185,9 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 4. Divider */}
         <div className="sidebar-divider" />
 
-        {/* 5. Navigation Menu - Collapsible */}
+        {/* 5. Navigation Menu */}
         <div className="sidebar-nav-section">
-          <button 
-            className="sidebar-nav-toggle"
-            onClick={() => setNavExpanded(!navExpanded)}
-            aria-expanded={navExpanded}
-            aria-label={navExpanded ? 'Collapse menu' : 'Expand menu'}
-          >
-            <span className="nav-toggle-icon">🧭</span>
-            <span className="nav-toggle-label">Menu</span>
-            <span className="nav-toggle-chevron">
-              {navExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </span>
-          </button>
-          <nav className={`sidebar-nav ${navExpanded ? 'nav-expanded' : 'nav-collapsed'}`} aria-label="Main navigation">
+          <nav className="sidebar-nav nav-expanded" aria-label="Main navigation">
             {getSidebarNavItems().map((item) => (
               <SidebarNavLink 
                 key={item.id}
