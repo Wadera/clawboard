@@ -19,13 +19,14 @@ let connectionListeners = new Set<(connected: boolean) => void>();
 let refCount = 0;
 
 function getWsUrl(): string {
-  // WebSocket endpoint is at /ws (not /api/ws)
-  // In production, nginx routes /api/* to backend, but WS is separate
+  // WebSocket endpoint is at {API_BASE}/ws
+  // Uses the same API base URL as REST calls for correct reverse proxy routing
+  const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   const token = auth.getToken();
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-  return `${protocol}//${host}/ws${tokenParam}`;
+  return `${protocol}//${host}${apiBase}/ws${tokenParam}`;
 }
 
 function notifyConnection(connected: boolean) {
