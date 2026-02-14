@@ -113,9 +113,6 @@ function AuthenticatedApp() {
             </Routes>
           </main>
 
-          <footer className="footer">
-            <p>ClawBoard v1.2.0 | {new Date().getFullYear()}</p>
-          </footer>
         </div>
       </div>
     </FileViewerProvider>
