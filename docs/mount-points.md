@@ -160,7 +160,7 @@ NFS_DIR=/mnt/nfs/NimsProjects
 
 ## Docker Compose Configuration
 
-Here's how these mounts appear in `docker-compose.yml`:
+Here's how these mounts appear in `docker-compose.prod.yml`:
 
 ```yaml
 services:

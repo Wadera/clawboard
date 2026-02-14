@@ -5,7 +5,7 @@
 ClawBoard is a comprehensive web-based dashboard for managing and monitoring your OpenClaw AI agent. It provides a beautiful, modern interface for task management, project tracking, journal entries, conversation history, and real-time agent monitoring.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.yml)
+[![Docker](https://img.shields.io/badge/docker-ready-brightgreen)](docker-compose.prod.yml)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue)](https://www.postgresql.org/)
 
 > ****Repository:** [github.com/Wadera/clawboard](https://github.com/Wadera/clawboard)
@@ -476,7 +476,7 @@ The backend container needs access to these OpenClaw files:
 | `OPENCLAW_GATEWAY_URL` | `ws://host.docker.internal:18789` | Gateway WebSocket URL |
 | `OPENCLAW_WORKSPACE` | `~/.openclaw/workspace` | Bot workspace directory |
 
-> **Note:** Inside the container, these are mapped to `CLAWDBOT_*` env vars that the backend reads. The `docker-compose.yml` handles this mapping automatically.
+> **Note:** Inside the container, these are mapped to `CLAWDBOT_*` env vars that the backend reads. The `docker-compose.prod.yml` handles this mapping automatically.
 
 ### Verifying the Connection
 
@@ -553,7 +553,7 @@ docker compose restart clawboard-backend
 **Common causes:**
 - OpenClaw gateway not running → `openclaw gateway start`
 - Wrong port in `.env` → default is `18789`
-- Docker networking issue → ensure `extra_hosts` is in docker-compose.yml
+- Docker networking issue → ensure `extra_hosts` is in docker-compose.prod.yml
 - Firewall blocking localhost connections → check iptables/firewalld rules
 
 ### Dashboard Won't Load
