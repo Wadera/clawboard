@@ -58,7 +58,7 @@ export const DEFAULT_CONFIG: ClawBoardPublicConfig = {
   },
   features: {
     journal: true,
-    imageGeneration: false,
+    imageGeneration: true,
     taskBoard: true,
     projects: true,
     tools: true,
