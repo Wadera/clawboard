@@ -14,7 +14,8 @@
     "textColor": "#e2e8f0",
     "sidebarTitle": "Nim",
     "loginTitle": "Welcome to NimSpace",
-    "loginSubtitle": "Development Dashboard"
+    "loginSubtitle": "Development Dashboard",
+    "faviconUrl": "/nim-favicon.svg"
   },
   "features": {
     "journal": true,
