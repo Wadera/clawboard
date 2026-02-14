@@ -631,6 +631,62 @@
 }
 
 /* ========================================
+   PLUGIN NAV ITEMS
+   ======================================== */
+
+/* Divider between core and plugin nav items */
+.sidebar-nav-divider {
+  height: 1px;
+  margin: 8px 12px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 20%,
+    rgba(255, 255, 255, 0.12) 80%,
+    transparent 100%
+  );
+}
+
+/* Plugin nav link - inherits from sidebar-nav-link */
+.plugin-nav-link {
+  position: relative;
+}
+
+/* Unhealthy plugin indicator */
+.plugin-nav-link.unhealthy {
+  opacity: 0.6;
+}
+
+.plugin-nav-link.unhealthy:hover {
+  opacity: 0.8;
+}
+
+/* Health indicator dot */
+.plugin-health-dot {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red-400, #f87171);
+  box-shadow: 0 0 6px var(--red-glow, rgba(248, 113, 113, 0.4));
+  animation: pulse-health 2s ease-in-out infinite;
+}
+
+@keyframes pulse-health {
+  0%, 100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(-50%) scale(0.9);
+  }
+}
+
+/* ========================================
    SECTIONS (Activity, Agents, Stats, etc.)
    ======================================== */
 

@@ -8,9 +8,11 @@ import { StopButton } from './StopButton';
 import { WorkspaceFiles } from './WorkspaceFiles';
 import { AgentDetailCard } from './AgentDetailCard';
 import { useBotStatus } from '../hooks/useBotStatus';
+import { usePlugins } from '../contexts/PluginContext';
 import { auth, authenticatedFetch } from '../utils/auth';
 import { StatusOrb } from './StatusOrb';
-// NotificationBadge removed — not needed
+import { DynamicIcon } from '../utils/icons';
+import { PluginNavItem } from '../types/plugin';
 
 interface UsageStats {
   session: { percentLeft: number; timeLeft: string };
@@ -46,6 +48,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const { status: botStatus } = useBotStatus();
+  const { pluginSidebarItems, loading: pluginsLoading } = usePlugins();
   const navigate = useNavigate();
 
   // Listen for model:status events to get OpenClaw version + usage stats
@@ -188,6 +191,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 5. Navigation Menu */}
         <div className="sidebar-nav-section">
           <nav className="sidebar-nav nav-expanded" aria-label="Main navigation">
+            {/* Core navigation items */}
             {getSidebarNavItems().map((item) => (
               <SidebarNavLink 
                 key={item.id}
@@ -196,6 +200,19 @@ export function Sidebar({ status, connected }: SidebarProps) {
                 label={item.label} 
               />
             ))}
+            
+            {/* Plugin navigation items */}
+            {!pluginsLoading && pluginSidebarItems.length > 0 && (
+              <>
+                <div className="sidebar-nav-divider" />
+                {pluginSidebarItems.map((item) => (
+                  <PluginNavLink
+                    key={`${item.pluginName}-${item.path}`}
+                    item={item}
+                  />
+                ))}
+              </>
+            )}
           </nav>
         </div>
 
@@ -330,6 +347,28 @@ function SidebarNavLink({ to, icon, label }: SidebarNavLinkProps) {
     >
       <span className="nav-icon">{icon}</span>
       <span className="nav-label">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * Plugin navigation link with dynamic icon and health indicator
+ */
+function PluginNavLink({ item }: { item: PluginNavItem }) {
+  const location = useLocation();
+  const isActive = location.pathname.startsWith(item.path);
+  
+  return (
+    <Link 
+      to={item.path} 
+      className={`sidebar-nav-link plugin-nav-link ${isActive ? 'active' : ''} ${!item.healthy ? 'unhealthy' : ''}`}
+      title={!item.healthy ? `${item.label} (plugin unhealthy)` : item.label}
+    >
+      <span className="nav-icon">
+        <DynamicIcon name={item.icon} size={18} />
+      </span>
+      <span className="nav-label">{item.label}</span>
+      {!item.healthy && <span className="plugin-health-dot" title="Plugin unhealthy" />}
     </Link>
   );
 }

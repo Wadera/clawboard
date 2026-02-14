@@ -17,6 +17,8 @@ import { FileViewerProvider } from './contexts/FileViewerContext';
 import { ModelSwitchProvider } from './contexts/ModelSwitchContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ClawBoardConfigProvider, useClawBoardConfig } from './contexts/ClawBoardConfigContext';
+import { PluginProvider, usePlugins } from './contexts/PluginContext';
+import { PluginFrame } from './components/PluginFrame';
 import { auth, authenticatedFetch } from './utils/auth';
 
 function App() {
@@ -60,6 +62,7 @@ function AuthenticatedApp() {
   
   return (
     <Router basename={basename}>
+      <PluginProvider>
       <ToastProvider>
       <ModelSwitchProvider>
       <FileViewerProvider>
@@ -100,17 +103,7 @@ function AuthenticatedApp() {
           </header>
 
           <main className="main-content">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              {config.features.taskBoard && <Route path="/tasks" element={<TasksPage />} />}
-              {config.features.projects && <Route path="/projects" element={<ProjectsPage />} />}
-              {config.features.imageGeneration && <Route path="/images" element={<ImageGenerationPage />} />}
-              {config.features.sessions && <Route path="/sessions" element={<SessionsPage />} />}
-              {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
-              {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
-              {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
-              {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
-            </Routes>
+            <AppRoutes config={config} />
           </main>
 
         </div>
@@ -118,7 +111,46 @@ function AuthenticatedApp() {
     </FileViewerProvider>
       </ModelSwitchProvider>
       </ToastProvider>
+      </PluginProvider>
     </Router>
+  );
+}
+
+/**
+ * App routes component that includes both static and plugin routes
+ */
+function AppRoutes({ config }: { config: ReturnType<typeof useClawBoardConfig>['config'] }) {
+  const { pluginRoutes, loading: pluginsLoading } = usePlugins();
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+  return (
+    <Routes>
+      {/* Core routes */}
+      <Route path="/" element={<DashboardPage />} />
+      {config.features.taskBoard && <Route path="/tasks" element={<TasksPage />} />}
+      {config.features.projects && <Route path="/projects" element={<ProjectsPage />} />}
+      {config.features.imageGeneration && <Route path="/images" element={<ImageGenerationPage />} />}
+      {config.features.sessions && <Route path="/sessions" element={<SessionsPage />} />}
+      {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
+      {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
+      {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
+      {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
+      
+      {/* Plugin routes - dynamically registered */}
+      {!pluginsLoading && pluginRoutes.map(route => (
+        <Route
+          key={`${route.pluginName}-${route.path}`}
+          path={`${route.path}/*`}
+          element={
+            <PluginFrame
+              pluginName={route.pluginName}
+              proxyPath={route.proxy_to}
+              apiBase={API_BASE}
+            />
+          }
+        />
+      ))}
+    </Routes>
   );
 }
 
