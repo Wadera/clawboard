@@ -81,7 +81,7 @@ services:
       # Auth profiles
       - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
       # Bot workspace memory
-      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:ro
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:rw
       # Generated media (journal images, voice notes, avatars)
       - ${OPENCLAW_WORKSPACE:-~/clawd}/media/generated:/clawd-media/generated:ro
       # Project media
