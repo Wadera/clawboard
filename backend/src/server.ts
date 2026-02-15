@@ -278,21 +278,28 @@ server.listen(PORT, async () => {
 ╚═══════════════════════════════════════╝
   `);
   
-  // Start session monitoring
+  // Start session monitoring (gracefully handles unreadable files)
   try {
     sessionMonitor.start();
     console.log('✅ Session monitor started');
-  } catch (err) {
-    console.warn('⚠️  Session monitor failed to start:', (err as Error).message);
-    console.warn('   Dashboard will work but session tracking unavailable');
+  } catch (err: any) {
+    console.warn(`⚠️ Session monitor failed to start (${err.code || err.message}). Status updates unavailable.`);
   }
   
   // Start Phase 3 services
-  await workspaceWatcher.start();
-  console.log('✅ Workspace watcher started');
+  try {
+    await workspaceWatcher.start();
+    console.log('✅ Workspace watcher started');
+  } catch (err: any) {
+    console.warn(`⚠️ Workspace watcher failed to start: ${err.message}`);
+  }
   
-  modelStatusService.start();
-  console.log('✅ Model status service started');
+  try {
+    await modelStatusService.start();
+    console.log('✅ Model status service started');
+  } catch (err: any) {
+    console.warn(`⚠️ Model status service failed to start (${err.code || err.message}). Model info unavailable.`);
+  }
   
   // Initialize task manager
   await taskManager.initialize();

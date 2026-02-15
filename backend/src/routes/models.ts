@@ -84,9 +84,58 @@ async function setPreferredDefault(model: string): Promise<void> {
 router.get('/status', async (_req: Request, res: Response) => {
   try {
     const [config, authData] = await Promise.all([
-      readJsonFile(CLAWDBOT_CONFIG),
+      readJsonFile(CLAWDBOT_CONFIG).catch((err: any) => {
+        if (err.code === 'EACCES') {
+          console.warn('⚠️ Cannot read OpenClaw config (EACCES). Model info will be limited.');
+        } else if (err.code !== 'ENOENT') {
+          console.warn('⚠️ Cannot read OpenClaw config:', err.message);
+        }
+        return null;
+      }),
       readJsonFile(AUTH_PROFILES_PATH).catch(() => null),
     ]);
+
+    // If config is unreadable, return minimal status from gateway/session data
+    if (!config) {
+      let sessionContext = { totalTokens: 0, contextTokens: 200000, used: 0, percent: 0 };
+      let activeModel = 'unknown';
+      let sessionAge = 'unknown';
+
+      if (gatewayConnector) {
+        const snapshot = gatewayConnector.getQueueSnapshot();
+        const mainSession = snapshot.sessions?.find(
+          (s: any) => s.sessionKey === 'agent:main:main' || s.sessionKey?.includes(':main:main')
+        );
+        if (mainSession) {
+          activeModel = mainSession.model || 'unknown';
+          const usage = mainSession.tokenUsage || { total: 0, context: 200000, percentUsed: 0 };
+          sessionContext = { totalTokens: usage.total, contextTokens: usage.context, used: usage.total, percent: usage.percentUsed };
+          if (mainSession.lastActivity) {
+            const ageSecs = Math.floor((Date.now() - mainSession.lastActivity) / 1000);
+            if (ageSecs < 60) sessionAge = `${ageSecs}s`;
+            else if (ageSecs < 3600) sessionAge = `${Math.floor(ageSecs / 60)}m`;
+            else sessionAge = `${Math.floor(ageSecs / 3600)}h`;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        activeModel,
+        modelAlias: shortModelName(activeModel),
+        defaultModel: activeModel,
+        defaultModelAlias: shortModelName(activeModel),
+        isOverride: false,
+        activeProfile: null,
+        contextUsage: sessionContext,
+        session: { ageFormatted: sessionAge },
+        profiles: {},
+        models: { primary: activeModel, fallbacks: [], available: [] },
+        authOrder: {},
+        configUnavailable: true,
+      });
+      return;
+    }
 
     const agentDefaults = config.agents?.defaults || {};
     const modelConfig = agentDefaults.model || {};
@@ -211,9 +260,14 @@ router.get('/status', async (_req: Request, res: Response) => {
       models: { primary: primaryModel, fallbacks, available },
       authOrder,
     });
-  } catch (err) {
-    console.error('❌ Failed to read models status:', err);
-    res.status(500).json({ success: false, error: 'Failed to read models status' });
+  } catch (err: any) {
+    if (err.code === 'EACCES') {
+      console.warn('⚠️ Models status: permission denied reading config files. Set PUID/PGID to match host file owner.');
+      res.status(503).json({ success: false, error: 'Config files not readable (permission denied). Set PUID/PGID in docker-compose.' });
+    } else {
+      console.error('❌ Failed to read models status:', err);
+      res.status(500).json({ success: false, error: 'Failed to read models status' });
+    }
   }
 });
 
