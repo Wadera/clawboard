@@ -181,6 +181,22 @@ export const TasksPage: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Handle focus parameter from URL
+  useEffect(() => {
+    const focusColumn = searchParams.get('focus') as ColumnKey | null;
+    if (focusColumn && COLUMNS.includes(focusColumn)) {
+      // Collapse all columns except the focused one
+      const columnsToCollapse = COLUMNS.filter(col => col !== focusColumn);
+      setCollapsedColumns(new Set(columnsToCollapse));
+      
+      // Scroll to the focused column after a short delay
+      setTimeout(() => {
+        const el = document.querySelector(`[data-status="${focusColumn}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+      }, 200);
+    }
+  }, [searchParams]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
