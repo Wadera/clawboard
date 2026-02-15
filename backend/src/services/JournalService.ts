@@ -8,6 +8,7 @@ export interface JournalEntry {
   mood: string | null;
   reflection_text: string;
   image_path: string | null;
+  voice_path: string | null;
   highlights: string[] | null;
   created_at: string;
 }
@@ -18,6 +19,7 @@ export interface CreateJournalEntryInput {
   mood?: string;
   reflection_text: string;
   image_path?: string;
+  voice_path?: string;
   highlights?: string[];
 }
 
@@ -62,7 +64,7 @@ export class JournalService {
    * Create a new journal entry
    */
   async create(input: CreateJournalEntryInput): Promise<JournalEntry> {
-    const { date, mood, reflection_text, image_path, highlights } = input;
+    const { date, mood, reflection_text, image_path, voice_path, highlights } = input;
 
     // Auto-calculate sequence if not provided
     let sequence = input.sequence;
@@ -75,10 +77,10 @@ export class JournalService {
     }
 
     const result = await pool.query(
-      `INSERT INTO journal_entries (date, sequence, mood, reflection_text, image_path, highlights)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO journal_entries (date, sequence, mood, reflection_text, image_path, voice_path, highlights)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [date, sequence, mood || null, reflection_text, image_path || null, highlights || null]
+      [date, sequence, mood || null, reflection_text, image_path || null, voice_path || null, highlights || null]
     );
 
     return result.rows[0];
@@ -107,6 +109,10 @@ export class JournalService {
     if (input.image_path !== undefined) {
       fields.push(`image_path = $${paramIndex++}`);
       values.push(input.image_path);
+    }
+    if (input.voice_path !== undefined) {
+      fields.push(`voice_path = $${paramIndex++}`);
+      values.push(input.voice_path);
     }
     if (input.highlights !== undefined) {
       fields.push(`highlights = $${paramIndex++}`);

@@ -1,5 +1,6 @@
 import { authenticatedFetch } from '../utils/auth';
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { BookOpen, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
 import { marked } from 'marked';
 import './JournalPage.css';
@@ -14,6 +15,7 @@ interface JournalEntry {
   mood: string | null;
   reflection_text: string;
   image_path: string | null;
+  voice_path: string | null;
   highlights: string[] | null;
   created_at: string;
 }
@@ -82,8 +84,7 @@ export function JournalPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('grid');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const pageSize = 10;
+  const pageSize = 12;
 
   // Real-time status hooks
   const { status: realtimeStatus, connected } = useRealtimeStatus();
@@ -155,14 +156,14 @@ export function JournalPage() {
         <div className="journal-view-toggle">
           <button
             className={`journal-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => { setViewMode('grid'); setExpandedId(null); }}
+            onClick={() => setViewMode('grid')}
             title="Grid view"
           >
             <LayoutGrid size={18} />
           </button>
           <button
             className={`journal-view-btn ${viewMode === 'timeline' ? 'active' : ''}`}
-            onClick={() => { setViewMode('timeline'); setExpandedId(null); }}
+            onClick={() => setViewMode('timeline')}
             title="Timeline view"
           >
             <List size={18} />
@@ -170,7 +171,7 @@ export function JournalPage() {
         </div>
       </div>
 
-      {/* Status Card */}
+      {/* Status Card with NimOrb */}
       <div className="journal-status-card">
         <div className="journal-status-content">
           {/* State row */}
@@ -207,10 +208,10 @@ export function JournalPage() {
 
         {/* Avatar image on the right */}
         <div className="journal-status-avatar">
-          {botStatus?.avatar_url ? (
+          {nimStatus?.avatar_url ? (
             <img 
-              src={botStatus.avatar_url} 
-              alt="Bot's current mood" 
+              src={nimStatus.avatar_url} 
+              alt="Nim's current mood" 
               className="journal-avatar-image"
             />
           ) : (
@@ -237,11 +238,12 @@ export function JournalPage() {
           {viewMode === 'grid' ? (
             <div className="journal-grid">
               {entries.map((entry) => (
-                <article
+                <Link
                   key={entry.id}
-                  className={`journal-grid-card ${expandedId === entry.id ? 'expanded' : ''}`}
-                  onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                  to={`/journal/${entry.id}`}
+                  className="journal-grid-card-link"
                 >
+                  <article className="journal-grid-card">
                   {entry.image_path && (
                     <div className="journal-grid-art">
                       <img
@@ -265,34 +267,16 @@ export function JournalPage() {
                         {entry.mood}
                       </span>
                     )}
-                    {expandedId === entry.id && (
-                      <div className="journal-grid-expanded">
-                        <div
-                          className="journal-entry-text"
-                          dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(entry.reflection_text),
-                          }}
-                        />
-                        {entry.highlights && entry.highlights.length > 0 && (
-                          <div className="journal-entry-highlights">
-                            <h4>✨ Highlights</h4>
-                            <ul>
-                              {entry.highlights.map((h, i) => (
-                                <li key={i}>{h}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </article>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="journal-timeline">
               {entries.map((entry) => (
-                <article key={entry.id} className="journal-entry">
+                <Link key={entry.id} to={`/journal/${entry.id}`} className="journal-entry-link">
+                  <article className="journal-entry">
                   <div className="journal-entry-date-bar">
                     <span className="journal-entry-mood-emoji">
                       {getMoodEmoji(entry.mood)}
@@ -318,6 +302,18 @@ export function JournalPage() {
                       </div>
                     )}
 
+                    {entry.voice_path && (
+                      <div className="journal-voice-player">
+                        <div className="voice-player-label">
+                          <span className="voice-icon">🎙️</span>
+                          <span>Listen to the narration</span>
+                        </div>
+                        <audio controls preload="metadata" className="voice-audio">
+                          <source src={`${API_BASE_URL}/clawd-media/${entry.voice_path}`} type="audio/mpeg" />
+                        </audio>
+                      </div>
+                    )}
+
                     <div
                       className="journal-entry-text"
                       dangerouslySetInnerHTML={{
@@ -337,6 +333,7 @@ export function JournalPage() {
                     )}
                   </div>
                 </article>
+                </Link>
               ))}
             </div>
           )}
