@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import { pool } from './db/connection';
 import { WebSocketService } from './services/websocket';
 import { SessionMonitor } from './services/sessionMonitor';
-import { taskManager } from './services/TaskManager';
+import { taskManagerDB as taskManager } from './services/TaskManagerDB';
 import { WorkspaceWatcher } from './services/workspaceWatcher';
 import { ModelStatusService } from './services/modelStatus';
 import { ControlService } from './services/controlService';

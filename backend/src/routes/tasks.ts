@@ -401,10 +401,15 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
 
     const task = await taskManager.updateSubtaskStatus(id, index, status, validatedRole, reviewNote);
     
+    // Get subtask summary (handle both sync and async versions)
+    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
+      ? taskManager.getSubtaskSummary(id)
+      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id)
+      subtaskSummary
     });
   } catch (err) {
     console.error('[Tasks API] Error updating subtask status:', err);
@@ -505,11 +510,20 @@ router.post('/:id/subtasks/:index/approve', async (req: Request, res: Response):
 
     const task = await taskManager.approveSubtask(id, index);
     
+    // Get subtask summary (handle both sync and async versions)
+    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
+      ? taskManager.getSubtaskSummary(id)
+      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    
+    const allCompleted = typeof taskManager.allSubtasksCompleted === 'function'
+      ? taskManager.allSubtasksCompleted(id)
+      : await (taskManager as any).allSubtasksCompletedAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id),
-      allCompleted: taskManager.allSubtasksCompleted(id)
+      subtaskSummary,
+      allCompleted
     });
   } catch (err) {
     console.error('[Tasks API] Error approving subtask:', err);
@@ -540,10 +554,15 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
 
     const task = await taskManager.rejectSubtask(id, index, note);
     
+    // Get subtask summary (handle both sync and async versions)
+    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
+      ? taskManager.getSubtaskSummary(id)
+      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id)
+      subtaskSummary
     });
   } catch (err) {
     console.error('[Tasks API] Error rejecting subtask:', err);
@@ -561,23 +580,30 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
  * GET /tasks/:id/subtasks/summary
  * Get subtask completion summary for a task
  */
-router.get('/:id/subtasks/summary', (req: Request, res: Response): void => {
+router.get('/:id/subtasks/summary', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const task = taskManager.getTask(id);
+    const task = await taskManager.getTask(id);
     
     if (!task) {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
     }
 
-    const summary = taskManager.getSubtaskSummary(id);
+    // Get subtask summary (handle both sync and async versions)
+    const summary = typeof taskManager.getSubtaskSummary === 'function' 
+      ? taskManager.getSubtaskSummary(id)
+      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    
+    const allCompleted = typeof taskManager.allSubtasksCompleted === 'function'
+      ? taskManager.allSubtasksCompleted(id)
+      : await (taskManager as any).allSubtasksCompletedAsync(id);
     
     res.json({ 
       success: true, 
       taskId: id,
       summary,
-      allCompleted: taskManager.allSubtasksCompleted(id)
+      allCompleted
     });
   } catch (err) {
     console.error('[Tasks API] Error getting subtask summary:', err);
