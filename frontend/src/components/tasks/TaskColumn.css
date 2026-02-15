@@ -291,10 +291,14 @@
     min-height: 50px;
     max-height: 50px;
   }
+
+  .task-column-header {
+    padding: 12px;
+  }
   
   .task-column-collapsed .task-column-header {
     flex-direction: row;
-    padding: var(--space-3) var(--space-4);
+    padding: 12px;
   }
   
   .task-column-collapsed .task-column-title {
@@ -308,8 +312,20 @@
     flex-direction: row;
   }
 
+  .task-column-content {
+    padding: 12px;
+    gap: 12px;
+  }
+
   /* Hide collapse button on mobile since we have tabs */
   .task-column-collapse-btn {
     display: none;
+  }
+
+  /* Ensure touch-friendly quick add button */
+  .task-column-quick-add {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
   }
 }

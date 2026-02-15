@@ -188,6 +188,9 @@ export class ModelStatusService {
 
     // Set up chokidar file watcher on sessions.json for real-time updates
     try {
+      // Verify file is readable before watching (avoids chokidar crash on EACCES)
+      await readFile(this.sessionsPath, 'utf-8');
+      
       this.fileWatcher = chokidar.watch(this.sessionsPath, {
         persistent: true,
         usePolling: true,        // NFS/Docker mounts need polling
@@ -204,9 +207,19 @@ export class ModelStatusService {
         this.debounceTimer = setTimeout(() => this.updateAndBroadcast(), 500);
       });
 
+      // Handle chokidar errors gracefully
+      this.fileWatcher.on('error', (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn('⚠️ File watcher error (will use polling):', msg);
+      });
+
       console.log('📊 File watcher active on sessions.json');
-    } catch (err) {
-      console.warn('⚠️ Could not start file watcher, using polling only:', err);
+    } catch (err: any) {
+      if (err.code === 'EACCES') {
+        console.warn('⚠️ Cannot read sessions file (EACCES). Set PUID/PGID to match host file owner.');
+      } else {
+        console.warn(`⚠️ Could not start file watcher (${err.code || err.message}). Using polling only.`);
+      }
     }
 
     // Set up file watcher for task-notifications.json
@@ -263,8 +276,16 @@ export class ModelStatusService {
       if (this.defaultModel) {
         console.log(`📊 Default model (from config fallback): ${this.defaultModel}`);
       }
-    } catch (err) {
-      console.warn('⚠️ Could not read default model:', err);
+    } catch (err: any) {
+      if (err.code === 'EACCES') {
+        console.warn('⚠️ Cannot read OpenClaw config (EACCES). Model info will be limited.');
+        console.warn('   Fix: Set PUID/PGID in docker-compose to match host file owner.');
+      } else if (err.code === 'ENOENT') {
+        console.warn('⚠️ OpenClaw config not found. Model info will show from session data only.');
+      } else {
+        console.warn('⚠️ Could not read default model:', err.message || err);
+      }
+      // Gracefully continue — model info will come from session data instead
     }
   }
 
@@ -526,8 +547,12 @@ export class ModelStatusService {
         openclawVersion: this.openclawVersion,
         updatedAt: new Date().toISOString(),
       };
-    } catch (err) {
-      console.error('❌ Failed to read model status:', err);
+    } catch (err: any) {
+      if (err.code === 'EACCES') {
+        console.warn('⚠️ Cannot read sessions file (EACCES). Set PUID/PGID to match host file owner.');
+      } else {
+        console.error('❌ Failed to read model status:', err.message || err);
+      }
       return null;
     }
   }

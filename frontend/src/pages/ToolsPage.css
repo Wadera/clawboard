@@ -12,6 +12,9 @@
 
 /* Header */
 .tools-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   padding: var(--space-6) var(--space-8);
@@ -19,6 +22,7 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .tools-page-header-title h1 {

@@ -85,7 +85,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { date, mood, reflection_text, image_path, highlights } = req.body;
+    const { date, mood, reflection_text, image_path, voice_path, highlights } = req.body;
 
     if (!date || !reflection_text) {
       res.status(400).json({
@@ -100,6 +100,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       mood,
       reflection_text,
       image_path,
+      voice_path,
       highlights
     });
 

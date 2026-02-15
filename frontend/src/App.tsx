@@ -11,6 +11,7 @@ import { SessionsPage } from './pages/SessionsPage';
 import { StatsPage } from './pages/StatsPage';
 import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
+import { JournalPostPage } from './pages/JournalPostPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { LoginPage } from './pages/LoginPage';
 import { FileViewerProvider } from './contexts/FileViewerContext';
@@ -133,6 +134,7 @@ function AppRoutes({ config }: { config: ReturnType<typeof useClawBoardConfig>['
       {config.features.sessions && <Route path="/sessions" element={<SessionsPage />} />}
       {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
       {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
+      {config.features.journal && <Route path="/journal/:id" element={<JournalPostPage />} />}
       {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
       {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
       

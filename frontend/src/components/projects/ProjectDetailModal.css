@@ -1672,6 +1672,48 @@
     width: 95%;
     max-height: 90vh;
   }
+
+  /* Stack header vertically on mobile */
+  .project-detail-header {
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .project-detail-title h2 {
+    font-size: var(--text-xl);
+  }
+
+  /* Actions row: wrap, icon-only buttons */
+  .project-detail-actions {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  /* Hide button text on mobile — icons only */
+  .project-detail-actions .btn-copy-context,
+  .project-detail-actions .btn-archive,
+  .project-detail-actions .btn-restore,
+  .project-detail-actions .btn-delete-project {
+    padding: var(--space-2);
+    font-size: 0;
+    gap: 0;
+  }
+
+  /* Keep icons visible */
+  .project-detail-actions .btn-copy-context svg,
+  .project-detail-actions .btn-archive svg,
+  .project-detail-actions .btn-restore svg,
+  .project-detail-actions .btn-delete-project svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Close button stays visible */
+  .project-detail-actions .modal-close {
+    margin-left: auto;
+  }
   
   .stats-grid {
     grid-template-columns: 1fr;

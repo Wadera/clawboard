@@ -369,7 +369,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 12px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-color, #374151);
     border-radius: 6px;
@@ -380,6 +380,8 @@
     font-family: inherit;
     width: 100%;
     justify-content: center;
+    min-height: 44px;
+    box-sizing: border-box;
   }
 
   .filter-bar-filters {
@@ -391,25 +393,29 @@
   }
 
   .filter-bar {
-    padding: 10px;
+    padding: 12px;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .filter-bar-search-input {
     font-size: 13px;
-    padding: 8px 36px;
+    padding: 12px 40px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
 
   .filter-bar-filters {
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
   }
 
   .filter-dropdown-button,
   .filter-clear-all {
-    padding: 6px 10px;
+    padding: 12px;
     font-size: 12px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
 
   .filter-clear-all {
@@ -420,8 +426,8 @@
 
   .filter-dropdown-menu {
     position: fixed;
-    left: 10px;
-    right: 10px;
+    left: 12px;
+    right: 12px;
     top: auto;
     bottom: 20px;
     min-width: auto;

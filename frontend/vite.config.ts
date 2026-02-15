@@ -12,9 +12,9 @@ export default defineConfig({
       usePolling: true
     },
     allowedHosts: [
-      
       'localhost',
-      ''
+      'nimspace.skyday.eu',
+      '.skyday.eu'
     ]
   },
   preview: {

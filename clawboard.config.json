@@ -1,0 +1,55 @@
+{
+  "bot": {
+    "name": "Nim",
+    "displayName": "Nim Dashboard",
+    "emoji": "\ud83e\udd16",
+    "description": "NimSpace AI Dashboard - Development Environment",
+    "avatarUrl": "/assets/avatar-placeholder.png"
+  },
+  "branding": {
+    "primaryColor": "#06b6d4",
+    "accentColor": "#0891b2",
+    "backgroundColor": "#0f172a",
+    "surfaceColor": "#1e293b",
+    "textColor": "#e2e8f0",
+    "sidebarTitle": "Nim",
+    "loginTitle": "Welcome to NimSpace",
+    "loginSubtitle": "Development Dashboard",
+    "faviconUrl": "/dashboard-dev/favicon.png"
+  },
+  "features": {
+    "journal": true,
+    "imageGeneration": false,
+    "taskBoard": true,
+    "projects": true,
+    "tools": true,
+    "auditLog": true,
+    "stats": true,
+    "botStatus": true,
+    "avatarPage": false
+  },
+  "paths": {
+    "dataDir": "/data",
+    "openclawDir": "/home/user/.openclaw",
+    "mediaDir": "/data/media",
+    "sessionsDir": "/home/user/.openclaw/agents/main/sessions"
+  },
+  "services": {
+    "taskApiUrl": "http://localhost:3001/api",
+    "openclawGatewayWs": "ws://localhost:3120",
+    "openclawApiUrl": "http://localhost:3120",
+    "imageGenEndpoint": "",
+    "imageGenProvider": "none"
+  },
+  "deployment": {
+    "domain": "localhost",
+    "port": 8085,
+    "useHttps": false,
+    "corsOrigin": "http://localhost:8085"
+  },
+  "plugins": {
+    "configFile": "./clawboard.plugins.json",
+    "enabled": true,
+    "healthCheckIntervalMs": 60000
+  }
+}

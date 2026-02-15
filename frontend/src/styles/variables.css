@@ -1,19 +1,9 @@
 /**
- * ClawBoard - Design Tokens
+ * Nim Dashboard - Design Tokens
  * Modern dark theme with semantic variables
  */
 
 :root {
-  /* ========================================
-     CLAWBOARD CONFIG OVERRIDES
-     These can be customized via clawboard.config.json
-     ======================================== */
-  --cb-primary: var(--config-primary, #6366f1);
-  --cb-accent: var(--config-accent, #8b5cf6);
-  --cb-bg: var(--config-bg, #0f172a);
-  --cb-surface: var(--config-surface, #1e293b);
-  --cb-text: var(--config-text, #e2e8f0);
-
   /* ========================================
      COLORS - Background Layers
      ======================================== */

@@ -76,7 +76,8 @@ export const DEFAULT_CONFIG: ClawBoardPublicConfig = {
  */
 export async function fetchConfig(): Promise<ClawBoardPublicConfig> {
   try {
-    const response = await fetch('/config');
+    const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
+    const response = await fetch(`${apiBase}/config`);
     
     if (!response.ok) {
       console.warn('Failed to fetch config from API, using defaults');

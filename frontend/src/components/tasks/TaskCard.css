@@ -186,6 +186,8 @@
   transition: all 0.15s ease;
   margin-top: 2px;
   width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .task-card-project-badge:hover {
@@ -194,7 +196,7 @@
 }
 
 .task-card-project-badge span {
-  max-width: 120px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -206,6 +208,8 @@
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .task-card-tag {
@@ -221,6 +225,8 @@
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .task-card-tag:hover {
@@ -234,10 +240,10 @@
 }
 
 .task-card-tag span {
-  max-width: 60px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .task-card-tag-more {
@@ -259,13 +265,15 @@
   color: var(--purple-300);
   animation: agentPulse 2s ease-in-out infinite;
   width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .task-card-agent-compact span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 100%;
 }
 
 @keyframes agentPulse {
@@ -383,9 +391,13 @@
 }
 
 /* Mobile Responsive */
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .task-card-compact {
-    padding: var(--space-3);
+    padding: 12px;
+  }
+
+  .task-card-compact-header {
+    gap: 8px;
   }
 
   .task-card-priority-compact {
@@ -396,5 +408,26 @@
 
   .task-card-title-compact {
     font-size: var(--text-xs);
+  }
+
+  .task-card-project-badge,
+  .task-card-tag,
+  .task-card-agent-compact {
+    font-size: 0.625rem;
+    padding: 2px 6px;
+  }
+
+  .task-card-tags {
+    gap: 3px;
+    margin-top: 4px;
+  }
+
+  /* Ensure stacking order on mobile - prevent overlaps */
+  .task-card-thinking,
+  .task-card-blocked,
+  .task-card-blocks {
+    margin-top: 4px;
+    font-size: 0.625rem;
+    padding: 2px 6px;
   }
 }

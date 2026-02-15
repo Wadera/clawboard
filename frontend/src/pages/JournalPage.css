@@ -219,10 +219,16 @@
 
 /* Header */
 .journal-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 2.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .journal-header-icon {
@@ -291,6 +297,12 @@
   gap: 2rem;
 }
 
+.journal-entry-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 /* Entry card */
 .journal-entry {
   background: linear-gradient(135deg, rgba(41, 37, 36, 0.7), rgba(28, 25, 23, 0.9));
@@ -300,7 +312,7 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.journal-entry:hover {
+.journal-entry-link:hover .journal-entry {
   border-color: rgba(245, 158, 11, 0.3);
   box-shadow: 0 4px 24px rgba(245, 158, 11, 0.06);
 }
@@ -341,6 +353,39 @@
 /* Entry body */
 .journal-entry-body {
   padding: 1.5rem;
+}
+
+/* Voice player */
+.journal-voice-player {
+  margin: 1rem 0 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 12px;
+}
+
+.voice-player-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.voice-icon {
+  font-size: 1.1rem;
+}
+
+.voice-audio {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* Style the audio controls to match dark theme */
+.voice-audio::-webkit-media-controls-panel {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* Art image */
@@ -487,24 +532,24 @@
   gap: 1.25rem;
 }
 
+.journal-grid-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 .journal-grid-card {
   background: linear-gradient(135deg, rgba(41, 37, 36, 0.7), rgba(28, 25, 23, 0.9));
   border: 1px solid rgba(245, 158, 11, 0.15);
   border-radius: 16px;
   overflow: hidden;
-  cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
-.journal-grid-card:hover {
+.journal-grid-card-link:hover .journal-grid-card {
   border-color: rgba(245, 158, 11, 0.3);
   box-shadow: 0 4px 24px rgba(245, 158, 11, 0.06);
   transform: translateY(-2px);
-}
-
-.journal-grid-card.expanded {
-  grid-column: 1 / -1;
-  cursor: default;
 }
 
 .journal-grid-art {

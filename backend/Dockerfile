@@ -17,6 +17,9 @@ RUN npm run build
 # Production image
 FROM node:20-alpine
 
+# Install su-exec for privilege dropping in entrypoint
+RUN apk add --no-cache su-exec
+
 WORKDIR /app
 
 # Copy package files and install production dependencies only
@@ -28,14 +31,17 @@ COPY --from=builder /app/dist ./dist
 # Copy migrations (SQL files, not compiled)
 COPY --from=builder /app/src/migrations ./dist/migrations
 
-# Create non-root user (UID 1002 to match host clawd user)
-RUN addgroup -g 1002 -S nodejs && \
-    adduser -S nodejs -u 1002
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-USER nodejs
+# Default PUID/PGID — override in docker-compose to match host file owner
+ENV PUID=1002
+ENV PGID=1002
 
 # Expose port
 EXPOSE 3000
 
-# Start server
+# Use entrypoint for PUID/PGID handling
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/server.js"]
