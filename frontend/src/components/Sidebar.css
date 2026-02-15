@@ -21,10 +21,6 @@
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
 }
 
-/* Sidebar always expanded on desktop */
-
-/* Collapse toggle removed - sidebar always fully visible on desktop */
-
 /* ========================================
    AVATAR SECTION - Top Priority
    ======================================== */
@@ -51,11 +47,6 @@
   z-index: 1000;
   transition: width 0.3s ease, height 0.3s ease;
   border-radius: 50%;
-}
-
-.sidebar-collapsed .avatar-container {
-  width: 56px;
-  height: 56px;
 }
 
 .avatar-container--clickable {
@@ -101,10 +92,6 @@
 .avatar-placeholder-emoji {
   font-size: 60px;
   animation: gentle-pulse 4s ease-in-out infinite;
-}
-
-.sidebar-collapsed .avatar-placeholder-emoji {
-  font-size: 28px;
 }
 
 /* Avatar state animations */
@@ -164,14 +151,6 @@
   pointer-events: none;
 }
 
-.sidebar-collapsed .avatar-state-indicator {
-  width: 20px;
-  height: 20px;
-  font-size: 10px;
-  bottom: 0;
-  right: 0;
-}
-
 /* ========================================
    MODEL SECTION - Below Avatar
    ======================================== */
@@ -186,13 +165,6 @@
   z-index: 50;
 }
 
-/* Ensure badge stays centered and doesn't overflow in collapsed state */
-.sidebar-collapsed .sidebar-model-section {
-  padding: 4px 0;
-  max-width: 64px;
-  overflow: hidden;
-}
-
 /* ========================================
    USAGE BARS - Always visible below badge
    ======================================== */
@@ -201,10 +173,6 @@
   width: 100%;
   padding: 4px 12px;
   flex-shrink: 0;
-}
-
-.sidebar-collapsed .sidebar-usage-bars {
-  display: none;
 }
 
 .usage-bar-row {
@@ -312,15 +280,6 @@
   animation: dot-pulse 2s ease-in-out infinite;
 }
 
-.sidebar-collapsed .connection-text {
-  display: none;
-}
-
-.sidebar-collapsed .sidebar-connection {
-  padding: 6px;
-  border-radius: 50%;
-}
-
 /* ========================================
    DIVIDER
    ======================================== */
@@ -365,20 +324,6 @@
   font-size: 14px;
   font-weight: 600;
   transition: color 0.3s ease;
-}
-
-.sidebar-collapsed .status-card-text {
-  display: none;
-}
-
-.sidebar-collapsed .sidebar-status-card {
-  padding: 10px;
-  display: flex;
-  justify-content: center;
-}
-
-.sidebar-collapsed .status-card-content {
-  justify-content: center;
 }
 
 .status-card-stop {
@@ -430,10 +375,6 @@
   color: #FF9800;
   border-radius: 4px;
   font-weight: 500;
-}
-
-.sidebar-collapsed .status-activity {
-  display: none;
 }
 
 /* ========================================
@@ -501,10 +442,6 @@
   max-width: 100%;
 }
 
-.sidebar-collapsed .sidebar-status-description {
-  display: none;
-}
-
 /* ========================================
    NAVIGATION - Collapsible Section
    ======================================== */
@@ -552,16 +489,6 @@
   align-items: center;
   opacity: 0.7;
   transition: transform 0.2s ease;
-}
-
-.sidebar-collapsed .nav-toggle-label,
-.sidebar-collapsed .nav-toggle-chevron {
-  display: none;
-}
-
-.sidebar-collapsed .sidebar-nav-toggle {
-  justify-content: center;
-  padding: 10px;
 }
 
 .sidebar-nav {
@@ -621,71 +548,6 @@
   justify-content: center;
 }
 
-.sidebar-collapsed .sidebar-nav-link {
-  justify-content: center;
-  padding: 12px;
-}
-
-.sidebar-collapsed .nav-label {
-  display: none;
-}
-
-/* ========================================
-   PLUGIN NAV ITEMS
-   ======================================== */
-
-/* Divider between core and plugin nav items */
-.sidebar-nav-divider {
-  height: 1px;
-  margin: 8px 12px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.12) 20%,
-    rgba(255, 255, 255, 0.12) 80%,
-    transparent 100%
-  );
-}
-
-/* Plugin nav link - inherits from sidebar-nav-link */
-.plugin-nav-link {
-  position: relative;
-}
-
-/* Unhealthy plugin indicator */
-.plugin-nav-link.unhealthy {
-  opacity: 0.6;
-}
-
-.plugin-nav-link.unhealthy:hover {
-  opacity: 0.8;
-}
-
-/* Health indicator dot */
-.plugin-health-dot {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--red-400, #f87171);
-  box-shadow: 0 0 6px var(--red-glow, rgba(248, 113, 113, 0.4));
-  animation: pulse-health 2s ease-in-out infinite;
-}
-
-@keyframes pulse-health {
-  0%, 100% {
-    opacity: 1;
-    transform: translateY(-50%) scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: translateY(-50%) scale(0.9);
-  }
-}
-
 /* ========================================
    SECTIONS (Activity, Agents, Stats, etc.)
    ======================================== */
@@ -709,10 +571,6 @@
 
 .section-icon {
   font-size: 14px;
-}
-
-.sidebar-collapsed .section-label {
-  display: none;
 }
 
 /* Activity Section - Removed, now merged into Status Card */
@@ -783,15 +641,6 @@
   flex: 1;
 }
 
-.sidebar-collapsed .agent-label {
-  display: none;
-}
-
-.sidebar-collapsed .agent-item {
-  justify-content: center;
-  padding: 8px;
-}
-
 /* Stats Section */
 .stats-grid {
   display: grid;
@@ -833,33 +682,9 @@
   max-width: 100%;
 }
 
-.sidebar-collapsed .stats-grid {
-  grid-template-columns: 1fr;
-  gap: 4px;
-}
-
-.sidebar-collapsed .stat-label {
-  display: none;
-}
-
-.sidebar-collapsed .stat-item {
-  padding: 6px 4px;
-  min-width: 0;
-}
-
-.sidebar-collapsed .stat-value {
-  font-size: 16px;
-  max-width: 100%;
-}
-
 /* Stop Section */
 .stop-section {
   padding: 0 4px;
-}
-
-/* Hide stop button in collapsed state */
-.sidebar-collapsed .status-card-stop {
-  display: none;
 }
 
 /* ========================================
@@ -886,14 +711,6 @@
 .sidebar-logout-button:hover {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.4);
-}
-
-.sidebar-collapsed .logout-text {
-  display: none;
-}
-
-.sidebar-collapsed .sidebar-logout-button {
-  padding: 10px;
 }
 
 /* ========================================
@@ -924,16 +741,6 @@
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
   font-style: italic;
-}
-
-.sidebar-collapsed .sidebar-version {
-  font-size: 9px;
-  line-height: 1.2;
-  word-break: break-all;
-}
-
-.sidebar-collapsed .sidebar-tagline {
-  display: none;
 }
 
 /* ========================================
@@ -1058,7 +865,6 @@
   .nav-toggle-label,
   .nav-toggle-chevron,
   .agent-label,
-  .stat-label,
   .logout-text,
   .sidebar-tagline,
   .status-activity,
@@ -1096,30 +902,8 @@
     padding: 8px;
   }
   
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-  
-  .stat-item {
-    padding: 6px 4px;
-  }
-  
-  .stat-value {
-    font-size: 16px;
-  }
-  
-  .stat-label {
-    font-size: 9px;
-  }
-  
   .sidebar-logout-button {
     padding: 10px;
-  }
-  
-  /* Hide collapse toggle on tablet - always collapsed */
-  .sidebar-collapse-toggle {
-    display: none;
   }
   
   /* Hide workspace files */
@@ -1174,12 +958,7 @@
     transform: translateX(0);
   }
   
-  /* Hide collapse toggle on mobile */
-  .sidebar-collapse-toggle {
-    display: none;
-  }
-  
-  /* Reset all collapsed styles when mobile menu is open */
+  /* Reset styles when mobile menu is open */
   .sidebar.sidebar-open .avatar-container {
     width: 120px;
     height: 120px;
@@ -1203,7 +982,6 @@
   .sidebar.sidebar-open .nav-toggle-label,
   .sidebar.sidebar-open .nav-toggle-chevron,
   .sidebar.sidebar-open .agent-label,
-  .sidebar.sidebar-open .stat-label,
   .sidebar.sidebar-open .logout-text,
   .sidebar.sidebar-open .sidebar-tagline {
     display: flex !important;
@@ -1226,10 +1004,6 @@
     padding: 10px 12px;
   }
   
-  .sidebar.sidebar-open .stats-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  
   .sidebar.sidebar-open .sidebar-logout-button {
     padding: 10px 16px;
   }
@@ -1245,8 +1019,4 @@
   padding: 12px var(--sidebar-padding);
   display: flex;
   justify-content: center;
-}
-
-.sidebar-collapsed .sidebar-notification-section {
-  padding: 8px 4px;
 }

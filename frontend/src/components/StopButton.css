@@ -40,7 +40,7 @@
   transform: scale(0.98);
 }
 
-/* Active state — pulsing glow when bot is working */
+/* Active state — pulsing glow when Nim is working */
 .stop-button.main.active {
   animation: stop-pulse 2s ease-in-out infinite;
 }

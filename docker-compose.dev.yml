@@ -56,6 +56,8 @@ services:
       - ./backend:/app
       - /app/node_modules
       - ./clawboard.config.json:/app/clawboard.config.json:ro
+      - ./clawboard.plugins.json:/app/clawboard.plugins.json:ro
+      - ../../nim-orb:/plugins/nim-orb:ro
       - /home/clawd/.openclaw/agents/main/sessions:/clawdbot/sessions:ro
       - /home/clawd/.openclaw/openclaw.json:/clawdbot/clawdbot.json:ro
       - /home/clawd/.openclaw/agents/main/agent/models.json:/clawdbot/models.json:ro
@@ -110,6 +112,21 @@ services:
       - frontend
     networks:
       - clawboard-network-dev
+
+  # NimOrb WebGL Avatar Plugin
+  nim-orb:
+    image: nim-orb
+    container_name: nim-orb-dev
+    restart: unless-stopped
+    ports:
+      - "3030:3030"
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data_dev:

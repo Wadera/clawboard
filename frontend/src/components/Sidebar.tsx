@@ -48,7 +48,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const { status: botStatus } = useBotStatus();
-  const { pluginSidebarItems, loading: pluginsLoading } = usePlugins();
+  const { plugins, pluginSidebarItems, loading: pluginsLoading } = usePlugins();
   const navigate = useNavigate();
 
   // Listen for model:status events to get OpenClaw version + usage stats
@@ -108,7 +108,6 @@ export function Sidebar({ status, connected }: SidebarProps) {
   // Get status message from database or use default
   const statusMessage = botStatus?.status_text || "Building something amazing...";
   const [statusExpanded, _setStatusExpanded] = useState(false);
-  const navExpanded = true; // Navigation always visible
 
   // Get state emoji and color
   const getStateDisplay = (state: string) => {
@@ -151,10 +150,34 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 1. Status Orb Section - Always at top */}
         <div className="sidebar-avatar-section">
           <div className="avatar-container">
-            <StatusOrb
-              state={status?.main.state || 'idle'}
-              size={120}
-            />
+            {(() => {
+              const orbPlugin = plugins.find(p => p.name === 'nim-orb' && p.healthy);
+              if (orbPlugin) {
+                const state = status?.main.state || 'idle';
+                return (
+                  <iframe
+                    src={`/orb-dev/avatar?state=${state}`}
+                    style={{
+                      width: 200,
+                      height: 200,
+                      border: 'none',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      background: 'transparent',
+                      marginTop: '-10px',
+                    }}
+                    title="NimOrb Avatar"
+                    allow="accelerometer; autoplay"
+                  />
+                );
+              }
+              return (
+                <StatusOrb
+                  state={status?.main.state || 'idle'}
+                  size={120}
+                />
+              );
+            })()}
           </div>
         </div>
 

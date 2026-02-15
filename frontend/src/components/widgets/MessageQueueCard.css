@@ -61,10 +61,10 @@
   color: var(--text-primary);
   font-size: var(--text-xs);
   font-weight: var(--font-bold);
-  animation: mq-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes mq-card-pulse {
+@keyframes pulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
@@ -124,9 +124,9 @@
   border: 2px solid var(--border-default);
   border-top-color: var(--orange-500);
   border-radius: 50%;
-  animation: mq-card-spin 0.6s linear infinite;
+  animation: spin 0.6s linear infinite;
 }
 
-@keyframes mq-card-spin {
+@keyframes spin {
   to { transform: rotate(360deg); }
 }

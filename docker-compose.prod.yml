@@ -75,6 +75,23 @@ services:
       
       # ClawBoard dashboard config (read-only)
       - ./clawboard.config.json:/app/clawboard.config.json:ro
+      
+      # OpenClaw media (for generated images, etc.)
+      - ${OPENCLAW_DIR:-~/.openclaw}/media:/clawdbot/media:ro
+      # Auth profiles
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
+      # Bot workspace memory
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:ro
+      # Generated media (journal images, voice notes, avatars)
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/media/generated:/clawd-media/generated:ro
+      # Project media
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/media/projects:/clawd-media/projects:ro
+      # Project sources (for source_dir references)
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/projects:/project-sources:ro
+      # NFS projects (for nfs_dir references)
+      - /mnt/nfs/NimsProjects:/nfs-projects:ro
+    ports:
+      - "${BACKEND_PORT:-3001}:${PORT:-3001}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -115,7 +132,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-8082}:80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/dashboard/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/dashboard/"]
       interval: 30s
       timeout: 10s
       retries: 3

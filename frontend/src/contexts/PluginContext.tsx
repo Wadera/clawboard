@@ -61,6 +61,7 @@ export function PluginProvider({ children }: PluginProviderProps) {
       }
       
       const data: PluginsResponse = await response.json();
+      console.log('🔌 Plugins loaded:', data.plugins?.length, data.plugins?.map(p => p.name));
       setPlugins(data.plugins || []);
       setError(null);
     } catch (err) {

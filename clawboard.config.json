@@ -2,7 +2,7 @@
   "bot": {
     "name": "Nim",
     "displayName": "Nim Dashboard",
-    "emoji": "🤖",
+    "emoji": "\ud83e\udd16",
     "description": "NimSpace AI Dashboard - Development Environment",
     "avatarUrl": "/assets/avatar-placeholder.png"
   },
@@ -15,7 +15,7 @@
     "sidebarTitle": "Nim",
     "loginTitle": "Welcome to NimSpace",
     "loginSubtitle": "Development Dashboard",
-    "faviconUrl": "/nim-favicon.svg"
+    "faviconUrl": "/dashboard-dev/favicon.png"
   },
   "features": {
     "journal": true,
