@@ -259,6 +259,7 @@ export class TaskManagerDB extends EventEmitter {
    * Query tasks with filters
    */
   async queryTasks(filters: TaskFilters = {}): Promise<Task[]> {
+    console.log('[TaskManagerDB] queryTasks called with filters:', filters);
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
@@ -301,13 +302,16 @@ export class TaskManagerDB extends EventEmitter {
       ORDER BY created_at DESC
     `;
 
+    console.log('[TaskManagerDB] Executing query:', query, 'with params:', params);
     const result = await this.pool.query(query, params);
+    console.log('[TaskManagerDB] Query returned', result.rows.length, 'rows');
 
     // Hydrate each task
     const tasks = await Promise.all(
       result.rows.map(row => this.hydrateTask(row))
     );
 
+    console.log('[TaskManagerDB] Hydrated', tasks.length, 'tasks');
     return tasks;
   }
 

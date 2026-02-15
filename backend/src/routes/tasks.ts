@@ -1,6 +1,6 @@
 // tasks.ts - API endpoints for task management
 import { Router, Request, Response } from 'express';
-import { taskManager, SubtaskStatus } from '../services/TaskManager';
+import { taskManagerDB as taskManager, SubtaskStatus } from '../services/TaskManagerDB';
 import { taskAutoUpdater } from '../services/TaskAutoUpdater';
 import { taskAnalyzer } from '../services/taskAnalyzer';
 import { generateTaskPromptWithTools } from '../utils/promptTemplate';
