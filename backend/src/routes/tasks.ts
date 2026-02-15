@@ -289,7 +289,7 @@ router.post('/:id/archive', async (req: Request, res: Response): Promise<void> =
  */
 router.post('/:id/spawn', async (req: Request, res: Response): Promise<void> => {
   try {
-    const task = taskManager.getTask(req.params.id);
+    const task = await taskManager.getTask(req.params.id);
     if (!task) {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
