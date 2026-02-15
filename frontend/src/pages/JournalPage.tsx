@@ -208,10 +208,10 @@ export function JournalPage() {
 
         {/* Avatar image on the right */}
         <div className="journal-status-avatar">
-          {nimStatus?.avatar_url ? (
+          {botStatus?.avatar_url ? (
             <img 
-              src={nimStatus.avatar_url} 
-              alt="Nim's current mood" 
+              src={botStatus.avatar_url} 
+              alt="Current mood" 
               className="journal-avatar-image"
             />
           ) : (
