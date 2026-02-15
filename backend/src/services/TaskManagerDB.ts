@@ -189,8 +189,27 @@ export class TaskManagerDB extends EventEmitter {
 
     // Parse JSON fields
     const sessionRefs = row.session_refs || [];
-    const activeAgent = row.active_agent || null;
-    const completedBy = row.completed_by || null;
+    // active_agent and completed_by are stored as VARCHAR in current schema
+    // Parse as JSON if it looks like JSON, otherwise treat as string
+    let activeAgent = null;
+    if (row.active_agent) {
+      try {
+        activeAgent = JSON.parse(row.active_agent);
+      } catch {
+        // Legacy format or invalid JSON - set to null
+        activeAgent = null;
+      }
+    }
+    
+    let completedBy = null;
+    if (row.completed_by) {
+      try {
+        completedBy = JSON.parse(row.completed_by);
+      } catch {
+        completedBy = null;
+      }
+    }
+    
     const taskResources = row.task_resources || undefined;
 
     // Map to Task interface
