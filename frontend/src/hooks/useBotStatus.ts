@@ -26,7 +26,7 @@ export function useBotStatus() {
 
   const fetchStatus = async () => {
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/bot-status/current`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/nim-status/current`);
       if (!response.ok) {
         if (response.status === 404) {
           setStatus(null);

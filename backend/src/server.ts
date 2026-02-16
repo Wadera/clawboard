@@ -221,6 +221,7 @@ app.use('/audit', authMiddleware, auditRoutes);
 app.use('/rate-limits', authMiddleware, rateLimitsRoutes);
 app.use('/projects', authMiddleware, projectsRoutes);
 app.use('/nim-status', authMiddleware, botStatusRoutes);
+app.use('/bot-status', authMiddleware, botStatusRoutes);
 app.use('/journal', authMiddleware, journalRoutes);
 app.use('/projects', authMiddleware, filesRoutes);
 app.use('/tools', authMiddleware, toolsRoutes);
