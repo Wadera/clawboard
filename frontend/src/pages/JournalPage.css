@@ -718,6 +718,7 @@
   gap: 0.75rem;
   align-items: start;
   min-height: 72px;
+  padding-bottom: 1rem;
 }
 
 /* Date column */
