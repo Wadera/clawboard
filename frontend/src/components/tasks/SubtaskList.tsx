@@ -27,7 +27,6 @@ const getSubtaskStatus = (subtask: Subtask): SubtaskStatus => {
 };
 
 // Statuses that count as "done"
-const DONE_STATUSES: SubtaskStatus[] = ['completed', 'skipped'];
 
 export const SubtaskList: React.FC<SubtaskListProps> = ({ 
   subtasks, 

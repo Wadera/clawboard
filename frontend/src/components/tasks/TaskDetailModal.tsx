@@ -11,7 +11,7 @@ import './TaskDetailModal.css';
 const getSubtaskStatus = (subtask: { status?: SubtaskStatus; completed?: boolean }): SubtaskStatus => {
   if (subtask.status) return subtask.status;
   if (subtask.completed) return 'completed';
-  return 'new';
+  return 'empty';
 };
 
 interface TaskDetailModalProps {
@@ -96,7 +96,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return acc;
   }, {} as Record<SubtaskStatus, number>) : {} as Record<SubtaskStatus, number>;
   const completedSubtasks = subtaskCounts.completed || 0;
-  const inReviewSubtasks = subtaskCounts.in_review || 0;
+  const inReviewSubtasks = subtaskCounts.review || 0;
 
   return createPortal(
     <div className="task-detail-overlay" onClick={handleBackdropClick}>
@@ -189,7 +189,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 Subtasks (
                   {completedSubtasks > 0 && <span className="subtask-count-completed">✅{completedSubtasks}</span>}
                   {inReviewSubtasks > 0 && <span className="subtask-count-review">🔄{inReviewSubtasks}</span>}
-                  {(subtaskCounts.new || 0) > 0 && <span className="subtask-count-new">⬜{subtaskCounts.new}</span>}
+                  {(subtaskCounts.empty || 0) > 0 && <span className="subtask-count-new">⬜{subtaskCounts.empty}</span>}
                 )
               </h3>
               <SubtaskList

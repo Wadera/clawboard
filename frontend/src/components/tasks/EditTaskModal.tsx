@@ -171,8 +171,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
       if (s.id !== id) return s;
       const currentStatus = getSubtaskStatus(s);
       const nextStatus: SubtaskStatus = 
-        currentStatus === 'new' ? 'in_review' :
-        currentStatus === 'in_review' ? 'completed' : 'new';
+        currentStatus === 'new' ? 'review' :
+        currentStatus === 'review' ? 'completed' : 'new';
       return { 
         ...s, 
         status: nextStatus,
@@ -443,7 +443,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               {subtasks.map((subtask, idx) => {
                 const status = getSubtaskStatus(subtask);
                 const statusIcon = status === 'completed' ? <Check size={12} /> 
-                  : status === 'in_review' ? <Clock size={12} /> 
+                  : status === 'review' ? <Clock size={12} /> 
                   : <Circle size={10} />;
                 const statusClass = `status-${status}`;
                 

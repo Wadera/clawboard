@@ -122,8 +122,6 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const completedTotal = summary.completed + summary.archived;
-
   return (
     <div className="dashboard-page">
       {/* Hero Section */}
