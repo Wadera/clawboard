@@ -248,6 +248,25 @@ def is_agent_context():
     # Check command-line args
     return "--agent" in sys.argv
 
+# Global ref set after parse_args; used by confirm_prompt
+_GLOBAL_YES = False
+
+def confirm_prompt(message):
+    """Show a y/N confirmation prompt. Returns True if confirmed.
+    
+    Auto-confirms when:
+    - --yes/-y global flag is set
+    - Running in agent context (CLAWBOARD_AGENT=1 or --agent)
+    """
+    if _GLOBAL_YES or is_agent_context():
+        return True
+    try:
+        answer = input(message)
+    except (EOFError, KeyboardInterrupt):
+        print(file=sys.stderr)
+        return False
+    return answer.strip().lower() == "y"
+
 def api(method, path, data=None):
     """Make API request, return parsed JSON."""
     url = f"{get_api_url()}{path}"
@@ -684,6 +703,14 @@ def cmd_get(args):
 def cmd_create(args):
     data = {"title": args.title}
     
+    # Warn if no subtasks provided (unless suppressed)
+    has_subtasks = bool(args.subtasks) or bool(getattr(args, 'add_subtask', None))
+    no_subtasks_flag = getattr(args, 'no_subtasks', False)
+    if not has_subtasks and not no_subtasks_flag:
+        if not confirm_prompt("⚠️ Creating task without subtasks. Continue? (y/N): "):
+            print("Aborted.", file=sys.stderr)
+            sys.exit(1)
+    
     if args.status:
         data["status"] = validate_status(args.status)
     else:
@@ -825,6 +852,18 @@ def cmd_delete(args):
 
 def cmd_spawn(args):
     task_id = resolve_task_id(args.id)
+    
+    # Warn if task has no subtasks (unless suppressed)
+    force = getattr(args, 'force', False)
+    if not force:
+        task_data = api("GET", f"/tasks/{task_id}")
+        task = task_data.get("task", task_data)
+        subtasks = task.get("subtasks") or []
+        if len(subtasks) == 0:
+            if not confirm_prompt("⚠️ This task has no subtasks. Agents work better with clear checkpoints. Spawn anyway? (y/N): "):
+                print("Aborted.", file=sys.stderr)
+                sys.exit(1)
+    
     result = api("POST", f"/tasks/{task_id}/spawn")
     prompt = result.get("prompt", "")
     print("─── Agent Spawn Prompt ───")
@@ -2780,6 +2819,7 @@ Subtask Workflow (6-state lifecycle):
     # Global flags
     parser.add_argument("--api", help="API base URL (overrides CLAWBOARD_API_URL)")
     parser.add_argument("--token", help="Auth token (overrides CLAWBOARD_TOKEN)")
+    parser.add_argument("--yes", "-y", action="store_true", help="Auto-confirm all interactive prompts")
     
     sub = parser.add_subparsers(dest="command")
     
@@ -2817,6 +2857,7 @@ Subtask Workflow (6-state lifecycle):
     p_create.add_argument("--depends-on", help="Comma-separated task IDs this task depends on")
     p_create.add_argument("--auto-start", type=bool, default=None)
     p_create.add_argument("--thinking", choices=VALID_THINKING_LEVELS, help="AI reasoning depth (low/medium/high)")
+    p_create.add_argument("--no-subtasks", action="store_true", help="Suppress warning about missing subtasks")
     
     # update
     p_update = sub.add_parser("update", aliases=["edit"], help="Update a task")
@@ -2856,6 +2897,7 @@ Subtask Workflow (6-state lifecycle):
     # spawn
     p_spawn = sub.add_parser("spawn", help="Get agent spawn prompt for a task")
     p_spawn.add_argument("id")
+    p_spawn.add_argument("--force", "-f", action="store_true", help="Skip subtask warning")
     
     # breakdown
     p_breakdown = sub.add_parser("breakdown", help="AI-generate subtasks for a task")
@@ -3124,7 +3166,9 @@ Subtask Workflow (6-state lifecycle):
     args = parser.parse_args()
     
     # Apply global overrides
-    global _CLI_TOKEN, _CLI_API, API
+    global _CLI_TOKEN, _CLI_API, _GLOBAL_YES, API
+    if args.yes:
+        _GLOBAL_YES = True
     if args.api:
         _CLI_API = args.api
     if args.token:
