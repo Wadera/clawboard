@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../types/task';
-import { Cpu, Folder, Tag, Brain, Lock, Link, Radio } from 'lucide-react';
+import { Cpu, Folder, Tag, Brain, Lock, Link, Radio, Flag, AlertTriangle } from 'lucide-react';
 import { EditTaskModal } from './EditTaskModal';
 import { TaskDetailModal } from './TaskDetailModal';
 import './TaskCard.css';
@@ -44,18 +44,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'low': return 'priority-low';
       case 'someday': return 'priority-someday';
       default: return 'priority-normal';
-    }
-  };
-
-  const getStatusClass = (): string => {
-    switch (task.status) {
-      case 'ideas': return 'status-ideas';
-      case 'todo': return 'status-todo';
-      case 'in-progress': return 'status-in-progress';
-      case 'stuck': return 'status-stuck';
-      case 'completed': return 'status-completed';
-      case 'archived': return 'status-archived';
-      default: return 'status-todo';
     }
   };
 
@@ -149,18 +137,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       >
         {/* Compact Card Content */}
         <div className="task-card-compact-header">
-          {/* Status Dot */}
-          <div className={`task-card-status-dot ${getStatusClass()}`} />
-          
-          {/* Priority Badge */}
-          <span className={`task-card-priority-compact ${getPriorityClass()}`}>
-            {task.priority.charAt(0).toUpperCase()}
-          </span>
-          
           {/* Title (1 line, truncated) */}
           <h3 className="task-card-title-compact">
             {task.title}
           </h3>
+          
+          {/* Header Icons: Auto-start, Blocked/NeedsReview, Session Link */}
+          {task.autoStart && (
+            <span className="task-card-icon-flag" title="Auto-start enabled">
+              <Flag size={13} />
+            </span>
+          )}
+          {(task.blocked || task.needsReview) && (
+            <span className={`task-card-icon-alert ${task.needsReview ? 'needs-review' : 'is-blocked'}`} title={task.needsReview ? 'Needs human review' : 'Blocked'}>
+              <AlertTriangle size={13} />
+            </span>
+          )}
           
           {/* Active Agent Session Link */}
           {task.activeAgent && typeof task.activeAgent === 'object' && task.activeAgent.sessionKey && task.activeAgent.sessionKey !== 'pending' && (
@@ -179,7 +171,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </div>
         
-        {/* Project Badge */}
+        {/* Project Badge — before tags */}
         {task.project && (
           <div
             className="task-card-project-badge"
@@ -194,7 +186,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         )}
         
-        {/* Tags */}
+        {/* Tags — after project */}
         {task.tags && task.tags.length > 0 && (
           <div className="task-card-tags">
             {task.tags.slice(0, 3).map((tag) => (
@@ -216,18 +208,42 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             )}
           </div>
         )}
-        
-        {/* Thinking Level Indicator */}
-        {task.thinking && (
-          <div className={`task-card-thinking thinking-${task.thinking}`}>
-            <Brain size={12} />
-            <span>{task.thinking === 'low' ? 'Low' : task.thinking === 'medium' ? 'Med' : 'High'}</span>
-            {task.thinkingAutoEstimated && <span className="task-card-thinking-auto" title="Auto-estimated">⚙</span>}
-            {(task.attemptCount ?? 0) > 0 && (
-              <span className="task-card-attempt" title={`Attempt #${task.attemptCount}`}>🔁{task.attemptCount}</span>
-            )}
-          </div>
-        )}
+
+        {/* Subtask Progress Bar */}
+        {task.subtasks && task.subtasks.length > 0 && (() => {
+          const counts = task.subtasks.reduce(
+            (acc, s) => {
+              if (s.status === 'completed' || s.completed) acc.completed++;
+              else if (s.status === 'in_progress') acc.inProgress++;
+              else if (s.status === 'review') acc.review++;
+              else if (s.status === 'blocked') acc.blocked++;
+              else if (s.status === 'skipped') acc.skipped++;
+              else acc.empty++;
+              return acc;
+            },
+            { completed: 0, inProgress: 0, review: 0, blocked: 0, skipped: 0, empty: 0 }
+          );
+          const total = task.subtasks.length;
+          const pct = (n: number) => `${(n / total) * 100}%`;
+          return (
+            <div className="task-card-subtask-progress" title={`✅${counts.completed} 🔄${counts.inProgress} 👀${counts.review} 🚫${counts.blocked} ⏭${counts.skipped} ⬜${counts.empty}`}>
+              <div className="subtask-bar">
+                {counts.completed > 0 && <div className="subtask-bar-segment bar-completed" style={{ width: pct(counts.completed) }} />}
+                {counts.inProgress > 0 && <div className="subtask-bar-segment bar-in-progress" style={{ width: pct(counts.inProgress) }} />}
+                {counts.review > 0 && <div className="subtask-bar-segment bar-review" style={{ width: pct(counts.review) }} />}
+                {counts.blocked > 0 && <div className="subtask-bar-segment bar-blocked" style={{ width: pct(counts.blocked) }} />}
+                {counts.skipped > 0 && <div className="subtask-bar-segment bar-skipped" style={{ width: pct(counts.skipped) }} />}
+              </div>
+              <span className="subtask-counts">
+                {counts.completed > 0 && <span>✅{counts.completed}</span>}
+                {counts.inProgress > 0 && <span>🔄{counts.inProgress}</span>}
+                {counts.review > 0 && <span>👀{counts.review}</span>}
+                {counts.blocked > 0 && <span>🚫{counts.blocked}</span>}
+                {counts.empty > 0 && <span>⬜{counts.empty}</span>}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Dependency Badges */}
         {task.blocked && task.blockingTasks && task.blockingTasks.length > 0 && (
@@ -251,6 +267,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <span>{typeof task.activeAgent === 'string' ? task.activeAgent : task.activeAgent.name}</span>
           </div>
         )}
+
+        {/* Card Footer: Priority + Thinking (moved to bottom) */}
+        <div className="task-card-footer">
+          <span className={`task-card-priority-compact ${getPriorityClass()}`}>
+            {task.priority.charAt(0).toUpperCase()}
+          </span>
+          
+          {task.thinking && (
+            <div className={`task-card-thinking thinking-${task.thinking}`}>
+              <Brain size={12} />
+              <span>{task.thinking === 'low' ? 'Low' : task.thinking === 'medium' ? 'Med' : 'High'}</span>
+              {task.thinkingAutoEstimated && <span className="task-card-thinking-auto" title="Auto-estimated">⚙</span>}
+              {(task.attemptCount ?? 0) > 0 && (
+                <span className="task-card-attempt" title={`Attempt #${task.attemptCount}`}>🔁{task.attemptCount}</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
