@@ -434,7 +434,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   <>
                     {counts.completed > 0 && <span className="status-count completed">✅{counts.completed}</span>}
                     {counts.review > 0 && <span className="status-count review">🔄{counts.review}</span>}
-                    {counts.new > 0 && <span className="status-count new">⬜{counts.new}</span>}
+                    {counts.empty > 0 && <span className="status-count empty">⬜{counts.empty}</span>}
                   </>
                 );
               })()})
