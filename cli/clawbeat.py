@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 # ─── Config ───
 
 # API configuration - override with environment variables
-API_BASE = os.getenv("CLAWBOARD_API_URL", "http://localhost:3001/api")
+API_BASE = os.getenv("CLAWBOARD_API_URL", "http://localhost:3001")
 TOKEN_ENV = os.getenv("CLAWBOARD_TOKEN", "")
 CONFIG_DIR = Path(os.getenv("CLAWBOARD_CONFIG_DIR", "~/.config/clawboard")).expanduser()
 TOKEN_FILE = CONFIG_DIR / "config.json"
