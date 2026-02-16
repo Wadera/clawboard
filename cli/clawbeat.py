@@ -51,10 +51,10 @@ RETRY_TRACKER_FILE = Path("/tmp/clawbeat-retries.json")
 
 # Timing thresholds (in minutes)
 ACTIVE_AGENT_THRESHOLD = 9
-PROCESS_STALE_THRESHOLD = 30
+PROCESS_STALE_THRESHOLD = 9
 
 # Legacy dedup window (fallback if wake_type not in DEDUP_WINDOWS)
-DEDUP_WINDOW_MINUTES = 30
+DEDUP_WINDOW_MINUTES = 9
 
 # Retry escalation threshold
 ESCALATION_THRESHOLD = 3
@@ -78,10 +78,10 @@ WAKE_TYPE_ESCALATE = "escalate_human"
 
 # Per-wake-type dedup windows (minutes). None = suppress until status changes.
 DEDUP_WINDOWS = {
-    WAKE_TYPE_SPAWN: 60,       # 1 hour — don't re-spawn quickly
-    WAKE_TYPE_REVIEW: 30,      # 30 min
-    WAKE_TYPE_STALE: 30,       # 30 min
-    WAKE_TYPE_COMPLETE: 30,    # 30 min
+    WAKE_TYPE_SPAWN: 10,       # 10 min
+    WAKE_TYPE_REVIEW: 19,      # 19 min (~2 heartbeat ticks)
+    WAKE_TYPE_STALE: 9,        # 9 min
+    WAKE_TYPE_COMPLETE: 9,     # 9 min
     WAKE_TYPE_ESCALATE: None,  # Suppress until unblocked
 }
 
@@ -1403,11 +1403,20 @@ def detect_dead_agent_session(task_id: str) -> tuple[bool, str]:
 
 # ─── Dedup Logic (Lifecycle-Aware) ───
 
-# Action types that indicate a resolution (suppress subsequent WAKEs)
+# Action types that indicate a true resolution (suppress subsequent WAKEs permanently)
+# Only terminal states: task is done or needs human intervention.
+# Everything else (approved, rejected, reviewed) should re-notify the orchestrator.
 RESOLUTION_ACTIONS = {
-    "completed", "agent_running", "blocked", "escalated",
-    "spawned", "reviewed", "approved", "rejected"
+    "completed", "blocked"
 }
+
+# Action types that indicate an agent is working (time-limited suppression)
+# Uses ACTIVE_AGENT_THRESHOLD (9min) — if agent hasn't reported back, re-evaluate.
+AGENT_ACTIONS = {"spawned", "agent_running"}
+
+# Non-terminal orchestrator actions — suppress briefly then re-notify
+# These need orchestrator follow-up (send back to agent, complete, or block)
+ORCHESTRATOR_ACTIONS = {"escalated", "reviewed", "approved", "rejected"}
 
 # Action types that are just notifications
 WAKE_ACTIONS = {"wake sent by clawbeat", "wake"}
@@ -1457,7 +1466,7 @@ def parse_orchestration_log(max_lines: int = 50
 
 
 def classify_action(action_str: str) -> str:
-    """Classify an action string. Returns: wake, resolution, or unknown."""
+    """Classify an action string. Returns: wake, resolution, agent, or unknown."""
     action_lower = action_str.lower()
 
     for wake_action in WAKE_ACTIONS:
@@ -1467,6 +1476,14 @@ def classify_action(action_str: str) -> str:
     for resolution in RESOLUTION_ACTIONS:
         if resolution in action_lower:
             return "resolution"
+
+    for agent_action in AGENT_ACTIONS:
+        if agent_action in action_lower:
+            return "agent"
+
+    for orch_action in ORCHESTRATOR_ACTIONS:
+        if orch_action in action_lower:
+            return "orchestrator"
 
     return "unknown"
 
@@ -1533,11 +1550,43 @@ def should_suppress_wake(task_id: str,
         log(f"No previous action for {short_id}, allowing WAKE")
         return False
 
-    # If last action was a resolution, suppress
+    # If last action was a resolution, suppress permanently
     if last_action_type == "resolution":
         log(f"Suppressing WAKE for {short_id}: "
             f"last action was resolution '{last_action}'")
         return True
+
+    # If last action was agent spawn/running, suppress for ACTIVE_AGENT_THRESHOLD (9min)
+    # After that, the agent is assumed stale and we should re-evaluate
+    if last_action_type == "agent" and last_time:
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            minutes=ACTIVE_AGENT_THRESHOLD)
+        if last_time > cutoff:
+            log(f"Suppressing WAKE for {short_id}: "
+                f"agent action '{last_action}' at {last_time} "
+                f"(within {ACTIVE_AGENT_THRESHOLD}min agent window)")
+            return True
+        else:
+            log(f"Agent action for {short_id} is stale "
+                f"({last_action} at {last_time}), allowing re-evaluation")
+            return False
+
+    # Orchestrator actions (approved/rejected/reviewed/escalated) — use dedup window
+    # These need follow-up: orchestrator should complete, block, or re-assign
+    if last_action_type == "orchestrator" and last_time:
+        dedup_minutes = DEDUP_WINDOWS.get(wake_type, DEDUP_WINDOW_MINUTES)
+        if dedup_minutes is None:
+            dedup_minutes = DEDUP_WINDOW_MINUTES  # Default 30min, not permanent
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=dedup_minutes)
+        if last_time > cutoff:
+            log(f"Suppressing WAKE for {short_id}: "
+                f"orchestrator action '{last_action}' at {last_time} "
+                f"(within {dedup_minutes}min window)")
+            return True
+        else:
+            log(f"Orchestrator action for {short_id} is past window "
+                f"({last_action} at {last_time}), re-notifying")
+            return False
 
     # For escalate_human: check if last wake was also escalate_human
     # If so, suppress (until status changes, detected by resolution action)
