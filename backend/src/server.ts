@@ -180,18 +180,8 @@ setGatewayConnector(gatewayConnector);
 setModelsGatewayConnector(gatewayConnector);
 setPluginLoader(pluginLoader);
 
-// Public routes (no auth required)
-app.use('/auth', authRoutes);
-app.use('/config', configRoutes);
-
-// Plugin routes (auth required) — registry + theme
-app.use('/plugins', authMiddleware, pluginsRoutes);
-
-// Plugin proxy middleware — routes /api/plugins/{name}/* to plugin containers
-app.use(authMiddleware, createPluginProxy(pluginLoader));
-
-// Public static file routes (no auth - for <img> tags that can't send headers)
-// These serve the actual image files without requiring authentication
+// Public static file routes (MUST be before auth middleware)
+// These serve image files without authentication - <img> tags can't send JWT headers
 const SCREENSHOT_DIR = '/clawdbot/media/browser';
 const GENERATED_DIR = '/clawd-media/generated';
 
@@ -208,6 +198,16 @@ app.use('/media/generated', express.static(GENERATED_DIR, {
     res.setHeader('Cache-Control', 'public, max-age=604800');
   }
 }));
+
+// Public routes (no auth required)
+app.use('/auth', authRoutes);
+app.use('/config', configRoutes);
+
+// Plugin routes (auth required) — registry + theme
+app.use('/plugins', authMiddleware, pluginsRoutes);
+
+// Plugin proxy middleware — routes /api/plugins/{name}/* to plugin containers
+app.use(authMiddleware, createPluginProxy(pluginLoader));
 
 // Protected routes (auth required)
 app.use('/status', authMiddleware, statusRoutes);

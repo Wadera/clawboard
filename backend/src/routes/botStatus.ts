@@ -100,4 +100,45 @@ router.post('/update', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/nim-status/history
+ * Returns paginated status history
+ * Query params: page (default 1), limit (default 20)
+ */
+router.get('/history', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+
+    // Get paginated history
+    const result = await pool.query<BotStatus>(
+      `SELECT id, mood, status_text, avatar_url, updated_at 
+       FROM bot_status 
+       ORDER BY updated_at DESC 
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    // Get total count
+    const countResult = await pool.query('SELECT count(*) FROM bot_status');
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({
+      success: true,
+      history: result.rows,
+      total,
+      page,
+      limit,
+      hasMore: offset + result.rows.length < total
+    });
+  } catch (error) {
+    console.error('Error fetching status history:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;
