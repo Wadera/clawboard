@@ -162,6 +162,7 @@ import projectsRoutes from './routes/projects';
 import botStatusRoutes from './routes/botStatus';
 import journalRoutes from './routes/journal';
 import filesRoutes from './routes/files';
+import sessionsRoutes from './routes/sessions';
 import toolsRoutes from './routes/tools';
 import gatewayRoutes, { setGatewayConnector } from './routes/gateway';
 import dashboardRoutes from './routes/dashboard';
@@ -227,6 +228,7 @@ app.use('/gateway', authMiddleware, gatewayRoutes);
 app.use('/dashboard', authMiddleware, dashboardRoutes);
 app.use('/models', authMiddleware, modelsRoutes);
 app.use('/images', authMiddleware, imagesRoutes);
+app.use('/sessions', authMiddleware, sessionsRoutes);
 // Note: nginx strips /api/ prefix, so routes are registered without it
 // app.use('/approvals', approvalsRoutes);
 // app.use('/thoughts', thoughtsRoutes);
