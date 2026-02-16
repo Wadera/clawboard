@@ -316,6 +316,19 @@ export function Sidebar({ status, connected }: SidebarProps) {
 
         {/* 11. Session Stats — removed (redundant with Sessions page) */}
 
+        {/* Environment Toggle */}
+        <div className="sidebar-env-toggle-wrapper">
+          <div className="env-toggle" onClick={() => {
+            const isDev = window.location.pathname.startsWith('/dashboard-dev');
+            window.location.href = isDev ? '/dashboard/' : '/dashboard-dev/';
+          }} title={`Switch to ${window.location.pathname.startsWith('/dashboard-dev') ? 'Production' : 'Development'}`}>
+            <span className="env-toggle-label">{window.location.pathname.startsWith('/dashboard-dev') ? 'DEV' : 'PROD'}</span>
+            <div className={`env-toggle-switch ${window.location.pathname.startsWith('/dashboard-dev') ? 'dev' : 'prod'}`}>
+              <div className="env-toggle-knob" />
+            </div>
+          </div>
+        </div>
+
         {/* Logout Button */}
         <div className="sidebar-section logout-section">
           <button 

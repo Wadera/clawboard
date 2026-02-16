@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import { Sidebar } from './components/Sidebar';
 import { useRealtimeStatus } from './hooks/useRealtimeStatus';
@@ -43,7 +43,7 @@ function App() {
 
 function AuthenticatedApp() {
   const { config } = useClawBoardConfig();
-  const { status: realtimeStatus, connected: wsConnected, error: wsError } = useRealtimeStatus();
+  const { status: realtimeStatus, connected: wsConnected } = useRealtimeStatus();
 
   // Global keyboard shortcut: Ctrl+Shift+X to stop
   useEffect(() => {
@@ -71,38 +71,6 @@ function AuthenticatedApp() {
         <Sidebar status={realtimeStatus} connected={wsConnected} />
 
         <div className="app">
-          <header className="header">
-            <div className="logo">
-              <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-                <h1>ClawBoard</h1>
-              </Link>
-            </div>
-            <div className="header-center">
-              {!wsConnected && (
-                <span className="ws-status" style={{ fontSize: '14px', color: '#ff6b6b' }}>
-                  ⚠️ WebSocket reconnecting...
-                </span>
-              )}
-              {wsError && (
-                <span className="ws-error" style={{ fontSize: '14px', color: '#ff6b6b' }}>
-                  ❌ {wsError}
-                </span>
-              )}
-            </div>
-            <div className="header-right">
-              <div className="env-toggle" onClick={() => {
-                const isDev = window.location.pathname.startsWith('/dashboard-dev');
-                window.location.href = isDev ? '/dashboard/' : '/dashboard-dev/';
-              }} title={`Switch to ${window.location.pathname.startsWith('/dashboard-dev') ? 'Production' : 'Development'}`}>
-                <span className={`env-toggle-label ${!window.location.pathname.startsWith('/dashboard-dev') ? 'active' : ''}`}>PROD</span>
-                <div className={`env-toggle-switch ${window.location.pathname.startsWith('/dashboard-dev') ? 'dev' : 'prod'}`}>
-                  <div className="env-toggle-knob" />
-                </div>
-                <span className={`env-toggle-label ${window.location.pathname.startsWith('/dashboard-dev') ? 'active' : ''}`}>DEV</span>
-              </div>
-            </div>
-          </header>
-
           <main className="main-content">
             <AppRoutes config={config} />
           </main>

@@ -716,6 +716,72 @@
 }
 
 /* ========================================
+   ENVIRONMENT TOGGLE (PROD/DEV)
+   ======================================== */
+
+.sidebar-env-toggle-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 12px 8px;
+  margin-top: 8px;
+}
+
+.env-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.env-toggle-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.3s ease;
+}
+
+.env-toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+  flex-shrink: 0;
+}
+
+.env-toggle-switch.prod {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+.env-toggle-switch.dev {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.env-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.env-toggle-switch.dev .env-toggle-knob {
+  transform: translateX(20px);
+}
+
+.env-toggle:hover .env-toggle-switch {
+  filter: brightness(1.15);
+}
+
+/* ========================================
    LOGOUT BUTTON
    ======================================== */
 
@@ -896,7 +962,8 @@
   .logout-text,
   .sidebar-tagline,
   .status-activity,
-  .sidebar-status-description {
+  .sidebar-status-description,
+  .env-toggle-label {
     display: none !important;
   }
   
@@ -1016,7 +1083,8 @@
   .sidebar.sidebar-open .nav-group-chevron,
   .sidebar.sidebar-open .agent-label,
   .sidebar.sidebar-open .logout-text,
-  .sidebar.sidebar-open .sidebar-tagline {
+  .sidebar.sidebar-open .sidebar-tagline,
+  .sidebar.sidebar-open .env-toggle-label {
     display: flex !important;
   }
   
