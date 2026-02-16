@@ -151,7 +151,7 @@ export const DashboardPage: React.FC = () => {
 
         <StatsCard
           icon="🔄"
-          label="In Progress"
+          label="Progress"
           value={summary.inProgress}
           description="actively working"
           color="orange"
