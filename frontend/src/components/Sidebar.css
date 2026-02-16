@@ -974,17 +974,28 @@
   }
   
   .sidebar-status-card {
-    padding: 8px;
+    padding: 8px 4px;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     overflow: hidden;
     max-width: 64px;
+    gap: 6px;
   }
   
-  .sidebar-status-card * {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .sidebar-status-card .status-card-content {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .sidebar-status-card .status-card-emoji {
+    font-size: 24px;
+  }
+  
+  .sidebar-status-card .status-card-stop {
+    width: 100%;
+    display: flex;
+    justify-content: center;
   }
   
   .status-card-content {
