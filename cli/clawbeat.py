@@ -51,10 +51,10 @@ RETRY_TRACKER_FILE = Path("/tmp/clawbeat-retries.json")
 
 # Timing thresholds (in minutes)
 ACTIVE_AGENT_THRESHOLD = 9
-PROCESS_STALE_THRESHOLD = 30
+PROCESS_STALE_THRESHOLD = 9
 
 # Legacy dedup window (fallback if wake_type not in DEDUP_WINDOWS)
-DEDUP_WINDOW_MINUTES = 30
+DEDUP_WINDOW_MINUTES = 9
 
 # Retry escalation threshold
 ESCALATION_THRESHOLD = 3
@@ -78,10 +78,10 @@ WAKE_TYPE_ESCALATE = "escalate_human"
 
 # Per-wake-type dedup windows (minutes). None = suppress until status changes.
 DEDUP_WINDOWS = {
-    WAKE_TYPE_SPAWN: 60,       # 1 hour — don't re-spawn quickly
-    WAKE_TYPE_REVIEW: 30,      # 30 min
-    WAKE_TYPE_STALE: 30,       # 30 min
-    WAKE_TYPE_COMPLETE: 30,    # 30 min
+    WAKE_TYPE_SPAWN: 10,       # 10 min
+    WAKE_TYPE_REVIEW: 19,      # 19 min (~2 heartbeat ticks)
+    WAKE_TYPE_STALE: 9,        # 9 min
+    WAKE_TYPE_COMPLETE: 9,     # 9 min
     WAKE_TYPE_ESCALATE: None,  # Suppress until unblocked
 }
 
