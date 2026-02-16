@@ -48,6 +48,15 @@ DEDUP_WINDOW_MINUTES = 30
 # Retry escalation threshold
 ESCALATION_THRESHOLD = 3
 
+# Circuit breaker for agent spawns (P0)
+MAX_SPAWNS_PER_HOUR = 3  # Max spawns per task per hour before blocking
+SPAWN_COOLDOWN_MINUTES = 15  # Minimum time between spawns for same task
+
+# Log rotation settings (P1)
+MAX_LOG_LINES = 500  # Rotate when log exceeds this
+KEEP_LOG_LINES = 200  # Keep this many lines after rotation
+RETRY_TRACKER_MAX_AGE_HOURS = 24  # Clean up entries older than this
+
 # ─── Globals ───
 
 VERBOSE = False
@@ -237,6 +246,120 @@ def clear_retry_count(task_id: str) -> None:
         log(f"Cleared retry count for {short_id}")
 
 
+# ─── Circuit Breaker (P0) ───
+
+def record_spawn(task_id: str) -> None:
+    """Record a spawn attempt in the retry tracker for circuit breaker tracking.
+    
+    Adds timestamp to spawn_history list in the tracker entry.
+    """
+    tracker = load_retry_tracker()
+    short_id = task_id[:8]
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if short_id not in tracker:
+        tracker[short_id] = {
+            "count": 0,
+            "first": now,
+            "last": now,
+            "history": [],
+            "spawn_history": []
+        }
+    
+    entry = tracker[short_id]
+    if "spawn_history" not in entry:
+        entry["spawn_history"] = []
+    
+    entry["spawn_history"].append(now)
+    entry["last"] = now
+    
+    # Keep only spawns from the last hour
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    entry["spawn_history"] = [
+        ts for ts in entry["spawn_history"]
+        if _parse_iso_timestamp(ts) and _parse_iso_timestamp(ts) > cutoff
+    ]
+    
+    save_retry_tracker(tracker)
+    log(f"Recorded spawn for {short_id}, total spawns this hour: {len(entry['spawn_history'])}")
+
+
+def _parse_iso_timestamp(ts_str: str) -> datetime | None:
+    """Parse ISO timestamp string to datetime. Returns None on failure."""
+    try:
+        if ts_str.endswith("Z"):
+            return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def check_circuit_breaker(task_id: str) -> tuple[bool, str]:
+    """Check if circuit breaker should block spawns for this task.
+    
+    Returns (should_block, reason). If should_block is True, the task
+    has exceeded MAX_SPAWNS_PER_HOUR and should be marked for human review.
+    """
+    tracker = load_retry_tracker()
+    short_id = task_id[:8]
+    
+    if short_id not in tracker:
+        return False, ""
+    
+    entry = tracker[short_id]
+    spawn_history = entry.get("spawn_history", [])
+    
+    if not spawn_history:
+        return False, ""
+    
+    # Count spawns in the last hour
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent_spawns = [
+        ts for ts in spawn_history
+        if _parse_iso_timestamp(ts) and _parse_iso_timestamp(ts) > cutoff
+    ]
+    
+    if len(recent_spawns) >= MAX_SPAWNS_PER_HOUR:
+        return True, (
+            f"Circuit breaker tripped: {len(recent_spawns)} spawns in the last hour "
+            f"(max {MAX_SPAWNS_PER_HOUR}). Task needs human review."
+        )
+    
+    # Also check cooldown - don't spawn again too quickly
+    if recent_spawns:
+        last_spawn = _parse_iso_timestamp(recent_spawns[-1])
+        if last_spawn:
+            cooldown_cutoff = datetime.now(timezone.utc) - timedelta(minutes=SPAWN_COOLDOWN_MINUTES)
+            if last_spawn > cooldown_cutoff:
+                minutes_ago = (datetime.now(timezone.utc) - last_spawn).total_seconds() / 60
+                return True, (
+                    f"Spawn cooldown active: last spawn was {minutes_ago:.0f} minutes ago "
+                    f"(cooldown: {SPAWN_COOLDOWN_MINUTES} min)"
+                )
+    
+    return False, ""
+
+
+def get_spawn_count_last_hour(task_id: str) -> int:
+    """Get the number of spawns for a task in the last hour."""
+    tracker = load_retry_tracker()
+    short_id = task_id[:8]
+    
+    if short_id not in tracker:
+        return 0
+    
+    spawn_history = tracker[short_id].get("spawn_history", [])
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    
+    return len([
+        ts for ts in spawn_history
+        if _parse_iso_timestamp(ts) and _parse_iso_timestamp(ts) > cutoff
+    ])
+
+
 # ─── Context Gathering ───
 
 def run_clawboard_command(args: list[str]) -> tuple[bool, str]:
@@ -355,6 +478,49 @@ def gather_task_context(task_id: str) -> dict:
 
 # ─── Prompt Builders ───
 
+def build_escalation_summary(task_id: str, retry_count: int, context: dict) -> list[str]:
+    """Build a structured escalation summary for P2 escalation.
+    
+    Returns list of lines explaining what's stuck and why.
+    """
+    short_id = task_id[:8]
+    lines = [
+        "### 🚨 ESCALATE TO HUMAN REQUIRED",
+        "",
+        f"**This task has failed {retry_count} times without resolution.**",
+        "",
+        "**What's stuck:**",
+    ]
+    
+    # Analyze retry history to explain the pattern
+    tracker = load_retry_tracker()
+    if short_id in tracker:
+        history = tracker[short_id].get("history", [])
+        if history:
+            # Summarize failure patterns
+            failure_counts = {}
+            for h in history:
+                failure_counts[h] = failure_counts.get(h, 0) + 1
+            
+            for failure, count in sorted(failure_counts.items(), key=lambda x: -x[1]):
+                lines.append(f"  - {failure}: {count}x")
+    
+    lines.extend([
+        "",
+        "**Why automated retry won't help:**",
+        "  - Pattern suggests structural issue, not transient failure",
+        "  - Same errors recurring indicates need for human decision",
+        "",
+        "**Recommended human actions:**",
+        f"  1. Review task details: `clawboard get {short_id}`",
+        f"  2. Check logs for root cause",
+        f"  3. Either fix the underlying issue OR mark blocked: `clawboard update {short_id} --tags blocked-human`",
+        "",
+    ])
+    
+    return lines
+
+
 def build_stuck_prompt(task: dict, context: dict, retry_count: int) -> str:
     """Build review prompt for stuck tasks.
     
@@ -372,14 +538,9 @@ def build_stuck_prompt(task: dict, context: dict, retry_count: int) -> str:
         "",
     ]
     
-    # Add escalation warning if needed
+    # P2: Structured escalation after threshold
     if retry_count >= ESCALATION_THRESHOLD:
-        lines.extend([
-            "### ⚠️ ESCALATION REQUIRED",
-            f"This task has failed {retry_count} times. The approach may be wrong.",
-            "**Consider:** Review before attempting again.",
-            "",
-        ])
+        lines.extend(build_escalation_summary(task_id, retry_count, context))
     
     # Add task details
     if context.get("task_details"):
@@ -455,14 +616,9 @@ def build_stalled_prompt(task: dict, context: dict, retry_count: int) -> str:
         "",
     ]
     
-    # Add escalation warning if needed
+    # P2: Structured escalation after threshold
     if retry_count >= ESCALATION_THRESHOLD:
-        lines.extend([
-            "### ⚠️ ESCALATION REQUIRED",
-            f"This task has failed {retry_count} times. The approach may be wrong.",
-            "**Consider:** Review before attempting again.",
-            "",
-        ])
+        lines.extend(build_escalation_summary(task_id, retry_count, context))
     
     # Add process state info
     if context.get("process_state"):
@@ -618,6 +774,199 @@ def build_autostart_prompt(task: dict, context: dict) -> str:
     ])
     
     return "\n".join(lines)
+
+
+# ─── Multi-Signal Completion Detection (P1) ───
+
+def check_recent_git_commits(task_id: str, hours: int = 2) -> list[str]:
+    """Check for recent git commits mentioning the task ID.
+    
+    Returns list of matching commit messages.
+    """
+    short_id = task_id[:8]
+    commits = []
+    
+    try:
+        # Run git log looking for commits mentioning the task ID
+        result = subprocess.run(
+            ["git", "log", f"--since={hours} hours ago", "--oneline", f"--grep={short_id}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            commits = result.stdout.strip().split('\n')
+            log(f"Found {len(commits)} git commits mentioning {short_id}")
+    except (subprocess.TimeoutExpired, OSError) as e:
+        log(f"Git commit check failed: {e}")
+    
+    return commits
+
+
+def check_session_file_activity(task_id: str, minutes: int = 30) -> dict:
+    """Check if any session files mention the task ID and were recently modified.
+    
+    Returns dict with:
+        active: bool - True if recent activity found
+        session: str - Name of most recent session with activity
+        last_modified: str - ISO timestamp of last modification
+    """
+    if not SESSIONS_DIR.exists():
+        return {"active": False}
+    
+    short_id = task_id[:8]
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    
+    try:
+        for entry in sorted(
+            SESSIONS_DIR.iterdir(),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        ):
+            if entry.suffix != ".jsonl" or ".deleted." in entry.name:
+                continue
+            
+            mtime = datetime.fromtimestamp(entry.stat().st_mtime, tz=timezone.utc)
+            if mtime < cutoff:
+                break  # No more recent files
+            
+            # Check if task ID is mentioned in the file
+            try:
+                with open(entry) as f:
+                    content = f.read()
+                    if short_id in content:
+                        return {
+                            "active": True,
+                            "session": entry.name,
+                            "last_modified": mtime.isoformat()
+                        }
+            except OSError:
+                continue
+    except OSError as e:
+        log(f"Session file check failed: {e}")
+    
+    return {"active": False}
+
+
+def check_container_status(container_name: str = None) -> dict:
+    """Check if relevant containers have restarted recently.
+    
+    Returns dict with:
+        running: bool
+        restart_count: int
+        last_started: str - ISO timestamp if available
+    """
+    result = {"running": False, "restart_count": 0}
+    
+    # Default container names to check
+    containers = [container_name] if container_name else ["clawboard", "openclaw"]
+    
+    try:
+        for name in containers:
+            proc = subprocess.run(
+                ["docker", "inspect", "--format", 
+                 "{{.State.Running}} {{.RestartCount}} {{.State.StartedAt}}", name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if proc.returncode == 0:
+                parts = proc.stdout.strip().split()
+                if len(parts) >= 3:
+                    result["running"] = parts[0] == "true"
+                    result["restart_count"] = int(parts[1]) if parts[1].isdigit() else 0
+                    result["last_started"] = parts[2]
+                    result["container"] = name
+                    break
+    except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+        log(f"Container status check failed: {e}")
+    
+    return result
+
+
+def is_task_actually_done(task: dict) -> tuple[bool, str]:
+    """Multi-signal completion detection.
+    
+    Check multiple signals beyond just API status:
+    1. API status (primary)
+    2. All subtasks completed
+    3. Recent git commits mentioning task
+    4. Process status file says finished
+    
+    Returns (is_done, reason_if_done).
+    """
+    task_id = task.get("id", "")
+    status = task.get("status", "")
+    
+    # Signal 1: API status is completed
+    if status == "completed":
+        return True, "API status is completed"
+    
+    # Signal 2: All subtasks completed (if task has subtasks)
+    subtasks = task.get("subtasks", [])
+    if subtasks and all(s.get("status") == "completed" for s in subtasks):
+        return True, f"All {len(subtasks)} subtasks are completed"
+    
+    # Signal 3: Process status file says finished
+    status_file = get_task_status_file(task_id)
+    if status_file.exists():
+        try:
+            with open(status_file) as f:
+                proc_status = json.load(f)
+            if proc_status.get("completed"):
+                return True, "Process status file indicates completion"
+            if not proc_status.get("running", True) and proc_status.get("exit_code") == 0:
+                return True, "Process exited successfully"
+        except (json.JSONDecodeError, OSError):
+            pass
+    
+    # Signal 4: Recent git commits mentioning completion
+    commits = check_recent_git_commits(task_id, hours=4)
+    for commit in commits:
+        commit_lower = commit.lower()
+        if any(word in commit_lower for word in ["complete", "done", "finish", "close"]):
+            return True, f"Git commit indicates completion: {commit[:50]}"
+    
+    return False, ""
+
+
+def detect_dead_agent_session(task_id: str) -> tuple[bool, str]:
+    """Check if task shows in-progress but agent session is dead.
+    
+    Returns (is_dead, reason).
+    """
+    short_id = task_id[:8]
+    
+    # Check session activity
+    session_info = check_session_file_activity(task_id, minutes=PROCESS_STALE_THRESHOLD)
+    
+    if session_info.get("active"):
+        return False, ""  # Session is active
+    
+    # Check if there's a status file claiming running
+    status_file = get_task_status_file(task_id)
+    if status_file.exists():
+        try:
+            with open(status_file) as f:
+                proc_status = json.load(f)
+            
+            if proc_status.get("running"):
+                pid = proc_status.get("pid")
+                if pid and not is_pid_alive(pid):
+                    return True, f"Process {pid} is dead but status file says running"
+                
+                # Check if status file is stale
+                updated = proc_status.get("updated", "")
+                if updated:
+                    update_time = _parse_iso_timestamp(updated)
+                    if update_time:
+                        stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=PROCESS_STALE_THRESHOLD)
+                        if update_time < stale_cutoff:
+                            return True, f"Status file is stale (last update: {updated})"
+        except (json.JSONDecodeError, OSError):
+            pass
+    
+    return False, ""
 
 
 # ─── Step 1: Check Active Sub-agents ───
@@ -776,6 +1125,10 @@ def check_process_status(task: dict) -> tuple[str, str]:
 def check_in_progress_tasks() -> list[tuple[dict, str, str]]:
     """Check all in-progress tasks for orphaned/finished processes.
     
+    P1: Multi-signal completion detection - also checks for:
+    - Tasks that appear done but status wasn't updated
+    - Dead agent sessions
+    
     Returns list of (task, status, reason) for tasks needing attention.
     """
     data = api_get("/tasks?status=in-progress")
@@ -784,6 +1137,31 @@ def check_in_progress_tasks() -> list[tuple[dict, str, str]]:
     
     needs_attention = []
     for task in tasks:
+        task_id = task.get("id", "")
+        
+        # P1: Multi-signal completion check
+        is_done, done_reason = is_task_actually_done(task)
+        if is_done:
+            log(f"Task {task_id[:8]} appears done: {done_reason}")
+            needs_attention.append((
+                task, 
+                "apparently_done", 
+                f"Task appears done ({done_reason}) but status is still in-progress"
+            ))
+            continue
+        
+        # P1: Dead agent session check
+        is_dead, dead_reason = detect_dead_agent_session(task_id)
+        if is_dead:
+            log(f"Task {task_id[:8]} has dead agent: {dead_reason}")
+            needs_attention.append((
+                task,
+                "dead_agent",
+                f"Agent session is dead: {dead_reason}"
+            ))
+            continue
+        
+        # Original process status check
         status, reason = check_process_status(task)
         if status != "alive":
             needs_attention.append((task, status, reason))
@@ -802,13 +1180,26 @@ def check_autostart_tasks() -> list[dict]:
     return autostart
 
 
-# ─── Dedup Logic ───
+# ─── Dedup Logic (P0: Action-Based) ───
 
-def parse_orchestration_log() -> list[tuple[datetime, str, str]]:
+# Action types that indicate a resolution (suppress subsequent WAKEs)
+RESOLUTION_ACTIONS = {
+    "completed", "agent_running", "blocked", "escalated", 
+    "spawned", "reviewed", "approved", "rejected"
+}
+
+# Action types that are just notifications (don't suppress other action types)
+WAKE_ACTIONS = {"wake sent by clawbeat", "wake"}
+
+
+def parse_orchestration_log(max_lines: int = 50) -> list[tuple[datetime, str, str]]:
     """Parse orchestration actions log.
     
     Format: HH:MM | TASK_ID | ACTION_TAKEN
     Returns list of (datetime, task_id, action).
+    
+    Args:
+        max_lines: Maximum number of lines to read from end of file
     """
     if not ORCHESTRATION_LOG.exists():
         log("No orchestration log found")
@@ -818,9 +1209,8 @@ def parse_orchestration_log() -> list[tuple[datetime, str, str]]:
     today = datetime.now(timezone.utc).date()
     
     try:
-        # Read last 10 lines
         with open(ORCHESTRATION_LOG) as f:
-            lines = f.readlines()[-10:]
+            lines = f.readlines()[-max_lines:]
         
         for line in lines:
             line = line.strip()
@@ -847,26 +1237,139 @@ def parse_orchestration_log() -> list[tuple[datetime, str, str]]:
     return entries
 
 
-def should_suppress_wake(task_id: str) -> bool:
-    """Check if we should suppress a WAKE for this task (recent action)."""
+def classify_action(action_str: str) -> str:
+    """Classify an action string into a category.
+    
+    Returns one of: "wake", "resolution", "unknown"
+    """
+    action_lower = action_str.lower()
+    
+    # Check if it's a WAKE notification
+    for wake_action in WAKE_ACTIONS:
+        if wake_action in action_lower:
+            return "wake"
+    
+    # Check if it's a resolution action
+    for resolution in RESOLUTION_ACTIONS:
+        if resolution in action_lower:
+            return "resolution"
+    
+    return "unknown"
+
+
+def get_last_action_for_task(task_id: str) -> tuple[str, str, datetime | None]:
+    """Get the most recent action for a task.
+    
+    Returns (action_type, action_str, timestamp) where action_type is
+    one of: "wake", "resolution", "unknown", or "none" if no action found.
+    """
+    entries = parse_orchestration_log()
+    short_id = task_id[:8]
+    
+    # Search in reverse (most recent first)
+    for entry_time, entry_task_id, action in reversed(entries):
+        if entry_task_id.startswith(short_id) or short_id.startswith(entry_task_id):
+            action_type = classify_action(action)
+            return action_type, action, entry_time
+    
+    return "none", "", None
+
+
+def should_suppress_wake(task_id: str, action_type: str = "wake") -> bool:
+    """Check if we should suppress a WAKE for this task.
+    
+    P0 Improvement: Action-based dedup instead of time-based.
+    - If last action was a WAKE, allow another WAKE (different type might be needed)
+    - If last action was a resolution, suppress (task was handled)
+    - Still respect time-based window for same action type
+    
+    Args:
+        task_id: Task ID to check
+        action_type: Type of action we want to take (e.g., "review", "spawn_agent")
+    """
     if DRY_RUN:
         log("Dry run - skipping dedup check")
         return False
     
-    entries = parse_orchestration_log()
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=DEDUP_WINDOW_MINUTES)
-    
-    # Get short ID for matching (first 8 chars)
     short_id = task_id[:8]
+    last_action_type, last_action, last_time = get_last_action_for_task(task_id)
     
-    for entry_time, entry_task_id, action in entries:
-        # Match if either ID starts with the other's prefix
-        if (entry_task_id.startswith(short_id) or short_id.startswith(entry_task_id)):
-            if entry_time > cutoff:
-                log(f"Suppressing WAKE for {short_id}: recent action at {entry_time}")
-                return True
+    if last_action_type == "none":
+        log(f"No previous action for {short_id}, allowing WAKE")
+        return False
+    
+    # If last action was a resolution (not just a WAKE notification), suppress
+    if last_action_type == "resolution":
+        log(f"Suppressing WAKE for {short_id}: last action was resolution '{last_action}'")
+        return True
+    
+    # If last action was a WAKE, check if it's the same action type within window
+    if last_action_type == "wake" and last_time:
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=DEDUP_WINDOW_MINUTES)
+        if last_time > cutoff:
+            # Same task woken recently - but allow if it's a different action type
+            # For now, we don't track action types in the log, so suppress
+            log(f"Suppressing WAKE for {short_id}: recently woken at {last_time}")
+            return True
     
     return False
+
+
+# ─── Log Rotation (P1) ───
+
+def rotate_orchestration_log() -> None:
+    """Rotate orchestration log if it exceeds MAX_LOG_LINES.
+    
+    Keeps only the last KEEP_LOG_LINES entries.
+    """
+    if DRY_RUN:
+        log("Dry run - skipping log rotation")
+        return
+    
+    if not ORCHESTRATION_LOG.exists():
+        return
+    
+    try:
+        with open(ORCHESTRATION_LOG) as f:
+            lines = f.readlines()
+        
+        if len(lines) > MAX_LOG_LINES:
+            log(f"Rotating orchestration log: {len(lines)} → {KEEP_LOG_LINES} lines")
+            with open(ORCHESTRATION_LOG, 'w') as f:
+                f.writelines(lines[-KEEP_LOG_LINES:])
+    except OSError as e:
+        log(f"Failed to rotate orchestration log: {e}")
+
+
+def cleanup_retry_tracker() -> None:
+    """Clean up retry tracker entries older than RETRY_TRACKER_MAX_AGE_HOURS.
+    
+    Removes entries where the last activity was too long ago.
+    """
+    if DRY_RUN:
+        log("Dry run - skipping retry tracker cleanup")
+        return
+    
+    tracker = load_retry_tracker()
+    if not tracker:
+        return
+    
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=RETRY_TRACKER_MAX_AGE_HOURS)
+    to_remove = []
+    
+    for task_id, entry in tracker.items():
+        last_str = entry.get("last", "")
+        last_time = _parse_iso_timestamp(last_str) if last_str else None
+        
+        if last_time and last_time < cutoff:
+            to_remove.append(task_id)
+            log(f"Cleaning up stale retry entry: {task_id} (last: {last_str})")
+    
+    if to_remove:
+        for task_id in to_remove:
+            del tracker[task_id]
+        save_retry_tracker(tracker)
+        log(f"Cleaned up {len(to_remove)} stale retry tracker entries")
 
 
 # ─── Main Decision Tree ───
@@ -888,7 +1391,7 @@ def run_heartbeat() -> None:
         task_id = task.get("id", "")
         task_title = task.get("title", "Unknown")
         
-        if should_suppress_wake(task_id):
+        if should_suppress_wake(task_id, action_type="review"):
             output("HEARTBEAT_OK", f"dedup suppressed: {task_id[:8]}")
         
         # Gather context and build rich prompt
@@ -902,9 +1405,9 @@ def run_heartbeat() -> None:
         # Build rich prompt
         message = build_stuck_prompt(task, context, retry_count)
         
-        # Determine recommended action
+        # Determine recommended action (P2: escalate_human after threshold)
         if retry_count >= ESCALATION_THRESHOLD:
-            recommended_action = "escalate"
+            recommended_action = "escalate_human"
         else:
             recommended_action = "review"
         
@@ -923,7 +1426,7 @@ def run_heartbeat() -> None:
         task, status, reason = attention_needed[0]
         task_id = task.get("id", "")
         
-        if should_suppress_wake(task_id):
+        if should_suppress_wake(task_id, action_type="restart_process"):
             output("HEARTBEAT_OK", f"dedup suppressed: {task_id[:8]}")
         
         # Gather context and build rich prompt
@@ -937,9 +1440,9 @@ def run_heartbeat() -> None:
         # Build rich prompt
         message = build_stalled_prompt(task, context, retry_count)
         
-        # Determine recommended action
+        # Determine recommended action (P2: escalate_human after threshold)
         if retry_count >= ESCALATION_THRESHOLD:
-            recommended_action = "escalate"
+            recommended_action = "escalate_human"
         elif status == "finished":
             recommended_action = "review"
         else:
@@ -961,12 +1464,37 @@ def run_heartbeat() -> None:
         task_id = task.get("id", "")
         task_title = task.get("title", "Unknown")
         
-        if should_suppress_wake(task_id):
+        if should_suppress_wake(task_id, action_type="spawn_agent"):
             output("HEARTBEAT_OK", f"dedup suppressed: {task_id[:8]}")
+        
+        # P0: Circuit breaker check
+        should_block, block_reason = check_circuit_breaker(task_id)
+        if should_block:
+            log(f"Circuit breaker blocked spawn for {task_id[:8]}: {block_reason}")
+            # Record this as needing human review
+            record_retry(task_id, f"Circuit breaker: {block_reason}")
+            output_wake(
+                reason=f"Circuit breaker tripped for {task_id[:8]}",
+                message=f"## ORCHESTRATE: Task [{task_id[:8]}] Needs Human Review\n\n"
+                        f"**Task:** {task_title}\n\n"
+                        f"### ⚠️ CIRCUIT BREAKER TRIPPED\n\n"
+                        f"{block_reason}\n\n"
+                        f"**Action Required:** Review this task manually before allowing more spawns.\n\n"
+                        f"Options:\n"
+                        f"- Fix the underlying issue and retry\n"
+                        f"- Mark as blocked: `clawboard update {task_id[:8]} --tags blocked-human`\n"
+                        f"- Clear retry tracker: delete entry from /tmp/clawbeat-retries.json\n",
+                task_id=task_id,
+                attempt=get_spawn_count_last_hour(task_id) + 1,
+                recommended_action="escalate_human"
+            )
         
         # Gather context and build rich prompt
         log("Gathering context for auto-start task...")
         context = gather_task_context(task_id)
+        
+        # Record this spawn attempt for circuit breaker
+        record_spawn(task_id)
         
         # Build rich prompt (no retry count for auto-start - it's a fresh task)
         message = build_autostart_prompt(task, context)
@@ -979,8 +1507,13 @@ def run_heartbeat() -> None:
             recommended_action="spawn_agent"
         )
     
-    # Step 5: All clear
-    log("Step 5: All clear, returning HEARTBEAT_OK")
+    # Step 5: Maintenance (P1)
+    log("Step 5: Running maintenance...")
+    rotate_orchestration_log()
+    cleanup_retry_tracker()
+    
+    # Step 6: All clear
+    log("Step 6: All clear, returning HEARTBEAT_OK")
     output("HEARTBEAT_OK", "All systems nominal")
 
 
