@@ -159,13 +159,28 @@ def get_api_token() -> str:
     if TOKEN_ENV:
         return TOKEN_ENV
 
+    # Try config.json (clawbeat's primary format: {"api_token": "..."})
     try:
         with open(TOKEN_FILE) as f:
             config = json.load(f)
-        return config.get("api_token", "")
+        token = config.get("api_token") or config.get("token")
+        if token:
+            return token
     except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-        log(f"Failed to read token: {e}")
-        return ""
+        log(f"Failed to read config.json: {e}")
+
+    # Fallback: token.json (clawboard CLI's format: {"token": "...", "expires_at": ...})
+    token_json = CONFIG_DIR / "token.json"
+    try:
+        with open(token_json) as f:
+            cached = json.load(f)
+        token = cached.get("token", "")
+        if token:
+            return token
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        log(f"Failed to read token.json: {e}")
+
+    return ""
 
 
 def api_get(path: str) -> dict:
@@ -482,7 +497,7 @@ def run_clawboard_command(args: list[str]) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=str(Path(__file__).parent.parent)
+            cwd=str(Path(__file__).resolve().parent.parent)
         )
         if result.returncode == 0:
             return True, result.stdout.strip()
