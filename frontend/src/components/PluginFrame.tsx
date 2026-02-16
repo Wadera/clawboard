@@ -33,7 +33,7 @@ export function PluginFrame({ pluginName, proxyPath, apiBase }: PluginFrameProps
   // Build the iframe URL
   // Remove 'claw-' prefix for cleaner URLs (matches backend proxy pattern)
   const shortName = pluginName.replace(/^claw-/, '');
-  const iframeSrc = `${apiBase}/plugins/${shortName}/ui${proxyPath}`;
+  const iframeSrc = `${apiBase}/plugins/${shortName}${proxyPath}`;
 
   // Reset loading/error state when URL changes
   useEffect(() => {

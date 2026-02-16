@@ -150,34 +150,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 1. Status Orb Section - Always at top */}
         <div className="sidebar-avatar-section">
           <div className="avatar-container">
-            {(() => {
-              const orbPlugin = plugins.find(p => p.name === 'nim-orb' && p.healthy);
-              if (orbPlugin) {
-                const state = status?.main.state || 'idle';
-                return (
-                  <iframe
-                    src={`${import.meta.env.VITE_API_BASE_URL || '/api'}/plugins/nim-orb/avatar?state=${state}`}
-                    style={{
-                      width: 200,
-                      height: 200,
-                      border: 'none',
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                      background: 'transparent',
-                      marginTop: '-10px',
-                    }}
-                    title="NimOrb Avatar"
-                    allow="accelerometer; autoplay"
-                  />
-                );
-              }
-              return (
-                <StatusOrb
-                  state={status?.main.state || 'idle'}
-                  size={120}
-                />
-              );
-            })()}
+            <OrbAvatar state={status?.main.state || 'idle'} plugins={plugins} />
           </div>
         </div>
 
@@ -480,6 +453,45 @@ function PluginNavLink({ item }: { item: PluginNavItem }) {
       {!item.healthy && <span className="plugin-health-dot" title="Plugin unhealthy" />}
     </Link>
   );
+}
+
+/**
+ * OrbAvatar — renders the nim-orb iframe once and uses postMessage for state updates.
+ * Falls back to the CSS StatusOrb when the nim-orb plugin isn't available.
+ */
+function OrbAvatar({ state, plugins: pluginsList }: { state: string; plugins: { name: string; healthy: boolean }[] }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const orbPlugin = pluginsList.find(p => p.name === 'nim-orb' && p.healthy);
+  const initialStateRef = useRef(state);
+
+  // Send state changes via postMessage (not by changing iframe src)
+  useEffect(() => {
+    if (!orbPlugin || !iframeRef.current?.contentWindow) return;
+    // Always send — the orb ignores if already in the same state
+    iframeRef.current.contentWindow.postMessage({ type: 'orb-state', state }, '*');
+  }, [state, orbPlugin]);
+
+  if (orbPlugin) {
+    return (
+      <iframe
+        ref={iframeRef}
+        src={`${import.meta.env.VITE_API_BASE_URL || '/api'}/plugins/nim-orb/avatar?state=${initialStateRef.current}`}
+        style={{
+          width: 200,
+          height: 200,
+          border: 'none',
+          borderRadius: '50%',
+          overflow: 'hidden',
+          background: 'transparent',
+          marginTop: '-10px',
+        }}
+        title="NimOrb Avatar"
+        allow="accelerometer; autoplay"
+      />
+    );
+  }
+
+  return <StatusOrb state={state} size={120} />;
 }
 
 function UsageBarRow({ label, percentLeft, timeLeft }: { label: string; percentLeft: number; timeLeft: string }) {
