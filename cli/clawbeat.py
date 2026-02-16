@@ -1404,10 +1404,16 @@ def detect_dead_agent_session(task_id: str) -> tuple[bool, str]:
 # ─── Dedup Logic (Lifecycle-Aware) ───
 
 # Action types that indicate a resolution (suppress subsequent WAKEs)
+# NOTE: "spawned" is NOT a resolution — it's the start of work, not the end.
+# Only true end-states go here. Spawned agents may crash or finish,
+# and clawbeat needs to re-evaluate on the next tick.
 RESOLUTION_ACTIONS = {
-    "completed", "agent_running", "blocked", "escalated",
-    "spawned", "reviewed", "approved", "rejected"
+    "completed", "blocked", "escalated",
+    "reviewed", "approved", "rejected"
 }
+
+# Action types that indicate an agent is working (time-limited suppression)
+AGENT_ACTIONS = {"spawned", "agent_running"}
 
 # Action types that are just notifications
 WAKE_ACTIONS = {"wake sent by clawbeat", "wake"}
@@ -1457,7 +1463,7 @@ def parse_orchestration_log(max_lines: int = 50
 
 
 def classify_action(action_str: str) -> str:
-    """Classify an action string. Returns: wake, resolution, or unknown."""
+    """Classify an action string. Returns: wake, resolution, agent, or unknown."""
     action_lower = action_str.lower()
 
     for wake_action in WAKE_ACTIONS:
@@ -1467,6 +1473,10 @@ def classify_action(action_str: str) -> str:
     for resolution in RESOLUTION_ACTIONS:
         if resolution in action_lower:
             return "resolution"
+
+    for agent_action in AGENT_ACTIONS:
+        if agent_action in action_lower:
+            return "agent"
 
     return "unknown"
 
@@ -1533,11 +1543,26 @@ def should_suppress_wake(task_id: str,
         log(f"No previous action for {short_id}, allowing WAKE")
         return False
 
-    # If last action was a resolution, suppress
+    # If last action was a resolution, suppress permanently
     if last_action_type == "resolution":
         log(f"Suppressing WAKE for {short_id}: "
             f"last action was resolution '{last_action}'")
         return True
+
+    # If last action was agent spawn/running, suppress for PROCESS_STALE_THRESHOLD
+    # After that, the agent is assumed stale and we should re-evaluate
+    if last_action_type == "agent" and last_time:
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            minutes=PROCESS_STALE_THRESHOLD)
+        if last_time > cutoff:
+            log(f"Suppressing WAKE for {short_id}: "
+                f"agent action '{last_action}' at {last_time} "
+                f"(within {PROCESS_STALE_THRESHOLD}min agent window)")
+            return True
+        else:
+            log(f"Agent action for {short_id} is stale "
+                f"({last_action} at {last_time}), allowing re-evaluation")
+            return False
 
     # For escalate_human: check if last wake was also escalate_human
     # If so, suppress (until status changes, detected by resolution action)
