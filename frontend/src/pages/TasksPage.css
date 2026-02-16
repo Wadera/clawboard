@@ -127,7 +127,7 @@
 }
 
 .search-filter-panel-inner {
-  padding: 0 var(--space-6, 24px);
+  padding: var(--space-3, 12px) var(--space-6, 24px);
   padding-bottom: var(--space-2, 8px);
 }
 

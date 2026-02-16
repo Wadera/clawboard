@@ -74,6 +74,7 @@ export const TasksPage: React.FC = () => {
     return !!(initial.searchQuery || initial.priorities.length || initial.tags.length || initial.projects.length);
   });
   const autoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFilterCountRef = useRef<number>(activeFilterCount);
   const boardRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
@@ -198,7 +199,11 @@ export const TasksPage: React.FC = () => {
       clearTimeout(autoCollapseTimerRef.current);
       autoCollapseTimerRef.current = null;
     }
-    if (searchPanelOpen && activeFilterCount === 0) {
+    // Only auto-collapse when filters were actively cleared (went from >0 to 0)
+    // NOT on every re-render with 0 filters (prevents WebSocket update collapse)
+    const wasFiltered = prevFilterCountRef.current > 0;
+    prevFilterCountRef.current = activeFilterCount;
+    if (searchPanelOpen && activeFilterCount === 0 && wasFiltered) {
       autoCollapseTimerRef.current = setTimeout(() => {
         setSearchPanelOpen(false);
       }, 1500);
