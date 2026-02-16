@@ -12,10 +12,26 @@ interface BotStatus {
   updated_at: string;
 }
 
+interface HistoryResponse {
+  success: boolean;
+  history: BotStatus[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export const StatusDisplay: React.FC = () => {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFullAvatar, setShowFullAvatar] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<BotStatus[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<BotStatus | null>(null);
 
   useEffect(() => {
     fetchStatus();
@@ -46,6 +62,47 @@ export const StatusDisplay: React.FC = () => {
       setError('Failed to load status');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHistory = async (page: number = 1) => {
+    setHistoryLoading(true);
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/nim-status/history?page=${page}&limit=20`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data: HistoryResponse = await response.json();
+      if (data.success) {
+        if (page === 1) {
+          setHistory(data.history);
+        } else {
+          setHistory(prev => [...prev, ...data.history]);
+        }
+        setHasMoreHistory(data.hasMore);
+        setHistoryPage(page);
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleShowHistory = () => {
+    if (!showHistory && history.length === 0) {
+      fetchHistory(1);
+    }
+    setShowHistory(!showHistory);
+  };
+
+  const handleLoadMore = () => {
+    if (!historyLoading && hasMoreHistory) {
+      fetchHistory(historyPage + 1);
     }
   };
 
@@ -105,9 +162,18 @@ export const StatusDisplay: React.FC = () => {
     <div className="status-display">
       <div className="status-header">
         <h2 className="status-title">Current Status</h2>
-        <span className="status-timestamp" title={new Date(status.updated_at).toLocaleString()}>
-          {formatTimestamp(status.updated_at)}
-        </span>
+        <div className="status-actions">
+          <button 
+            className="history-toggle-btn"
+            onClick={handleShowHistory}
+            aria-label={showHistory ? 'Hide history' : 'Show history'}
+          >
+            {showHistory ? '📖 Hide History' : '📖 Show History'}
+          </button>
+          <span className="status-timestamp" title={new Date(status.updated_at).toLocaleString()}>
+            {formatTimestamp(status.updated_at)}
+          </span>
+        </div>
       </div>
       
       <div className="status-content">
@@ -121,7 +187,12 @@ export const StatusDisplay: React.FC = () => {
         <p className="status-text">{status.status_text}</p>
         
         {status.avatar_url && (
-          <div className="status-avatar">
+          <div 
+            className="status-avatar" 
+            onClick={() => setShowFullAvatar(true)}
+            style={{ cursor: 'pointer' }}
+            title="Click to enlarge"
+          >
             <img 
               src={status.avatar_url} 
               alt="Current avatar" 
@@ -130,6 +201,102 @@ export const StatusDisplay: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* History Timeline */}
+      {showHistory && (
+        <div className="status-history">
+          <h3 className="history-title">Status History</h3>
+          <div className="history-timeline">
+            {history.map((item) => (
+              <div 
+                key={item.id} 
+                className="history-item"
+                onClick={() => setSelectedHistoryItem(item)}
+              >
+                <div className="history-item-time">
+                  {formatTimestamp(item.updated_at)}
+                </div>
+                <div className="history-item-content">
+                  <span className="history-mood">{getMoodEmoji(item.mood)}</span>
+                  <span className="history-mood-label">{item.mood}</span>
+                  <p className="history-text">{item.status_text}</p>
+                  {item.avatar_url && (
+                    <img 
+                      src={item.avatar_url} 
+                      alt={`Avatar from ${item.updated_at}`}
+                      className="history-avatar-thumb"
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {historyLoading && (
+            <div className="history-loading">
+              <div className="loading-spinner" />
+            </div>
+          )}
+          
+          {hasMoreHistory && !historyLoading && (
+            <button 
+              className="load-more-btn"
+              onClick={handleLoadMore}
+            >
+              Load More
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Full Avatar Lightbox */}
+      {showFullAvatar && status.avatar_url && (
+        <div 
+          className="avatar-lightbox" 
+          onClick={() => setShowFullAvatar(false)}
+        >
+          <img 
+            src={status.avatar_url} 
+            alt="Full size avatar" 
+            className="avatar-full"
+          />
+        </div>
+      )}
+
+      {/* History Item Detail Modal */}
+      {selectedHistoryItem && (
+        <div 
+          className="avatar-lightbox" 
+          onClick={() => setSelectedHistoryItem(null)}
+        >
+          <div className="history-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="modal-close"
+              onClick={() => setSelectedHistoryItem(null)}
+            >
+              ✕
+            </button>
+            <div className="history-detail-content">
+              <div className="history-detail-header">
+                <span className="history-detail-mood">
+                  {getMoodEmoji(selectedHistoryItem.mood)} {selectedHistoryItem.mood}
+                </span>
+                <span className="history-detail-time">
+                  {new Date(selectedHistoryItem.updated_at).toLocaleString()}
+                </span>
+              </div>
+              <p className="history-detail-text">{selectedHistoryItem.status_text}</p>
+              {selectedHistoryItem.avatar_url && (
+                <img 
+                  src={selectedHistoryItem.avatar_url} 
+                  alt="Full avatar"
+                  className="history-detail-avatar"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

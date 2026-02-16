@@ -180,18 +180,8 @@ setGatewayConnector(gatewayConnector);
 setModelsGatewayConnector(gatewayConnector);
 setPluginLoader(pluginLoader);
 
-// Public routes (no auth required)
-app.use('/auth', authRoutes);
-app.use('/config', configRoutes);
-
-// Plugin routes (auth required) — registry + theme
-app.use('/plugins', authMiddleware, pluginsRoutes);
-
-// Plugin proxy middleware — routes /api/plugins/{name}/* to plugin containers
-app.use(authMiddleware, createPluginProxy(pluginLoader));
-
-// Public static file routes (no auth - for <img> tags that can't send headers)
-// These serve the actual image files without requiring authentication
+// Public static file routes (MUST be before auth middleware)
+// These serve image files without authentication - <img> tags can't send JWT headers
 const SCREENSHOT_DIR = '/clawdbot/media/browser';
 const GENERATED_DIR = '/clawd-media/generated';
 
@@ -209,6 +199,16 @@ app.use('/media/generated', express.static(GENERATED_DIR, {
   }
 }));
 
+// Public routes (no auth required)
+app.use('/auth', authRoutes);
+app.use('/config', configRoutes);
+
+// Plugin routes (auth required) — registry + theme
+app.use('/plugins', authMiddleware, pluginsRoutes);
+
+// Plugin proxy middleware — routes /api/plugins/{name}/* to plugin containers
+app.use(authMiddleware, createPluginProxy(pluginLoader));
+
 // Protected routes (auth required)
 app.use('/status', authMiddleware, statusRoutes);
 app.use('/tasks', authMiddleware, tasksRoutes);
@@ -220,7 +220,7 @@ app.use('/agents', authMiddleware, agentsRoutes);
 app.use('/audit', authMiddleware, auditRoutes);
 app.use('/rate-limits', authMiddleware, rateLimitsRoutes);
 app.use('/projects', authMiddleware, projectsRoutes);
-app.use('/bot-status', authMiddleware, botStatusRoutes);
+app.use('/nim-status', authMiddleware, botStatusRoutes);
 app.use('/journal', authMiddleware, journalRoutes);
 app.use('/projects', authMiddleware, filesRoutes);
 app.use('/tools', authMiddleware, toolsRoutes);
