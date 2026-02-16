@@ -389,7 +389,7 @@ export const TasksPage: React.FC = () => {
           activeAgent: { name: 'sub-agent', sessionKey: 'pending' },
           executionMode: 'subagent' as const
         } : t));
-        console.log('[Spawn] Prompt generated for task:', taskId, '\n', data.prompt.substring(0, 200) + '...');
+        // Spawn succeeded
       } else {
         console.error('Failed to spawn task:', data.error);
         alert(`Failed to spawn: ${data.error}`);

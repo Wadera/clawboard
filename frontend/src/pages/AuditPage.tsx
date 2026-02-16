@@ -80,8 +80,8 @@ export const AuditPage: React.FC = () => {
   const [modelStatsExpanded, setModelStatsExpanded] = useState(true);
   const [screenshots, setScreenshots] = useState<Record<string, string[]>>({});
   const [loadingScreenshots, setLoadingScreenshots] = useState<Record<string, boolean>>({});
-  // @ts-ignore - TODO: Implement lightbox UI
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // TODO: Implement lightbox UI — lightboxImage state set on click but not yet rendered
+  const [, setLightboxImage] = useState<string | null>(null);
 
   // Filters
   const [eventType, setEventType] = useState('');
