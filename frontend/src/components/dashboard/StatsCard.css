@@ -19,6 +19,21 @@
   overflow: hidden;
 }
 
+/* Make link cards clickable with proper styling */
+.stats-card-link {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.stats-card-link:hover {
+  transform: translateY(-6px);
+}
+
+.stats-card-link:active {
+  transform: translateY(-2px);
+}
+
 .stats-card::before {
   content: '';
   position: absolute;

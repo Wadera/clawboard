@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import './StatsCard.css';
 
 interface StatsCardProps {
@@ -9,6 +10,7 @@ interface StatsCardProps {
   description?: string;
   color: 'blue' | 'orange' | 'green' | 'purple' | 'red' | 'gray';
   pulse?: boolean;
+  to?: string;
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({
@@ -19,9 +21,10 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   description,
   color,
   pulse = false,
+  to,
 }) => {
-  return (
-    <div className={`stats-card stats-card-${color} ${pulse ? 'stats-card-pulse' : ''}`}>
+  const content = (
+    <>
       <div className="stats-card-icon">{icon}</div>
       
       <div className="stats-card-content">
@@ -36,6 +39,20 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           <div className="stats-card-description">{description}</div>
         )}
       </div>
+    </>
+  );
+
+  if (to) {
+    return (
+      <Link to={to} className={`stats-card stats-card-${color} ${pulse ? 'stats-card-pulse' : ''} stats-card-link`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`stats-card stats-card-${color} ${pulse ? 'stats-card-pulse' : ''}`}>
+      {content}
     </div>
   );
 };

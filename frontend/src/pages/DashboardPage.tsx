@@ -133,6 +133,7 @@ export const DashboardPage: React.FC = () => {
           value={summary.ideas}
           description="things to explore"
           color="purple"
+          to="/tasks?focus=ideas"
         />
 
         <StatsCard
@@ -142,6 +143,7 @@ export const DashboardPage: React.FC = () => {
           description="actively working"
           color="orange"
           pulse={summary.inProgress > 0}
+          to="/tasks?focus=in-progress"
         />
 
         <StatsCard
@@ -151,6 +153,7 @@ export const DashboardPage: React.FC = () => {
           description="needs attention"
           color={summary.stuck > 0 ? 'red' : 'gray'}
           pulse={summary.stuck > 0}
+          to="/tasks?focus=stuck"
         />
 
         <StatsCard
@@ -159,6 +162,7 @@ export const DashboardPage: React.FC = () => {
           value={completedTotal}
           description={summary.recentCompleted > 0 ? `${summary.recentCompleted} recent` : 'all time'}
           color="green"
+          to="/tasks?focus=completed"
         />
       </div>
 

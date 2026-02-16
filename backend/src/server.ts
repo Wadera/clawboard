@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import { pool } from './db/connection';
 import { WebSocketService } from './services/websocket';
 import { SessionMonitor } from './services/sessionMonitor';
-import { taskManager } from './services/TaskManager';
+import { taskManagerDB as taskManager } from './services/TaskManagerDB';
 import { WorkspaceWatcher } from './services/workspaceWatcher';
 import { ModelStatusService } from './services/modelStatus';
 import { ControlService } from './services/controlService';
@@ -167,6 +167,7 @@ import gatewayRoutes, { setGatewayConnector } from './routes/gateway';
 import dashboardRoutes from './routes/dashboard';
 import modelsRoutes, { setModelsGatewayConnector } from './routes/models';
 import pluginsRoutes, { setPluginLoader } from './routes/plugins';
+import imagesRoutes from './routes/images';
 import { authMiddleware } from './middleware/auth';
 import { createPluginProxy } from './middleware/pluginProxy';
 
@@ -225,6 +226,7 @@ app.use('/tools', authMiddleware, toolsRoutes);
 app.use('/gateway', authMiddleware, gatewayRoutes);
 app.use('/dashboard', authMiddleware, dashboardRoutes);
 app.use('/models', authMiddleware, modelsRoutes);
+app.use('/images', authMiddleware, imagesRoutes);
 // Note: nginx strips /api/ prefix, so routes are registered without it
 // app.use('/approvals', approvalsRoutes);
 // app.use('/thoughts', thoughtsRoutes);

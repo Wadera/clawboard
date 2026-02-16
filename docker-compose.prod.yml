@@ -81,7 +81,7 @@ services:
       # Auth profiles
       - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
       # Bot workspace memory
-      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:ro
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:rw
       # Generated media (journal images, voice notes, avatars)
       - ${OPENCLAW_WORKSPACE:-~/clawd}/media/generated:/clawd-media/generated:ro
       # Project media
@@ -143,6 +143,26 @@ services:
     #   - "traefik.http.routers.clawboard.entrypoints=websecure"
     #   - "traefik.http.routers.clawboard.tls.certresolver=letsencrypt"
     #   - "traefik.http.services.clawboard.loadbalancer.server.port=80"
+
+  # ========================================
+  # NIM-ORB PLUGIN
+  # ========================================
+  nim-orb:
+    build:
+      context: /home/clawd/clawd/projects/nim-orb
+      dockerfile: Dockerfile
+    container_name: nim-orb
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3030
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3030/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ========================================
   # EXAMPLE PLUGIN SERVICE

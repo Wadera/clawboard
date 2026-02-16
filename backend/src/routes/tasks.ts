@@ -1,6 +1,6 @@
 // tasks.ts - API endpoints for task management
 import { Router, Request, Response } from 'express';
-import { taskManager, SubtaskStatus } from '../services/TaskManager';
+import { taskManagerDB as taskManager, SubtaskStatus } from '../services/TaskManagerDB';
 import { taskAutoUpdater } from '../services/TaskAutoUpdater';
 import { taskAnalyzer } from '../services/taskAnalyzer';
 import { generateTaskPromptWithTools } from '../utils/promptTemplate';
@@ -15,7 +15,7 @@ const VALID_SUBTASK_STATUSES: SubtaskStatus[] = ['new', 'in_review', 'completed'
  * GET /tasks
  * List all active tasks with optional filters
  */
-router.get('/', (req: Request, res: Response): void => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const filters: any = {};
     
@@ -27,15 +27,15 @@ router.get('/', (req: Request, res: Response): void => {
       filters.parentId = req.query.parentId === 'null' ? null : req.query.parentId as string;
     }
 
-    const tasks = taskManager.queryTasks(filters);
+    const tasks = await taskManager.queryTasks(filters);
     
     // Add computed dependency fields
-    const tasksWithDeps = tasks.map(task => ({
+    const tasksWithDeps = await Promise.all(tasks.map(async task => ({
       ...task,
-      blocked: taskManager.isTaskBlocked(task.id),
-      blockingTasks: taskManager.getBlockingTasks(task.id).map(t => ({ id: t.id, title: t.title })),
-      dependentTasks: taskManager.getDependentTasks(task.id).map(t => ({ id: t.id, title: t.title })),
-    }));
+      blocked: await taskManager.isTaskBlocked(task.id),
+      blockingTasks: (await taskManager.getBlockingTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+      dependentTasks: (await taskManager.getDependentTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+    })));
     
     res.json({ success: true, tasks: tasksWithDeps });
   } catch (err) {
@@ -52,7 +52,7 @@ router.get('/', (req: Request, res: Response): void => {
  * Get the task the bot is currently working on (auto-detected)
  * NOTE: Must be BEFORE /:id route to avoid being caught by wildcard
  */
-router.get('/current', (_req: Request, res: Response): void => {
+router.get('/current', async (_req: Request, res: Response): Promise<void> => {
   try {
     const currentTask = taskAutoUpdater.getCurrentTask();
     const currentTaskId = taskAutoUpdater.getCurrentTaskId();
@@ -78,27 +78,35 @@ router.get('/current', (_req: Request, res: Response): void => {
  * Used by bot heartbeat cycle to auto-pick tasks
  * NOTE: Must be BEFORE /:id to avoid wildcard catch
  */
-router.get('/next', (_req: Request, res: Response): void => {
+router.get('/next', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const todoTasks = taskManager.queryTasks({ status: 'todo' });
-    
-    const priorityOrder: Record<string, number> = {
-      urgent: 0, high: 1, normal: 2, low: 3, someday: 4
-    };
-    
-    const autoStartTasks = todoTasks
-      .filter(t => t.autoStart && !taskManager.isTaskBlocked(t.id))
-      .sort((a, b) => {
-        const pa = priorityOrder[a.priority] ?? 99;
-        const pb = priorityOrder[b.priority] ?? 99;
-        if (pa !== pb) return pa - pb;
-        return new Date(a.created).getTime() - new Date(b.created).getTime();
-      });
+    // Use getNextTask if available (TaskManagerDB), otherwise fall back to manual logic
+    let task: any = null;
+    if (typeof (taskManager as any).getNextTask === 'function') {
+      task = await (taskManager as any).getNextTask();
+    } else {
+      const todoTasks = await taskManager.queryTasks({ status: 'todo' });
+      
+      const priorityOrder: Record<string, number> = {
+        urgent: 0, high: 1, normal: 2, low: 3, someday: 4
+      };
+      
+      const autoStartTasks = todoTasks
+        .filter(t => t.autoStart)
+        .sort((a, b) => {
+          const pa = priorityOrder[a.priority] ?? 99;
+          const pb = priorityOrder[b.priority] ?? 99;
+          if (pa !== pb) return pa - pb;
+          return new Date(a.created).getTime() - new Date(b.created).getTime();
+        });
+      
+      task = autoStartTasks[0] || null;
+    }
 
     res.json({
       success: true,
-      task: autoStartTasks[0] || null,
-      queueLength: autoStartTasks.length,
+      task,
+      queueLength: task ? 1 : 0,
     });
   } catch (err) {
     console.error('[Tasks API] Error getting next task:', err);
@@ -114,9 +122,9 @@ router.get('/next', (_req: Request, res: Response): void => {
  * Get a single task by ID
  * NOTE: This wildcard must be AFTER specific routes like /current and /next
  */
-router.get('/:id', (req: Request, res: Response): void => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const task = taskManager.getTask(req.params.id);
+    const task = await taskManager.getTask(req.params.id);
     if (!task) {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
@@ -281,7 +289,7 @@ router.post('/:id/archive', async (req: Request, res: Response): Promise<void> =
  */
 router.post('/:id/spawn', async (req: Request, res: Response): Promise<void> => {
   try {
-    const task = taskManager.getTask(req.params.id);
+    const task = await taskManager.getTask(req.params.id);
     if (!task) {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
@@ -401,10 +409,13 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
 
     const task = await taskManager.updateSubtaskStatus(id, index, status, validatedRole, reviewNote);
     
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id)
+      subtaskSummary
     });
   } catch (err) {
     console.error('[Tasks API] Error updating subtask status:', err);
@@ -505,11 +516,15 @@ router.post('/:id/subtasks/:index/approve', async (req: Request, res: Response):
 
     const task = await taskManager.approveSubtask(id, index);
     
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id),
-      allCompleted: taskManager.allSubtasksCompleted(id)
+      subtaskSummary,
+      allCompleted
     });
   } catch (err) {
     console.error('[Tasks API] Error approving subtask:', err);
@@ -540,10 +555,13 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
 
     const task = await taskManager.rejectSubtask(id, index, note);
     
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    
     res.json({ 
       success: true, 
       task,
-      subtaskSummary: taskManager.getSubtaskSummary(id)
+      subtaskSummary
     });
   } catch (err) {
     console.error('[Tasks API] Error rejecting subtask:', err);
@@ -561,23 +579,25 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
  * GET /tasks/:id/subtasks/summary
  * Get subtask completion summary for a task
  */
-router.get('/:id/subtasks/summary', (req: Request, res: Response): void => {
+router.get('/:id/subtasks/summary', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const task = taskManager.getTask(id);
+    const task = await taskManager.getTask(id);
     
     if (!task) {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
     }
 
-    const summary = taskManager.getSubtaskSummary(id);
+    // Get subtask summary (always use async version for DB)
+    const summary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
     
     res.json({ 
       success: true, 
       taskId: id,
       summary,
-      allCompleted: taskManager.allSubtasksCompleted(id)
+      allCompleted
     });
   } catch (err) {
     console.error('[Tasks API] Error getting subtask summary:', err);
