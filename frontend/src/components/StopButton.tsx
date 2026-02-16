@@ -96,13 +96,13 @@ export function StopButton({ variant, agentKey, isActive = false, onStopped }: S
   }
 
   const label = (() => {
-    if (feedback === 'success') return '✓ Stopped';
-    if (feedback === 'error') return '✗ Failed';
-    if (loading) return 'Stopping…';
+    if (feedback === 'success') return <><span className="stop-icon">✓</span><span className="stop-text"> Stopped</span></>;
+    if (feedback === 'error') return <><span className="stop-icon">✗</span><span className="stop-text"> Failed</span></>;
+    if (loading) return <><span className="stop-icon">⏹</span><span className="stop-text"> Stopping…</span></>;
     switch (variant) {
-      case 'main': return '⏹ Stop Bot';
+      case 'main': return <><span className="stop-icon">⏹</span><span className="stop-text"> Stop Bot</span></>;
       case 'agent': return '⏹';
-      case 'emergency': return '🛑 Emergency Stop All';
+      case 'emergency': return <><span className="stop-icon">🛑</span><span className="stop-text"> Emergency Stop All</span></>;
     }
   })();
 
@@ -121,7 +121,7 @@ export function StopButton({ variant, agentKey, isActive = false, onStopped }: S
         }
       >
         {loading ? <span className="stop-spinner" /> : null}
-        {feedback ? <span className="stop-feedback">{label}</span> : label}
+        {feedback ? <span className="stop-feedback">{label}</span> : <span className="stop-label-content">{label}</span>}
       </button>
 
       {showConfirm && createPortal(

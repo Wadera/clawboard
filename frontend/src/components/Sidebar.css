@@ -973,9 +973,10 @@
   }
   
   .sidebar-status-card {
-    padding: 10px;
+    padding: 8px;
     display: flex;
     justify-content: center;
+    overflow: hidden;
   }
   
   .status-card-content {
@@ -1016,7 +1017,26 @@
     display: none !important;
   }
   
-  /* Version footer adjustments */
+  /* Model badge: hide text row, show only context bar */
+  .model-status-text {
+    display: none !important;
+  }
+  
+  .model-status-badge {
+    max-width: 56px;
+    overflow: hidden;
+  }
+  
+  .context-bar-container {
+    max-width: 56px;
+  }
+  
+  /* Model tooltip: reposition for collapsed sidebar */
+  .model-status-tooltip {
+    left: 92px !important;
+  }
+  
+  /* Sidebar footer: compact */
   .sidebar-footer {
     padding-top: 8px;
   }

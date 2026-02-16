@@ -202,10 +202,23 @@
   background: #dc2626;
 }
 
-/* Responsive: collapsed sidebar */
+/* Responsive: collapsed sidebar (tablet) */
+@media (max-width: 1279px) and (min-width: 768px) {
+  .stop-button.main {
+    padding: 0;
+    font-size: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+  
+  .stop-text {
+    display: none !important;
+  }
+}
+
 @media (max-width: 1023px) {
   .stop-button.main {
-    padding: 8px 12px;
-    font-size: 12px;
+    font-size: 14px;
   }
 }

@@ -23,16 +23,18 @@
   max-width: 100%;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) and (min-width: 768px) {
   .model-status-badge {
     max-width: 56px;
     overflow: hidden;
   }
   
   .model-status-text {
-    font-size: 10px;
-    gap: 3px;
-    justify-content: center;
+    display: none !important;
+  }
+  
+  .context-bar-container {
+    max-width: 56px;
   }
 }
 
