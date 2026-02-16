@@ -185,9 +185,9 @@ export const ProjectsPage: React.FC = () => {
   
   if (loading) {
     return (
-      <div className="projects-page-loading">
+      <div className="page-loading">
         <div className="loading-spinner" />
-        <div>Loading projects...</div>
+        <span>Loading projects...</span>
       </div>
     );
   }
@@ -204,7 +204,7 @@ export const ProjectsPage: React.FC = () => {
   }
   
   return (
-    <div className="projects-page">
+    <div className="projects-page fade-in">
       {/* Header */}
       <div className="projects-page-header">
         <div className="projects-page-header-title">

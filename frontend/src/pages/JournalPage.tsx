@@ -236,7 +236,7 @@ export function JournalPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="journal-page">
+    <div className="journal-page fade-in">
       <div className="journal-header">
         <BookOpen size={28} className="journal-header-icon" />
         <div>
@@ -439,8 +439,8 @@ export function JournalPage() {
       )}
 
       {loading ? (
-        <div className="journal-loading">
-          <div className="journal-loading-spinner" />
+        <div className="page-loading">
+          <div className="loading-spinner" />
           <p>Loading entries...</p>
         </div>
       ) : entries.length === 0 ? (

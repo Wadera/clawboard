@@ -61,6 +61,50 @@
   padding: 2rem;
   overflow-y: auto;
   min-width: 0;
+  position: relative;
+}
+
+/* ==============================================
+   FADE-IN ANIMATION & LOADING STATES
+   ============================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Route transition wrapper */
+.route-transition {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Centered loading spinner for main-content area */
+.page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  color: #a1a1aa;
+  font-size: 0.95rem;
+}
+
+.page-loading .loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .container {

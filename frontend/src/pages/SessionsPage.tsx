@@ -333,17 +333,15 @@ export const SessionsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="sessions-page">
-        <div className="sessions-loading">
-          <Loader size={32} className="sessions-spinner" />
-          <span>Loading sessions...</span>
-        </div>
+      <div className="page-loading">
+        <div className="loading-spinner" />
+        <span>Loading sessions...</span>
       </div>
     );
   }
 
   return (
-    <div className="sessions-page">
+    <div className="sessions-page fade-in">
       {/* Mobile backdrop */}
       {sidebarVisible && (
         <div className="sessions-backdrop" onClick={() => setSidebarVisible(false)} />

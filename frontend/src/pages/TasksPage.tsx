@@ -602,14 +602,15 @@ export const TasksPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="tasks-page-loading">
-        <div>Loading tasks...</div>
+      <div className="page-loading">
+        <div className="loading-spinner" />
+        <span>Loading tasks...</span>
       </div>
     );
   }
 
   return (
-    <div className="tasks-page-container">
+    <div className="tasks-page-container fade-in">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} />
       

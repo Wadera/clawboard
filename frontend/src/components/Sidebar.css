@@ -932,6 +932,7 @@
     width: 80px;
     padding: 16px 8px 24px;
     align-items: center;
+    overflow: hidden;
   }
   
   .avatar-container {
@@ -977,6 +978,13 @@
     display: flex;
     justify-content: center;
     overflow: hidden;
+    max-width: 64px;
+  }
+  
+  .sidebar-status-card * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
   .status-card-content {
@@ -1017,18 +1025,12 @@
     display: none !important;
   }
   
-  /* Model badge: hide text row, show only context bar */
-  .model-status-text {
+  /* Model badge: hide entirely in collapsed sidebar */
+  .model-status-badge,
+  .model-status-text,
+  .context-bar-container,
+  .model-status-tooltip-wrapper {
     display: none !important;
-  }
-  
-  .model-status-badge {
-    max-width: 56px;
-    overflow: hidden;
-  }
-  
-  .context-bar-container {
-    max-width: 56px;
   }
   
   /* Model tooltip: reposition for collapsed sidebar */

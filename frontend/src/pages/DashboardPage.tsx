@@ -101,11 +101,9 @@ export const DashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-page">
-        <div className="dashboard-loading">
-          <div className="loading-spinner" aria-label="Loading dashboard" />
-          <p>Loading dashboard...</p>
-        </div>
+      <div className="page-loading">
+        <div className="loading-spinner" aria-label="Loading dashboard" />
+        <p>Loading dashboard...</p>
       </div>
     );
   }
@@ -123,7 +121,7 @@ export const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page fade-in">
       {/* Hero Section */}
       <HeroCard />
 

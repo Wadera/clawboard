@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 import { Sidebar } from './components/Sidebar';
 import { useRealtimeStatus } from './hooks/useRealtimeStatus';
@@ -72,7 +72,9 @@ function AuthenticatedApp() {
 
         <div className="app">
           <main className="main-content">
-            <AppRoutes config={config} />
+            <RouteTransition>
+              <AppRoutes config={config} />
+            </RouteTransition>
           </main>
 
         </div>
@@ -82,6 +84,18 @@ function AuthenticatedApp() {
       </ToastProvider>
       </PluginProvider>
     </Router>
+  );
+}
+
+/**
+ * CSS-only route transition — re-triggers fadeIn on path change
+ */
+function RouteTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <div className="route-transition" key={location.pathname}>
+      {children}
+    </div>
   );
 }
 
