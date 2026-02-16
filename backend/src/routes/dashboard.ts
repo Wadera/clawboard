@@ -88,8 +88,11 @@ router.get('/active', (_req: Request, res: Response): void => {
         subtaskProgress: {
           total: summary.total,
           completed: summary.completed,
-          inReview: summary.in_review,
-          new: summary.new,
+          skipped: summary.skipped,
+          review: summary.review,
+          inProgress: summary.in_progress,
+          blocked: summary.blocked,
+          empty: summary.empty,
         },
         updatedAt: task.updated,
       };

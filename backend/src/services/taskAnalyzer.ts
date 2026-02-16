@@ -294,7 +294,7 @@ export class TaskAnalyzer extends EventEmitter {
     return {
       id: uuidv4(),
       text,
-      status: 'new',
+      status: 'empty',
       completed: false,  // Legacy field for backward compatibility
     };
   }

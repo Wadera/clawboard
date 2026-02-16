@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Subtask, SubtaskStatus } from '../../types/task';
-import { Check, ChevronUp, ChevronDown, Pencil, Clock } from 'lucide-react';
+import { Check, ChevronUp, ChevronDown, Pencil, Clock, AlertCircle, SkipForward, Loader2 } from 'lucide-react';
 import './SubtaskList.css';
 
 interface SubtaskListProps {
@@ -13,13 +13,21 @@ interface SubtaskListProps {
   readOnly?: boolean;
 }
 
-// Helper to get effective status (handles legacy boolean completed field)
+// Helper to get effective status (handles legacy field and old status names)
 const getSubtaskStatus = (subtask: Subtask): SubtaskStatus => {
-  if (subtask.status) return subtask.status;
+  let status = subtask.status;
   // Legacy fallback
-  if (subtask.completed) return 'completed';
-  return 'new';
+  if (!status) {
+    return subtask.completed ? 'completed' : 'empty';
+  }
+  // Normalize old status names
+  if (status === 'new' as any) return 'empty';
+  if (status === 'in_review' as any) return 'review';
+  return status;
 };
+
+// Statuses that count as "done"
+const DONE_STATUSES: SubtaskStatus[] = ['completed', 'skipped'];
 
 export const SubtaskList: React.FC<SubtaskListProps> = ({ 
   subtasks, 
@@ -44,7 +52,7 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
 
   if (!subtasks || subtasks.length === 0) return null;
 
-  // Phase 3: Count by status
+  // Phase 4: Count by status (6-state)
   const statusCounts = subtasks.reduce((acc, s) => {
     const status = getSubtaskStatus(s);
     acc[status] = (acc[status] || 0) + 1;
@@ -52,10 +60,14 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
   }, {} as Record<SubtaskStatus, number>);
   
   const completed = statusCounts.completed || 0;
-  const inReview = statusCounts.in_review || 0;
-  const newCount = statusCounts.new || 0;
+  const skipped = statusCounts.skipped || 0;
+  const review = statusCounts.review || 0;
+  const inProgress = statusCounts.in_progress || 0;
+  const blocked = statusCounts.blocked || 0;
+  const empty = statusCounts.empty || 0;
   const total = subtasks.length;
-  // Progress bar widths calculated from completed/inReview/total directly
+  const done = completed + skipped;
+  // Progress bar widths calculated from done/review/inProgress/blocked/total
 
   const handleStartEdit = (subtask: Subtask) => {
     if (readOnly || !onEditText) return;
@@ -89,43 +101,67 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
   const canMoveUp = (index: number) => index > 0;
   const canMoveDown = (index: number) => index < subtasks.length - 1;
 
-  // Get status display info
+  // Get status display info (6-state)
   const getStatusInfo = (status: SubtaskStatus) => {
     switch (status) {
       case 'completed':
         return { icon: <Check size={12} />, className: 'subtask-status-completed', tooltip: 'Completed' };
-      case 'in_review':
+      case 'skipped':
+        return { icon: <SkipForward size={12} />, className: 'subtask-status-skipped', tooltip: 'Skipped' };
+      case 'review':
         return { icon: <Clock size={12} />, className: 'subtask-status-review', tooltip: 'Awaiting Review' };
-      case 'new':
+      case 'in_progress':
+        return { icon: <Loader2 size={12} />, className: 'subtask-status-in-progress', tooltip: 'In Progress' };
+      case 'blocked':
+        return { icon: <AlertCircle size={12} />, className: 'subtask-status-blocked', tooltip: 'Blocked' };
+      case 'empty':
       default:
-        return { icon: null, className: 'subtask-status-new', tooltip: 'Not started' };
+        return { icon: null, className: 'subtask-status-empty', tooltip: 'Not started' };
     }
   };
 
   return (
-    <div className={`subtask-list ${compact ? 'subtask-list-compact' : ''}`}>
+    <div className={`subtask-list ${compact ? 'subtask-list-compact' : ''} ${blocked > 0 ? 'has-blocked' : ''}`}>
       {/* Progress summary */}
       <div className="subtask-progress">
         <div className="subtask-progress-bar">
-          {/* Completed segment */}
+          {/* Completed segment (green) */}
           <div
             className="subtask-progress-fill subtask-progress-completed"
             style={{ width: `${(completed / total) * 100}%` }}
           />
-          {/* In-review segment */}
+          {/* Skipped segment (gray) */}
+          <div
+            className="subtask-progress-fill subtask-progress-skipped"
+            style={{ width: `${(skipped / total) * 100}%`, left: `${(completed / total) * 100}%` }}
+          />
+          {/* Review segment (yellow) */}
           <div
             className="subtask-progress-fill subtask-progress-review"
-            style={{ width: `${(inReview / total) * 100}%`, marginLeft: `${(completed / total) * 100}%` }}
+            style={{ width: `${(review / total) * 100}%`, left: `${((completed + skipped) / total) * 100}%` }}
+          />
+          {/* In-progress segment (blue) */}
+          <div
+            className="subtask-progress-fill subtask-progress-in-progress"
+            style={{ width: `${(inProgress / total) * 100}%`, left: `${((completed + skipped + review) / total) * 100}%` }}
+          />
+          {/* Blocked segment (red) */}
+          <div
+            className="subtask-progress-fill subtask-progress-blocked"
+            style={{ width: `${(blocked / total) * 100}%`, left: `${((completed + skipped + review + inProgress) / total) * 100}%` }}
           />
         </div>
         <span className="subtask-progress-text">
           {compact ? (
-            `${completed}/${total}`
+            `${done}/${total}`
           ) : (
             <>
               {completed > 0 && <span className="progress-completed">✅{completed}</span>}
-              {inReview > 0 && <span className="progress-review">🔄{inReview}</span>}
-              {newCount > 0 && <span className="progress-new">⬜{newCount}</span>}
+              {skipped > 0 && <span className="progress-skipped">⏭️{skipped}</span>}
+              {review > 0 && <span className="progress-review">🟡{review}</span>}
+              {inProgress > 0 && <span className="progress-in-progress">🔄{inProgress}</span>}
+              {blocked > 0 && <span className="progress-blocked">🔴{blocked}</span>}
+              {empty > 0 && <span className="progress-empty">⬜{empty}</span>}
             </>
           )}
         </span>
@@ -147,11 +183,16 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 if (subtask.id) {
-                  // Cycle through states: new -> in_review -> completed -> new
+                  // Cycle through primary states: empty -> in_progress -> review -> completed -> empty
+                  // (blocked and skipped are set via actions, not cycling)
                   if (onStatusChange) {
                     const nextStatus: SubtaskStatus = 
-                      status === 'new' ? 'in_review' :
-                      status === 'in_review' ? 'completed' : 'new';
+                      status === 'empty' ? 'in_progress' :
+                      status === 'in_progress' ? 'review' :
+                      status === 'review' ? 'completed' :
+                      status === 'completed' ? 'empty' :
+                      status === 'skipped' ? 'empty' :
+                      status === 'blocked' ? 'empty' : 'empty';
                     onStatusChange(subtask.id, nextStatus);
                   } else {
                     onToggle(subtask.id);
@@ -185,9 +226,14 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
                 title={!readOnly && onEditText ? 'Click to edit' : undefined}
               >
                 {subtask.text}
-                {status === 'in_review' && subtask.reviewNote && (
+                {status === 'review' && subtask.reviewNote && (
                   <span className="subtask-review-note" title={subtask.reviewNote}>
                     💬
+                  </span>
+                )}
+                {status === 'blocked' && subtask.blockedReason && (
+                  <span className="subtask-blocked-reason" title={subtask.blockedReason}>
+                    ⚠️
                   </span>
                 )}
               </span>

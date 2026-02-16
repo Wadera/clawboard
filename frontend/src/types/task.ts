@@ -3,18 +3,25 @@ export type TaskStatus = 'ideas' | 'todo' | 'in-progress' | 'stuck' | 'completed
 export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low' | 'someday';
 export type TaskLinkType = 'project' | 'tool' | 'git' | 'doc' | 'memory' | 'session';
 
-// Phase 3: Tri-state subtask status
-export type SubtaskStatus = 'new' | 'in_review' | 'completed';
+// Phase 4: 6-state subtask lifecycle
+// empty       - Not started
+// in_progress - Agent working on it
+// review      - Awaiting orchestrator review
+// blocked     - Cannot proceed, needs intervention
+// skipped     - Intentionally skipped (counts as "done")
+// completed   - Approved by orchestrator
+export type SubtaskStatus = 'empty' | 'in_progress' | 'review' | 'blocked' | 'skipped' | 'completed';
 
 export interface Subtask {
   id: string;
   text: string;
-  // Phase 3: Now using tri-state status instead of boolean
+  // Phase 4: 6-state status
   status: SubtaskStatus;
   // Legacy support - will be migrated to status
   completed?: boolean;
   completedAt?: string;
   reviewNote?: string;  // Agent's note when marking for review
+  blockedReason?: string;  // Why is this subtask blocked?
   sessionRef?: string;  // Which session completed it
 }
 

@@ -424,6 +424,21 @@
   border-radius: var(--radius-md);
 }
 
+/* Subtask Blocked State - red border */
+.task-card.subtask-blocked {
+  border-left: 3px solid #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.task-card.subtask-blocked::before {
+  content: '🔴';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  z-index: 10;
+}
+
 /* Accessibility */
 .task-card:focus {
   outline: 2px solid rgba(139, 92, 246, 0.5);

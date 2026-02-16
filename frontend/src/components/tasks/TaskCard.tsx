@@ -31,6 +31,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [showDetail, setShowDetail] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
 
+  // Check if any subtask is blocked
+  const hasBlockedSubtask = task.subtasks?.some(s => s.status === 'blocked') || false;
+
   const getPriorityClass = (): string => {
     switch (task.priority) {
       case 'urgent': return 'priority-urgent';
@@ -131,7 +134,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         onDragStart={disableDrag ? undefined : () => { setIsDragging(true); onDragStart(); }}
         onDragEnd={disableDrag ? undefined : () => { setIsDragging(false); onDragEnd(); }}
         onClick={handleCardClick}
-        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''} ${task.activeAgent && task.status === 'in-progress' ? 'agent-active' : ''}`}
+        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''} ${hasBlockedSubtask ? 'subtask-blocked' : ''} ${task.activeAgent && task.status === 'in-progress' ? 'agent-active' : ''}`}
         role="button"
         tabIndex={0}
         aria-label={`Task: ${task.title}, Priority: ${task.priority}, Status: ${task.status}`}
