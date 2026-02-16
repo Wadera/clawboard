@@ -210,7 +210,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       notes
     });
 
-    res.status(201).json({ success: true, task });
+    // Add computed dependency fields
+    const taskWithDeps = {
+      ...task,
+      blocked: await taskManager.isTaskBlocked(task.id),
+      blockingTasks: (await taskManager.getBlockingTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+      dependentTasks: (await taskManager.getDependentTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+    };
+
+    res.status(201).json({ success: true, task: taskWithDeps });
   } catch (err) {
     console.error('[Tasks API] Error creating task:', err);
     res.status(500).json({ 
@@ -238,7 +246,16 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     const task = await taskManager.updateTask(req.params.id, updates);
-    res.json({ success: true, task });
+
+    // Add computed dependency fields (same as GET endpoints)
+    const taskWithDeps = {
+      ...task,
+      blocked: await taskManager.isTaskBlocked(task.id),
+      blockingTasks: (await taskManager.getBlockingTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+      dependentTasks: (await taskManager.getDependentTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+    };
+
+    res.json({ success: true, task: taskWithDeps });
   } catch (err) {
     console.error('[Tasks API] Error updating task:', err);
     if (err instanceof Error && err.message.includes('not found')) {
@@ -613,7 +630,15 @@ router.put('/:id/subtasks/:index', async (req: Request, res: Response): Promise<
 
     const task = await taskManager.updateSubtaskStatus(id, index, newStatus, role, reviewNote, blockedReason);
     
-    res.json({ success: true, task });
+    // Add computed dependency fields
+    const taskWithDeps = {
+      ...task,
+      blocked: await taskManager.isTaskBlocked(task.id),
+      blockingTasks: (await taskManager.getBlockingTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+      dependentTasks: (await taskManager.getDependentTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+    };
+    
+    res.json({ success: true, task: taskWithDeps });
   } catch (err) {
     console.error('[Tasks API] Error updating subtask:', err);
     const message = err instanceof Error ? err.message : 'Unknown error';
