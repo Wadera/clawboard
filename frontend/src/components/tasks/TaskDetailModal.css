@@ -339,6 +339,11 @@
   box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
 }
 
+.task-detail-inline-select option {
+  background: #1a1a2e;
+  color: var(--text-primary);
+}
+
 .task-detail-inline-input {
   padding: var(--space-2) var(--space-3);
   background: rgba(255, 255, 255, 0.05);
@@ -393,6 +398,14 @@
 
 .task-detail-field-row-3 {
   gap: var(--space-4);
+}
+
+.task-detail-field-row-3 .task-detail-field-group {
+  min-width: 180px;
+}
+
+.task-detail-field-row-3 .task-detail-inline-select {
+  min-width: 160px;
 }
 
 .task-detail-field-group {

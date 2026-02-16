@@ -454,7 +454,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Project and Tags */}
+          {/* Project */}
           <div className="task-detail-section">
             <div className="task-detail-field-row">
               <div className="task-detail-field-group">
@@ -473,7 +473,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </span>
                 )}
               </div>
-              <div className="task-detail-field-group">
+            </div>
+          </div>
+
+          {/* Tags — full width row */}
+          <div className="task-detail-section">
+            <div className="task-detail-field-row">
+              <div className="task-detail-field-group" style={{ flex: '1 1 100%' }}>
                 <span className="task-detail-field-label"><Tag size={14} /> Tags:</span>
                 {isEditing ? (
                   <input
@@ -481,10 +487,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     className="task-detail-inline-input"
+                    style={{ flex: 1 }}
                     placeholder="phase-4, frontend, ux"
                   />
                 ) : (
-                  <span className="task-detail-field-value">
+                  <span className="task-detail-field-value" style={{ flexWrap: 'wrap' }}>
                     {hasTags ? task.tags.map((tag, i) => (
                       <span key={i} className="task-detail-tag">{tag}</span>
                     )) : <span className="task-detail-field-empty">—</span>}
