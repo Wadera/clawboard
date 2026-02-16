@@ -10,10 +10,10 @@
   gap: var(--space-8);
 }
 
-/* Stats Grid - 4 cards */
+/* Stats Grid - 6 cards */
 .dashboard-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-6);
 }
 
@@ -68,9 +68,11 @@
 }
 
 /* Responsive Design */
+/* Tablet: 3x2 grid */
 @media (max-width: 1199px) {
   .dashboard-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-5);
   }
 
   .dashboard-widget-grid {
@@ -78,6 +80,7 @@
   }
 }
 
+/* Mobile: 6 in a row but compact */
 @media (max-width: 640px) {
   .dashboard-page {
     padding: var(--space-4);
@@ -85,14 +88,39 @@
   }
 
   .dashboard-stats-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-2);
+  }
+
+  /* Compact mobile cards */
+  .dashboard-stats-grid .stats-card {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .dashboard-stats-grid .stats-card-icon {
+    font-size: 20px;
+  }
+
+  .dashboard-stats-grid .stats-card-value {
+    font-size: var(--text-sm);
+  }
+
+  .dashboard-stats-grid .stats-card-label {
+    font-size: 0.625rem; /* 10px */
+    letter-spacing: 0.02em;
+  }
+
+  .dashboard-stats-grid .stats-card-description {
+    display: none; /* Hide description on mobile for compactness */
   }
 }
 
+/* Very small screens: 3x2 if 6-in-a-row is too cramped */
 @media (max-width: 400px) {
   .dashboard-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
   }
 }
 
