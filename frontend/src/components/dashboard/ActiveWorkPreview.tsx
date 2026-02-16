@@ -174,7 +174,7 @@ export const ActiveWorkPreview: React.FC = () => {
                       <div key={idx} className="active-work-subtask-item">
                         {st.status === 'completed' || st.completed ? (
                           <CheckCircle2 size={12} className="subtask-icon-done" />
-                        ) : st.status === 'in_review' ? (
+                        ) : st.status === 'review' ? (
                           <RotateCw size={12} className="subtask-icon-review" />
                         ) : (
                           <Circle size={12} className="subtask-icon-new" />

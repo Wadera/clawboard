@@ -21,7 +21,7 @@ const getSubtaskStatus = (subtask: Subtask): SubtaskStatus => {
     return subtask.completed ? 'completed' : 'empty';
   }
   // Normalize old status names
-  if (status === 'new' as any) return 'empty';
+  if (status === 'empty' as any) return 'empty';
   if (status === 'in_review' as any) return 'review';
   return status;
 };

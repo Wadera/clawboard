@@ -138,8 +138,8 @@ export const ContextPreview: React.FC<ContextPreviewProps> = ({ projectId, taskI
       if (ctx.task.subtasks?.length) {
         lines.push('  subtasks:');
         ctx.task.subtasks.forEach((st: any, i: number) => {
-          const status = st.status || (st.completed ? 'completed' : 'new');
-          const icon = status === 'completed' ? '✅' : status === 'in_review' ? '🔄' : '⬜';
+          const status = st.status || (st.completed ? 'completed' : 'empty');
+          const icon = status === 'completed' ? '✅' : status === 'review' ? '🔄' : '⬜';
           lines.push(`    - [${i}] ${icon} ${st.text}`);
         });
       }

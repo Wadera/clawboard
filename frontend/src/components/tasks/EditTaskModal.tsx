@@ -11,7 +11,7 @@ import './EditTaskModal.css';   // Extra edit-specific styles
 const getSubtaskStatus = (subtask: Subtask): SubtaskStatus => {
   if (subtask.status) return subtask.status;
   if (subtask.completed) return 'completed';
-  return 'new';
+  return 'empty';
 };
 
 interface EditTaskModalProps {
@@ -155,7 +155,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     setSubtasks([...subtasks, {
       id: generateId(),
       text: newSubtask.trim(),
-      status: 'new' as SubtaskStatus,  // Phase 3: Use new status field
+      status: 'empty' as SubtaskStatus,  // Phase 3: Use new status field
       completed: false,  // Legacy support
     }]);
     setNewSubtask('');
@@ -165,14 +165,14 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     setSubtasks(subtasks.filter(s => s.id !== id));
   };
 
-  // Phase 3: Cycle through tri-state: new -> in_review -> completed -> new
+  // Phase 3: Cycle through tri-state: empty -> review -> completed -> empty
   const handleToggleSubtask = (id: string) => {
     setSubtasks(subtasks.map(s => {
       if (s.id !== id) return s;
       const currentStatus = getSubtaskStatus(s);
       const nextStatus: SubtaskStatus = 
-        currentStatus === 'new' ? 'review' :
-        currentStatus === 'review' ? 'completed' : 'new';
+        currentStatus === 'empty' ? 'review' :
+        currentStatus === 'review' ? 'completed' : 'empty';
       return { 
         ...s, 
         status: nextStatus,
@@ -433,7 +433,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 return (
                   <>
                     {counts.completed > 0 && <span className="status-count completed">✅{counts.completed}</span>}
-                    {counts.in_review > 0 && <span className="status-count review">🔄{counts.in_review}</span>}
+                    {counts.review > 0 && <span className="status-count review">🔄{counts.review}</span>}
                     {counts.new > 0 && <span className="status-count new">⬜{counts.new}</span>}
                   </>
                 );

@@ -132,7 +132,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       id: generateId(),
       text: newSubtask.trim(),
       completed: false,
-      status: 'new' as const,
+      status: 'empty' as const,
     }]);
     setNewSubtask('');
   };
