@@ -8,6 +8,7 @@ import {
   BarChart3,
   Wrench,
   Radio,
+  Briefcase,
   LucideIcon
 } from 'lucide-react';
 
@@ -15,6 +16,9 @@ import {
  * Navigation configuration - Single source of truth for all navigation items.
  * Used by Sidebar and Dashboard HeroCard quick actions.
  */
+
+/** Sidebar menu group identifiers */
+export type NavGroup = 'main' | 'workspace';
 
 export interface NavItem {
   /** Unique identifier for the nav item */
@@ -33,21 +37,42 @@ export interface NavItem {
   showInHero: boolean;
   /** Sort order (lower = first) */
   order: number;
+  /** Sidebar group — 'main' (always visible) or 'workspace' (collapsible) */
+  group: NavGroup;
 }
+
+/** Group metadata for rendering collapsible sections */
+export interface NavGroupMeta {
+  id: NavGroup;
+  label: string;
+  icon: LucideIcon;
+  /** Whether the group is collapsible */
+  collapsible: boolean;
+  /** Default collapsed state */
+  defaultCollapsed: boolean;
+  order: number;
+}
+
+export const navGroups: NavGroupMeta[] = [
+  { id: 'main', label: 'Main', icon: Home, collapsible: false, defaultCollapsed: false, order: 0 },
+  { id: 'workspace', label: 'Workspace', icon: Briefcase, collapsible: true, defaultCollapsed: false, order: 1 },
+];
 
 /**
  * All navigation items in the application.
  * Add new pages here and they'll automatically appear in both sidebar and hero.
  */
 export const navigationItems: NavItem[] = [
+  // === Main group (always visible, not collapsible) ===
   {
     id: 'dashboard',
     path: '/',
     label: 'Dashboard',
     icon: Home,
     showInSidebar: true,
-    showInHero: false, // Already on dashboard, no need to link to it
+    showInHero: false,
     order: 0,
+    group: 'main',
   },
   {
     id: 'sessions',
@@ -57,16 +82,18 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 1,
+    group: 'main',
   },
   {
     id: 'tasks',
     path: '/tasks',
     label: 'Tasks',
-    heroLabel: 'On My Mind', // Different label for hero
+    heroLabel: 'On My Mind',
     icon: ListTodo,
     showInSidebar: true,
     showInHero: true,
     order: 2,
+    group: 'main',
   },
   {
     id: 'projects',
@@ -76,6 +103,7 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 3,
+    group: 'main',
   },
   {
     id: 'journal',
@@ -85,7 +113,10 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 4,
+    group: 'main',
   },
+
+  // === Workspace group (collapsible) ===
   {
     id: 'images',
     path: '/images',
@@ -94,6 +125,7 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 5,
+    group: 'workspace',
   },
   {
     id: 'tools',
@@ -103,6 +135,7 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 6,
+    group: 'workspace',
   },
   {
     id: 'audit',
@@ -112,6 +145,7 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 7,
+    group: 'workspace',
   },
   {
     id: 'stats',
@@ -121,6 +155,7 @@ export const navigationItems: NavItem[] = [
     showInSidebar: true,
     showInHero: true,
     order: 8,
+    group: 'workspace',
   },
 ];
 
@@ -131,6 +166,20 @@ export const getSidebarNavItems = (): NavItem[] => {
   return navigationItems
     .filter(item => item.showInSidebar)
     .sort((a, b) => a.order - b.order);
+};
+
+/**
+ * Get sidebar items grouped by their NavGroup
+ */
+export const getSidebarGroups = (): { group: NavGroupMeta; items: NavItem[] }[] => {
+  const sidebarItems = getSidebarNavItems();
+  return navGroups
+    .sort((a, b) => a.order - b.order)
+    .map(group => ({
+      group,
+      items: sidebarItems.filter(item => item.group === group.id),
+    }))
+    .filter(g => g.items.length > 0);
 };
 
 /**

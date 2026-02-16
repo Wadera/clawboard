@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut } from 'lucide-react';
-import { getSidebarNavItems } from '../config/navigation';
+import { Menu, X, LogOut, ChevronDown, Puzzle } from 'lucide-react';
+import { getSidebarGroups, NavGroupMeta, NavItem } from '../config/navigation';
 import './Sidebar.css';
 import { ModelStatusBadge } from './ModelStatusBadge';
 import { StopButton } from './StopButton';
@@ -211,30 +211,28 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 4. Divider */}
         <div className="sidebar-divider" />
 
-        {/* 5. Navigation Menu */}
+        {/* 5. Navigation Menu — grouped with collapsible sections */}
         <div className="sidebar-nav-section">
-          <nav className="sidebar-nav nav-expanded" aria-label="Main navigation">
-            {/* Core navigation items */}
-            {getSidebarNavItems().map((item) => (
-              <SidebarNavLink 
-                key={item.id}
-                to={item.path} 
-                icon={<item.icon size={18} />} 
-                label={item.label} 
-              />
+          <nav aria-label="Main navigation">
+            {getSidebarGroups().map(({ group, items }) => (
+              <NavGroupSection key={group.id} group={group} items={items} />
             ))}
-            
-            {/* Plugin navigation items */}
+
+            {/* Plugins group — dynamically populated from loaded plugins */}
             {!pluginsLoading && pluginSidebarItems.length > 0 && (
-              <>
-                <div className="sidebar-nav-divider" />
+              <CollapsibleGroup
+                id="plugins"
+                label="Plugins"
+                icon={<Puzzle size={14} />}
+                defaultCollapsed={false}
+              >
                 {pluginSidebarItems.map((item) => (
                   <PluginNavLink
                     key={`${item.pluginName}-${item.path}`}
                     item={item}
                   />
                 ))}
-              </>
+              </CollapsibleGroup>
             )}
           </nav>
         </div>
@@ -316,19 +314,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
         {/* 10. Workspace Files */}
         <WorkspaceFiles />
 
-        {/* 11. Session Stats */}
-        <div className="sidebar-section stats-section">
-          <div className="stats-grid">
-            <div className="stat-item" title="Messages this session">
-              <span className="stat-value">{status?.stats?.messageCount ?? '-'}</span>
-              <span className="stat-label">Msgs</span>
-            </div>
-            <div className="stat-item" title="Tools used this session">
-              <span className="stat-value">{status?.stats?.toolsUsed ?? '-'}</span>
-              <span className="stat-label">Tools</span>
-            </div>
-          </div>
-        </div>
+        {/* 11. Session Stats — removed (redundant with Sessions page) */}
 
         {/* Logout Button */}
         <div className="sidebar-section logout-section">
@@ -353,6 +339,93 @@ export function Sidebar({ status, connected }: SidebarProps) {
     </>
   );
 }
+
+/* ============================================================
+   Collapsible group — reusable animated fold/unfold wrapper
+   ============================================================ */
+
+const STORAGE_KEY_PREFIX = 'sidebar-group-';
+
+interface CollapsibleGroupProps {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  defaultCollapsed: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleGroup({ id, label, icon, defaultCollapsed, children }: CollapsibleGroupProps) {
+  const storageKey = STORAGE_KEY_PREFIX + id;
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null ? stored === '1' : defaultCollapsed;
+    } catch { return defaultCollapsed; }
+  });
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const toggle = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(storageKey, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }, [storageKey]);
+
+  return (
+    <div className="nav-group">
+      <button
+        className={`nav-group-header ${collapsed ? 'collapsed' : ''}`}
+        onClick={toggle}
+        aria-expanded={!collapsed}
+      >
+        <span className="nav-group-icon">{icon}</span>
+        <span className="nav-group-label">{label}</span>
+        <ChevronDown size={14} className={`nav-group-chevron ${collapsed ? 'chevron-collapsed' : ''}`} />
+      </button>
+      <div
+        ref={contentRef}
+        className={`nav-group-content ${collapsed ? 'nav-group-content--collapsed' : 'nav-group-content--expanded'}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   NavGroupSection — renders one group from navigation config
+   ============================================================ */
+
+function NavGroupSection({ group, items }: { group: NavGroupMeta; items: NavItem[] }) {
+  if (!group.collapsible) {
+    // Main group — render items directly (no header)
+    return (
+      <div className="nav-group nav-group--flat">
+        {items.map(item => (
+          <SidebarNavLink key={item.id} to={item.path} icon={<item.icon size={18} />} label={item.label} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <CollapsibleGroup
+      id={group.id}
+      label={group.label}
+      icon={<group.icon size={14} />}
+      defaultCollapsed={group.defaultCollapsed}
+    >
+      {items.map(item => (
+        <SidebarNavLink key={item.id} to={item.path} icon={<item.icon size={18} />} label={item.label} />
+      ))}
+    </CollapsibleGroup>
+  );
+}
+
+/* ============================================================
+   SidebarNavLink — single nav item
+   ============================================================ */
 
 interface SidebarNavLinkProps {
   to: string;
