@@ -3,12 +3,11 @@
 .sessions-page {
   display: grid;
   grid-template-columns: 300px 1fr;
-  height: calc(100vh - 2rem); /* Subtract top padding only (no header) */
+  height: 100vh;
   gap: 0;
   background: var(--bg-app);
   overflow: hidden;
   margin: -2rem;
-  margin-top: 0; /* Keep top padding for spacing */
 }
 
 /* Left Panel - Session List */
