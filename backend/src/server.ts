@@ -203,12 +203,12 @@ app.use('/media/generated', express.static(GENERATED_DIR, {
 app.use('/auth', authRoutes);
 app.use('/config', configRoutes);
 
-// Plugin routes — registry needs auth, but proxy is public (iframes can't send JWT)
-app.use('/plugins', authMiddleware, pluginsRoutes);
-
-// Plugin proxy middleware — public (plugins handle their own auth if needed)
-// Must be before auth middleware so iframes can load plugin content
+// Plugin proxy middleware — public, MUST be before /plugins auth route
+// Iframes can't send JWT headers, so plugin content must be unauthenticated
 app.use(createPluginProxy(pluginLoader));
+
+// Plugin routes — registry needs auth (list plugins, theme CSS)
+app.use('/plugins', authMiddleware, pluginsRoutes);
 
 // Protected routes (auth required)
 app.use('/status', authMiddleware, statusRoutes);
