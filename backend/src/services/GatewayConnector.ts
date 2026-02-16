@@ -449,14 +449,8 @@ export class GatewayConnector {
         const displayName = session.label || session.displayName || session.key;
         const channel = session.origin?.provider || session.channel || 'unknown';
 
-        // Override model for heartbeat sessions (gateway reports agent default, not per-session model)
-        // Both the heartbeat poller and the heartbeat-refresh cron use phi4
-        let model = session.model || 'unknown';
-        if (session.key.includes(':heartbeat')) {
-          model = 'phi4';
-        } else if (session.key.includes(':cron:') && displayName.toLowerCase().includes('heartbeat')) {
-          model = 'phi4';
-        }
+        // Use the model reported by the gateway — no hardcoded overrides
+        const model = session.model || 'unknown';
 
         this.sessionStates.set(session.key, {
           sessionKey: session.key,
