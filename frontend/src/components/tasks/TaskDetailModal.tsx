@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Pencil, Clock, Tag, Cpu, Calendar, Zap, AlertTriangle, FileText, Bot, Play, CheckCircle, Copy, Check } from 'lucide-react';
+import { X, Pencil, Clock, Tag, Cpu, Calendar, Zap, AlertTriangle, FileText, Bot, Play, CheckCircle, Copy, Check, Lock, Link, ArrowRight } from 'lucide-react';
 import { Task, SubtaskStatus } from '../../types/task';
 import { SubtaskList } from './SubtaskList';
 import { TaskLinks } from './TaskLinks';
@@ -289,7 +289,72 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           )}
 
-          {/* Blocked By */}
+          {/* Task Dependencies */}
+          {((task.blockingTasks && task.blockingTasks.length > 0) || (task.dependentTasks && task.dependentTasks.length > 0) || (task.dependsOn && task.dependsOn.length > 0)) && (
+            <div className="task-detail-section">
+              <h3 className="task-detail-section-title">
+                <Link size={16} /> Dependencies
+                {task.blocked && <span className="task-detail-dep-blocked-badge">🔒 BLOCKED</span>}
+              </h3>
+              <div className="task-detail-dependencies">
+                {/* Depends On (tasks this task needs completed first) */}
+                {task.blockingTasks && task.blockingTasks.length > 0 && (
+                  <div className="task-detail-dep-group">
+                    <div className="task-detail-dep-group-label">
+                      <Lock size={14} /> Depends on ({task.blockingTasks.length} incomplete)
+                    </div>
+                    {task.blockingTasks.map((dep) => (
+                      <div key={dep.id} className="task-detail-dep-item task-detail-dep-blocking">
+                        <ArrowRight size={12} />
+                        <span className="task-detail-dep-title">{dep.title}</span>
+                        <code className="task-detail-dep-id">{dep.id.substring(0, 8)}</code>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Completed dependencies (from dependsOn that are NOT in blockingTasks) */}
+                {task.dependsOn && task.dependsOn.length > 0 && task.blockingTasks && (
+                  (() => {
+                    const blockingIds = new Set(task.blockingTasks.map(t => t.id));
+                    const completedDeps = task.dependsOn!.filter(id => !blockingIds.has(id));
+                    if (completedDeps.length === 0) return null;
+                    return (
+                      <div className="task-detail-dep-group">
+                        <div className="task-detail-dep-group-label task-detail-dep-completed-label">
+                          <CheckCircle size={14} /> Completed dependencies ({completedDeps.length})
+                        </div>
+                        {completedDeps.map((depId) => (
+                          <div key={depId} className="task-detail-dep-item task-detail-dep-completed">
+                            <CheckCircle size={12} />
+                            <code className="task-detail-dep-id">{depId.substring(0, 8)}</code>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
+                )}
+
+                {/* Tasks that depend on this one */}
+                {task.dependentTasks && task.dependentTasks.length > 0 && (
+                  <div className="task-detail-dep-group">
+                    <div className="task-detail-dep-group-label task-detail-dep-blocks-label">
+                      <Link size={14} /> Blocks ({task.dependentTasks.length})
+                    </div>
+                    {task.dependentTasks.map((dep) => (
+                      <div key={dep.id} className="task-detail-dep-item task-detail-dep-dependent">
+                        <ArrowRight size={12} />
+                        <span className="task-detail-dep-title">{dep.title}</span>
+                        <code className="task-detail-dep-id">{dep.id.substring(0, 8)}</code>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Blocked By (legacy manual blockers) */}
           {task.blockedBy && task.blockedBy.length > 0 && (
             <div className="task-detail-section">
               <h3 className="task-detail-section-title">Blocked By</h3>

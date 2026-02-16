@@ -131,7 +131,16 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       res.status(404).json({ success: false, error: 'Task not found' });
       return;
     }
-    res.json({ success: true, task });
+    
+    // Add computed dependency fields (same as list endpoint)
+    const taskWithDeps = {
+      ...task,
+      blocked: await taskManager.isTaskBlocked(task.id),
+      blockingTasks: (await taskManager.getBlockingTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+      dependentTasks: (await taskManager.getDependentTasks(task.id)).map(t => ({ id: t.id, title: t.title })),
+    };
+    
+    res.json({ success: true, task: taskWithDeps });
   } catch (err) {
     console.error('[Tasks API] Error getting task:', err);
     res.status(500).json({ 
@@ -368,6 +377,117 @@ router.post('/auto-archive', async (_req: Request, res: Response): Promise<void>
       success: false, 
       error: err instanceof Error ? err.message : 'Unknown error' 
     });
+  }
+});
+
+// ============================================================
+// Task Dependency Management APIs
+// ============================================================
+
+/**
+ * GET /tasks/:id/dependencies
+ * Get full dependency info for a task (both directions)
+ * Returns { dependsOn: Task[], blockedBy: Task[] }
+ */
+router.get('/:id/dependencies', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const deps = await taskManager.getTaskDependencies(id);
+    const blocked = await taskManager.isTaskBlocked(id);
+
+    res.json({
+      success: true,
+      taskId: id,
+      blocked,
+      dependsOn: deps.dependsOn.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        project: t.project,
+      })),
+      blockedBy: deps.blockedBy.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        project: t.project,
+      })),
+    });
+  } catch (err) {
+    console.error('[Tasks API] Error getting dependencies:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('not found')) {
+      res.status(404).json({ success: false, error: message });
+    } else {
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+});
+
+/**
+ * POST /tasks/:id/dependencies
+ * Add a dependency (this task depends on another)
+ * Body: { dependsOn: "task-uuid" }
+ */
+router.post('/:id/dependencies', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { dependsOn } = req.body;
+
+    if (!dependsOn) {
+      res.status(400).json({ success: false, error: 'dependsOn task ID is required' });
+      return;
+    }
+
+    await taskManager.addDependency(id, dependsOn);
+
+    // Return updated dependency info
+    const deps = await taskManager.getTaskDependencies(id);
+    const blocked = await taskManager.isTaskBlocked(id);
+
+    res.status(201).json({
+      success: true,
+      taskId: id,
+      blocked,
+      dependsOn: deps.dependsOn.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+      })),
+    });
+  } catch (err) {
+    console.error('[Tasks API] Error adding dependency:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('not found')) {
+      res.status(404).json({ success: false, error: message });
+    } else if (message.includes('Circular') || message.includes('itself') || message.includes('already exists')) {
+      res.status(400).json({ success: false, error: message });
+    } else {
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+});
+
+/**
+ * DELETE /tasks/:id/dependencies/:depTaskId
+ * Remove a dependency
+ */
+router.delete('/:id/dependencies/:depTaskId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, depTaskId } = req.params;
+
+    await taskManager.removeDependency(id, depTaskId);
+
+    res.json({ success: true, taskId: id, removed: depTaskId });
+  } catch (err) {
+    console.error('[Tasks API] Error removing dependency:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('not found')) {
+      res.status(404).json({ success: false, error: message });
+    } else {
+      res.status(500).json({ success: false, error: message });
+    }
   }
 });
 

@@ -24,6 +24,11 @@ Usage:
   clawboard skip-subtask TASK_ID INDEX           # Orchestrator: marks skipped (counts as done)
   clawboard uncomplete-subtask TASK_ID INDEX     # Legacy: marks as empty
 
+  # Task dependencies
+  clawboard add-dep TASK_ID DEPENDS_ON_ID        # Add dependency (task depends on another)
+  clawboard remove-dep TASK_ID DEPENDS_ON_ID     # Remove dependency
+  clawboard deps TASK_ID                         # Show dependencies for a task
+
   # Project management
   clawboard projects [--include-stats]
   clawboard project get ID
@@ -1011,6 +1016,65 @@ def cmd_start_subtask(args):
     summary = result.get("subtaskSummary", {})
     print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_progress', 0)} 🔄 | {summary.get('empty', 0)} ⬜")
     print(format_task(task, verbose=True))
+
+def cmd_add_dep(args):
+    """Add a task dependency (task depends on another task)."""
+    task_id = resolve_task_id(args.task_id)
+    depends_on_id = resolve_task_id(args.depends_on_id)
+    
+    result = api("POST", f"/tasks/{task_id}/dependencies", {
+        "dependsOn": depends_on_id
+    })
+    
+    blocked = result.get("blocked", False)
+    deps = result.get("dependsOn", [])
+    
+    print(f"✅ Added dependency: {task_id[:8]} depends on {depends_on_id[:8]}")
+    if deps:
+        print(f"   Total dependencies: {len(deps)}")
+        for d in deps:
+            print(f"   🔗 {d.get('title', d['id'][:8])} [{d.get('status', '?')}]")
+    if blocked:
+        print(f"   🔒 Task is BLOCKED (dependencies not complete)")
+
+def cmd_remove_dep(args):
+    """Remove a task dependency."""
+    task_id = resolve_task_id(args.task_id)
+    depends_on_id = resolve_task_id(args.depends_on_id)
+    
+    result = api("DELETE", f"/tasks/{task_id}/dependencies/{depends_on_id}")
+    
+    print(f"✅ Removed dependency: {task_id[:8]} no longer depends on {depends_on_id[:8]}")
+
+def cmd_deps(args):
+    """Show dependencies for a task."""
+    task_id = resolve_task_id(args.task_id)
+    result = api("GET", f"/tasks/{task_id}/dependencies")
+    
+    blocked = result.get("blocked", False)
+    depends_on = result.get("dependsOn", [])
+    blocked_by = result.get("blockedBy", [])
+    
+    print(f"Dependencies for task {task_id[:8]}:")
+    if blocked:
+        print(f"   🔒 BLOCKED — has unmet dependencies")
+    else:
+        print(f"   ✅ Not blocked")
+    
+    if depends_on:
+        print(f"\n   🔗 Depends on ({len(depends_on)}):")
+        for d in depends_on:
+            status_icon = "✅" if d.get("status") in ("completed", "archived") else "⏳"
+            print(f"      {status_icon} {d.get('title', '?')} [{d.get('status', '?')}] ({d['id'][:8]})")
+    else:
+        print(f"\n   No dependencies")
+    
+    if blocked_by:
+        print(f"\n   ⬇️  Blocks ({len(blocked_by)}):")
+        for d in blocked_by:
+            print(f"      {d.get('title', '?')} [{d.get('status', '?')}] ({d['id'][:8]})")
+    else:
+        print(f"\n   Blocks no other tasks")
 
 def cmd_review(args):
     """Show a review-focused view of a task and its subtasks."""
@@ -2823,6 +2887,20 @@ Subtask Workflow (6-state lifecycle):
     p_start_sub.add_argument("task_id")
     p_start_sub.add_argument("index", help="0-based subtask index")
     
+    # add-dep (add task dependency)
+    p_add_dep = sub.add_parser("add-dep", help="Add dependency (task depends on another)")
+    p_add_dep.add_argument("task_id", help="Task that has the dependency")
+    p_add_dep.add_argument("depends_on_id", help="Task it depends on")
+    
+    # remove-dep (remove task dependency)
+    p_remove_dep = sub.add_parser("remove-dep", help="Remove dependency between tasks")
+    p_remove_dep.add_argument("task_id", help="Task that has the dependency")
+    p_remove_dep.add_argument("depends_on_id", help="Task to remove from dependencies")
+    
+    # deps (show dependencies for a task)
+    p_deps = sub.add_parser("deps", help="Show dependencies for a task")
+    p_deps.add_argument("task_id", help="Task ID to show dependencies for")
+    
     # projects
     p_projects = sub.add_parser("projects", help="List projects")
     p_projects.add_argument("--include-stats", action="store_true", help="Include task stats for each project")
@@ -3085,6 +3163,12 @@ Subtask Workflow (6-state lifecycle):
         cmd_skip_subtask(args)
     elif cmd == "start-subtask":
         cmd_start_subtask(args)
+    elif cmd == "add-dep":
+        cmd_add_dep(args)
+    elif cmd == "remove-dep":
+        cmd_remove_dep(args)
+    elif cmd == "deps":
+        cmd_deps(args)
     elif cmd == "projects":
         cmd_projects(args)
     elif cmd == "create-multiphase":

@@ -738,7 +738,7 @@ export class TaskManagerDB extends EventEmitter {
   }
 
   /**
-   * Get next task to work on (todo + autoStart + not blocked)
+   * Get next task to work on (todo + autoStart + not blocked by dependencies)
    */
   async getNextTask(): Promise<Task | null> {
     const todoTasks = await this.queryTasks({ status: 'todo' });
@@ -747,11 +747,14 @@ export class TaskManagerDB extends EventEmitter {
       urgent: 0, high: 1, normal: 2, low: 3, someday: 4
     };
     
-    // Filter out blocked tasks
+    // Filter out blocked tasks (async check against DB)
     const autoStartTasks: Task[] = [];
     for (const t of todoTasks) {
-      if (t.autoStart && !this.isTaskBlockedSync(t)) {
-        autoStartTasks.push(t);
+      if (t.autoStart) {
+        const blocked = await this.isTaskBlocked(t.id);
+        if (!blocked) {
+          autoStartTasks.push(t);
+        }
       }
     }
     
@@ -1048,21 +1051,125 @@ export class TaskManagerDB extends EventEmitter {
     return dependent;
   }
 
-  async isTaskBlocked(id: string): Promise<boolean> {
-    const blocking = await this.getBlockingTasks(id);
-    return blocking.length > 0;
+  /**
+   * Get full dependency info for a task (both directions)
+   */
+  async getTaskDependencies(taskId: string): Promise<{ dependsOn: Task[]; blockedBy: Task[] }> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
+    // dependsOn: tasks this task depends on (all, regardless of status)
+    const dependsOnTasks: Task[] = [];
+    if (task.dependsOn && task.dependsOn.length > 0) {
+      for (const depId of task.dependsOn) {
+        const depTask = await this.getTask(depId);
+        if (depTask) {
+          dependsOnTasks.push(depTask);
+        }
+      }
+    }
+
+    // blockedBy: tasks that depend on this task (reverse direction)
+    const dependentTasks = await this.getDependentTasks(taskId);
+
+    return { dependsOn: dependsOnTasks, blockedBy: dependentTasks };
   }
 
   /**
-   * Sync version for compatibility (uses in-memory check)
+   * Add a single dependency (taskId depends on dependsOnId)
    */
-  private isTaskBlockedSync(task: Task): boolean {
-    if (!task.dependsOn || task.dependsOn.length === 0) {
-      return false;
+  async addDependency(taskId: string, dependsOnId: string): Promise<void> {
+    // Validate both tasks exist
+    const task = await this.getTask(taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+    const depTask = await this.getTask(dependsOnId);
+    if (!depTask) throw new Error(`Dependency task not found: ${dependsOnId}`);
+
+    // Self-reference check
+    if (taskId === dependsOnId) {
+      throw new Error('Task cannot depend on itself');
     }
-    // For sync version, we can't check DB - assume not blocked
-    // This is used in getNextTask which already has tasks loaded
-    return false;
+
+    // Check for circular dependency
+    if (await this.hasCircularDependency(taskId, dependsOnId, new Set())) {
+      throw new Error(`Circular dependency detected: ${taskId} -> ${dependsOnId}`);
+    }
+
+    // Check if already exists
+    const existing = await this.pool.query(
+      'SELECT 1 FROM task_dependencies WHERE task_id = $1 AND depends_on_task_id = $2',
+      [taskId, dependsOnId]
+    );
+    if (existing.rows.length > 0) {
+      throw new Error(`Dependency already exists: ${taskId} -> ${dependsOnId}`);
+    }
+
+    await this.pool.query(
+      'INSERT INTO task_dependencies (task_id, depends_on_task_id) VALUES ($1, $2)',
+      [taskId, dependsOnId]
+    );
+
+    // Update task's updated_at
+    await this.pool.query(
+      'UPDATE tasks SET updated_at = $1 WHERE id = $2',
+      [new Date().toISOString(), taskId]
+    );
+
+    console.log(`[TaskManagerDB] Added dependency: ${taskId} depends on ${dependsOnId}`);
+  }
+
+  /**
+   * Remove a single dependency
+   */
+  async removeDependency(taskId: string, dependsOnId: string): Promise<void> {
+    const result = await this.pool.query(
+      'DELETE FROM task_dependencies WHERE task_id = $1 AND depends_on_task_id = $2',
+      [taskId, dependsOnId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(`Dependency not found: ${taskId} -> ${dependsOnId}`);
+    }
+
+    // Update task's updated_at
+    await this.pool.query(
+      'UPDATE tasks SET updated_at = $1 WHERE id = $2',
+      [new Date().toISOString(), taskId]
+    );
+
+    console.log(`[TaskManagerDB] Removed dependency: ${taskId} no longer depends on ${dependsOnId}`);
+  }
+
+  /**
+   * Get all tasks that are blocked by unmet dependencies (for clawbeat)
+   */
+  async getBlockedTasks(): Promise<Task[]> {
+    // Find all tasks that have at least one dependency on a non-completed/non-archived task
+    const result = await this.pool.query(`
+      SELECT DISTINCT td.task_id
+      FROM task_dependencies td
+      JOIN tasks dep ON dep.id = td.depends_on_task_id
+      JOIN tasks t ON t.id = td.task_id
+      WHERE dep.status NOT IN ('completed', 'archived')
+        AND t.status NOT IN ('completed', 'archived')
+    `);
+
+    const blocked: Task[] = [];
+    for (const row of result.rows) {
+      const task = await this.getTask(row.task_id);
+      if (task) {
+        blocked.push(task);
+      }
+    }
+
+    return blocked;
+  }
+
+  async isTaskBlocked(id: string): Promise<boolean> {
+    const blocking = await this.getBlockingTasks(id);
+    return blocking.length > 0;
   }
 
   /**
