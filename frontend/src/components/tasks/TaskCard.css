@@ -537,4 +537,19 @@
     font-size: 0.625rem;
     padding: 2px 6px;
   }
+
+  .task-card-footer {
+    margin-top: 6px;
+    padding-top: 4px;
+    gap: 4px;
+  }
+
+  .subtask-counts {
+    font-size: 0.55rem;
+    gap: 4px;
+  }
+
+  .subtask-bar {
+    height: 3px;
+  }
 }
