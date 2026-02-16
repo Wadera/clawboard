@@ -136,6 +136,31 @@ export class TaskManagerDB extends EventEmitter {
   }
 
   /**
+   * Resolve project name to UUID (for create/update)
+   */
+  private async resolveProjectId(nameOrId: string, client?: PoolClient): Promise<string | null> {
+    const executor = client || this.pool;
+    // Try as UUID first
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidPattern.test(nameOrId)) {
+      return nameOrId;
+    }
+    // Look up by name
+    const res = await executor.query('SELECT id FROM projects WHERE name = $1', [nameOrId]);
+    return res.rows.length > 0 ? res.rows[0].id : null;
+  }
+
+  /**
+   * Resolve project UUID to name (for reads)
+   */
+  private async resolveProjectName(projectId: string | null, client?: PoolClient): Promise<string | undefined> {
+    if (!projectId) return undefined;
+    const executor = client || this.pool;
+    const res = await executor.query('SELECT name FROM projects WHERE id = $1', [projectId]);
+    return res.rows.length > 0 ? res.rows[0].name : undefined;
+  }
+
+  /**
    * Map database row to Task object
    * Joins subtasks, tags, dependencies, links into flat structure
    */
@@ -231,7 +256,7 @@ export class TaskManagerDB extends EventEmitter {
       blockedBy: [], // Computed from dependencies
       blockedReason: row.blocked_reason || undefined,
       dependsOn,
-      project: row.project_id || undefined,
+      project: await this.resolveProjectName(row.project_id, executor as any) || undefined,
       tags,
       created: row.created_at,
       updated: row.updated_at,
@@ -269,8 +294,14 @@ export class TaskManagerDB extends EventEmitter {
     }
 
     if (filters.project) {
-      conditions.push(`project_id = $${paramIndex++}`);
-      params.push(filters.project);
+      const projId = await this.resolveProjectId(filters.project);
+      if (projId) {
+        conditions.push(`project_id = $${paramIndex++}`);
+        params.push(projId);
+      } else {
+        // Project not found — return empty
+        conditions.push('FALSE');
+      }
     }
 
     if (filters.priority) {
@@ -369,7 +400,7 @@ export class TaskManagerDB extends EventEmitter {
           data.description || '',
           data.status || 'todo',
           data.priority || 'normal',
-          data.project || null,
+          data.project ? await this.resolveProjectId(data.project, client) : null,
           thinking.thinking,
           thinking.thinkingAutoEstimated,
           data.model || null,
@@ -518,7 +549,7 @@ export class TaskManagerDB extends EventEmitter {
       if (updates.description !== undefined) addField('description', updates.description);
       if (updates.status !== undefined) addField('status', updates.status);
       if (updates.priority !== undefined) addField('priority', updates.priority);
-      if (updates.project !== undefined) addField('project_id', updates.project || null);
+      if (updates.project !== undefined) addField('project_id', updates.project ? await this.resolveProjectId(updates.project, client) : null);
       if (updates.thinking !== undefined) addField('thinking_budget', updates.thinking);
       if (updates.thinkingAutoEstimated !== undefined) addField('thinking_auto_estimated', updates.thinkingAutoEstimated);
       if (updates.model !== undefined) addField('model', updates.model);
