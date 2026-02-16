@@ -75,6 +75,8 @@ services:
       
       # ClawBoard dashboard config (read-only)
       - ./clawboard.config.json:/app/clawboard.config.json:ro
+      # Plugin registry config (read-only)
+      - ./clawboard.plugins.json:/app/clawboard.plugins.json:ro
       
       # OpenClaw media (for generated images, etc.)
       - ${OPENCLAW_DIR:-~/.openclaw}/media:/clawdbot/media:ro

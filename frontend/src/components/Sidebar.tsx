@@ -156,7 +156,7 @@ export function Sidebar({ status, connected }: SidebarProps) {
                 const state = status?.main.state || 'idle';
                 return (
                   <iframe
-                    src={`/orb-dev/avatar?state=${state}`}
+                    src={`${import.meta.env.VITE_API_BASE_URL || '/api'}/plugins/nim-orb/avatar?state=${state}`}
                     style={{
                       width: 200,
                       height: 200,
