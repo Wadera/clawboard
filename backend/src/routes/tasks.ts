@@ -409,10 +409,8 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
 
     const task = await taskManager.updateSubtaskStatus(id, index, status, validatedRole, reviewNote);
     
-    // Get subtask summary (handle both sync and async versions)
-    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
-      ? taskManager.getSubtaskSummary(id)
-      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
     
     res.json({ 
       success: true, 
@@ -518,14 +516,9 @@ router.post('/:id/subtasks/:index/approve', async (req: Request, res: Response):
 
     const task = await taskManager.approveSubtask(id, index);
     
-    // Get subtask summary (handle both sync and async versions)
-    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
-      ? taskManager.getSubtaskSummary(id)
-      : await (taskManager as any).getSubtaskSummaryAsync(id);
-    
-    const allCompleted = typeof taskManager.allSubtasksCompleted === 'function'
-      ? taskManager.allSubtasksCompleted(id)
-      : await (taskManager as any).allSubtasksCompletedAsync(id);
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
     
     res.json({ 
       success: true, 
@@ -562,10 +555,8 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
 
     const task = await taskManager.rejectSubtask(id, index, note);
     
-    // Get subtask summary (handle both sync and async versions)
-    const subtaskSummary = typeof taskManager.getSubtaskSummary === 'function' 
-      ? taskManager.getSubtaskSummary(id)
-      : await (taskManager as any).getSubtaskSummaryAsync(id);
+    // Get subtask summary (always use async version for DB)
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
     
     res.json({ 
       success: true, 
@@ -598,14 +589,9 @@ router.get('/:id/subtasks/summary', async (req: Request, res: Response): Promise
       return;
     }
 
-    // Get subtask summary (handle both sync and async versions)
-    const summary = typeof taskManager.getSubtaskSummary === 'function' 
-      ? taskManager.getSubtaskSummary(id)
-      : await (taskManager as any).getSubtaskSummaryAsync(id);
-    
-    const allCompleted = typeof taskManager.allSubtasksCompleted === 'function'
-      ? taskManager.allSubtasksCompleted(id)
-      : await (taskManager as any).allSubtasksCompletedAsync(id);
+    // Get subtask summary (always use async version for DB)
+    const summary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
     
     res.json({ 
       success: true, 
