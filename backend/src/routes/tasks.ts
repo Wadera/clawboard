@@ -8,8 +8,10 @@ import { notificationManager } from '../services/NotificationManager';
 
 const router = Router();
 
-// Valid subtask statuses for validation
-const VALID_SUBTASK_STATUSES: SubtaskStatus[] = ['new', 'in_review', 'completed'];
+// Valid subtask statuses for validation (6-state lifecycle)
+const VALID_SUBTASK_STATUSES: SubtaskStatus[] = ['empty', 'in_progress', 'review', 'blocked', 'skipped', 'completed'];
+// Statuses agents can set
+const AGENT_ALLOWED_STATUSES: SubtaskStatus[] = ['in_progress', 'review'];
 
 /**
  * GET /tasks
@@ -377,17 +379,22 @@ router.post('/auto-archive', async (_req: Request, res: Response): Promise<void>
  * PATCH /tasks/:id/subtasks/:index/status
  * Update subtask status with role-based permissions
  * 
- * Body: { status: 'new' | 'in_review' | 'completed', role?: 'agent' | 'orchestrator', reviewNote?: string }
+ * Body: { 
+ *   status: 'empty' | 'in_progress' | 'review' | 'blocked' | 'skipped' | 'completed', 
+ *   role?: 'agent' | 'orchestrator', 
+ *   reviewNote?: string,
+ *   blockedReason?: string 
+ * }
  * 
  * Role permissions:
- * - agent: can only mark as 'in_review', cannot mark as 'completed'
+ * - agent: can only set 'in_progress' or 'review'
  * - orchestrator (default): can set any status
  */
 router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const index = parseInt(req.params.index, 10);
-    const { status, role, reviewNote } = req.body;
+    const { status, role, reviewNote, blockedReason } = req.body;
 
     // Validate index
     if (isNaN(index) || index < 0) {
@@ -407,15 +414,17 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
     // Validate role if provided
     const validatedRole = role === 'agent' ? 'agent' : 'orchestrator';
 
-    const task = await taskManager.updateSubtaskStatus(id, index, status, validatedRole, reviewNote);
+    const task = await taskManager.updateSubtaskStatus(id, index, status, validatedRole, reviewNote, blockedReason);
     
     // Get subtask summary (always use async version for DB)
     const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const hasBlocked = await (taskManager as any).hasBlockedSubtasks(id);
     
     res.json({ 
       success: true, 
       task,
-      subtaskSummary
+      subtaskSummary,
+      hasBlocked
     });
   } catch (err) {
     console.error('[Tasks API] Error updating subtask status:', err);
@@ -423,7 +432,7 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
     
     if (message.includes('not found')) {
       res.status(404).json({ success: false, error: message });
-    } else if (message.includes('cannot') || message.includes('Cannot')) {
+    } else if (message.includes('cannot') || message.includes('Cannot') || message.includes('Agents cannot')) {
       res.status(403).json({ success: false, error: message });
     } else {
       res.status(500).json({ success: false, error: message });
@@ -436,16 +445,16 @@ router.patch('/:id/subtasks/:index/status', async (req: Request, res: Response):
  * Legacy endpoint for subtask updates (backward compatible)
  * Supports both old {completed: boolean} and new {status: SubtaskStatus} format
  * 
- * SECURITY: To mark as 'completed', caller must either:
+ * SECURITY: To use restricted statuses (completed, blocked, skipped), caller must either:
  * - Include header X-Orchestrator-Key with valid value
  * - Include orchestrator: true in request body (for trusted internal callers)
- * Otherwise, 'completed' status is blocked (use 'in_review' instead)
+ * Otherwise, only agent-allowed statuses (in_progress, review) are permitted.
  */
 router.put('/:id/subtasks/:index', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const index = parseInt(req.params.index, 10);
-    const { completed, status, reviewNote, orchestrator } = req.body;
+    const { completed, status, reviewNote, blockedReason, orchestrator } = req.body;
 
     if (isNaN(index) || index < 0) {
       res.status(400).json({ success: false, error: 'Invalid subtask index' });
@@ -458,14 +467,13 @@ router.put('/:id/subtasks/:index', async (req: Request, res: Response): Promise<
       newStatus = status;
     } else if (completed !== undefined) {
       // Legacy format: map boolean to status
-      newStatus = completed ? 'completed' : 'new';
+      newStatus = completed ? 'completed' : 'empty';
     } else {
       res.status(400).json({ success: false, error: 'Either "status" or "completed" must be provided' });
       return;
     }
 
     // Determine role based on orchestrator flag or header
-    // Only orchestrators can mark subtasks as 'completed'
     const orchestratorHeader = req.headers['x-orchestrator-key'] as string | undefined;
     const envKey = process.env.ORCHESTRATOR_KEY;
     const isOrchestrator = 
@@ -474,16 +482,16 @@ router.put('/:id/subtasks/:index', async (req: Request, res: Response): Promise<
       (envKey !== undefined && orchestratorHeader === envKey);
     const role = isOrchestrator ? 'orchestrator' : 'agent';
 
-    // Block agents from marking as completed
-    if (newStatus === 'completed' && role === 'agent') {
+    // Block agents from using non-agent statuses
+    if (!AGENT_ALLOWED_STATUSES.includes(newStatus) && role === 'agent') {
       res.status(403).json({ 
         success: false, 
-        error: 'Agents cannot mark subtasks as completed. Use status "in_review" instead, or include orchestrator flag.' 
+        error: `Agents cannot set status to '${newStatus}'. Use ${AGENT_ALLOWED_STATUSES.join(' or ')} instead, or include orchestrator flag.` 
       });
       return;
     }
 
-    const task = await taskManager.updateSubtaskStatus(id, index, newStatus, role, reviewNote);
+    const task = await taskManager.updateSubtaskStatus(id, index, newStatus, role, reviewNote, blockedReason);
     
     res.json({ success: true, task });
   } catch (err) {
@@ -492,7 +500,7 @@ router.put('/:id/subtasks/:index', async (req: Request, res: Response): Promise<
     
     if (message.includes('not found')) {
       res.status(404).json({ success: false, error: message });
-    } else if (message.includes('cannot') || message.includes('Cannot')) {
+    } else if (message.includes('cannot') || message.includes('Cannot') || message.includes('Agents cannot')) {
       res.status(403).json({ success: false, error: message });
     } else {
       res.status(500).json({ success: false, error: message });
@@ -540,7 +548,7 @@ router.post('/:id/subtasks/:index/approve', async (req: Request, res: Response):
 
 /**
  * POST /tasks/:id/subtasks/:index/reject
- * Reject a subtask (orchestrator marks as new with optional note)
+ * Reject a subtask (orchestrator marks as empty with optional note)
  */
 router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -576,8 +584,83 @@ router.post('/:id/subtasks/:index/reject', async (req: Request, res: Response): 
 });
 
 /**
+ * POST /tasks/:id/subtasks/:index/block
+ * Block a subtask (orchestrator only, requires reason)
+ */
+router.post('/:id/subtasks/:index/block', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const index = parseInt(req.params.index, 10);
+    const { reason } = req.body;
+
+    if (isNaN(index) || index < 0) {
+      res.status(400).json({ success: false, error: 'Invalid subtask index' });
+      return;
+    }
+
+    const task = await taskManager.blockSubtask(id, index, reason);
+    
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    
+    res.json({ 
+      success: true, 
+      task,
+      subtaskSummary,
+      hasBlocked: true
+    });
+  } catch (err) {
+    console.error('[Tasks API] Error blocking subtask:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    
+    if (message.includes('not found')) {
+      res.status(404).json({ success: false, error: message });
+    } else {
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+});
+
+/**
+ * POST /tasks/:id/subtasks/:index/skip
+ * Skip a subtask (orchestrator only, counts as "done")
+ */
+router.post('/:id/subtasks/:index/skip', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const index = parseInt(req.params.index, 10);
+
+    if (isNaN(index) || index < 0) {
+      res.status(400).json({ success: false, error: 'Invalid subtask index' });
+      return;
+    }
+
+    const task = await taskManager.skipSubtask(id, index);
+    
+    const subtaskSummary = await (taskManager as any).getSubtaskSummaryAsync(id);
+    const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
+    
+    res.json({ 
+      success: true, 
+      task,
+      subtaskSummary,
+      allCompleted
+    });
+  } catch (err) {
+    console.error('[Tasks API] Error skipping subtask:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    
+    if (message.includes('not found')) {
+      res.status(404).json({ success: false, error: message });
+    } else {
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+});
+
+/**
  * GET /tasks/:id/subtasks/summary
  * Get subtask completion summary for a task
+ * Returns counts for all 6 statuses: empty, in_progress, review, blocked, skipped, completed
  */
 router.get('/:id/subtasks/summary', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -592,12 +675,14 @@ router.get('/:id/subtasks/summary', async (req: Request, res: Response): Promise
     // Get subtask summary (always use async version for DB)
     const summary = await (taskManager as any).getSubtaskSummaryAsync(id);
     const allCompleted = await (taskManager as any).allSubtasksCompletedAsync(id);
+    const hasBlocked = await (taskManager as any).hasBlockedSubtasks(id);
     
     res.json({ 
       success: true, 
       taskId: id,
       summary,
-      allCompleted
+      allCompleted,
+      hasBlocked
     });
   } catch (err) {
     console.error('[Tasks API] Error getting subtask summary:', err);

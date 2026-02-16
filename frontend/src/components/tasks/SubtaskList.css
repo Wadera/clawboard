@@ -36,11 +36,26 @@
 
 .subtask-progress-completed {
   background: linear-gradient(90deg, #22c55e, #16a34a);
-  z-index: 2;
+  z-index: 5;
+}
+
+.subtask-progress-skipped {
+  background: linear-gradient(90deg, #6b7280, #4b5563);
+  z-index: 4;
 }
 
 .subtask-progress-review {
   background: linear-gradient(90deg, #f59e0b, #d97706);
+  z-index: 3;
+}
+
+.subtask-progress-in-progress {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  z-index: 2;
+}
+
+.subtask-progress-blocked {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
   z-index: 1;
 }
 
@@ -58,11 +73,23 @@
   color: #22c55e;
 }
 
+.progress-skipped {
+  color: #6b7280;
+}
+
 .progress-review {
   color: #f59e0b;
 }
 
-.progress-new {
+.progress-in-progress {
+  color: #3b82f6;
+}
+
+.progress-blocked {
+  color: #ef4444;
+}
+
+.progress-empty {
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -116,10 +143,16 @@
   background: rgba(139, 92, 246, 0.15);
 }
 
-/* Phase 3: Tri-state checkbox styles */
+/* Phase 4: 6-state checkbox styles */
 .subtask-checkbox.subtask-status-completed {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   border-color: #22c55e;
+  color: white;
+}
+
+.subtask-checkbox.subtask-status-skipped {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  border-color: #6b7280;
   color: white;
 }
 
@@ -130,7 +163,20 @@
   animation: pulse-review 2s ease-in-out infinite;
 }
 
-.subtask-checkbox.subtask-status-new {
+.subtask-checkbox.subtask-status-in-progress {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-color: #3b82f6;
+  color: white;
+  animation: spin-in-progress 2s linear infinite;
+}
+
+.subtask-checkbox.subtask-status-blocked {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border-color: #ef4444;
+  color: white;
+}
+
+.subtask-checkbox.subtask-status-empty {
   background: transparent;
   border-color: rgba(255, 255, 255, 0.3);
 }
@@ -138,6 +184,11 @@
 @keyframes pulse-review {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+@keyframes spin-in-progress {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Legacy support */
@@ -166,18 +217,32 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Phase 3: Tri-state text styles */
+/* Phase 4: 6-state text styles */
 .subtask-status-completed .subtask-text {
   text-decoration: line-through;
   color: var(--text-tertiary);
   opacity: 0.6;
 }
 
+.subtask-status-skipped .subtask-text {
+  text-decoration: line-through;
+  color: var(--text-quaternary);
+  opacity: 0.5;
+}
+
 .subtask-status-review .subtask-text {
   color: #fbbf24;
 }
 
-.subtask-status-new .subtask-text {
+.subtask-status-in-progress .subtask-text {
+  color: #60a5fa;
+}
+
+.subtask-status-blocked .subtask-text {
+  color: #f87171;
+}
+
+.subtask-status-empty .subtask-text {
   color: var(--text-secondary);
 }
 
@@ -186,6 +251,19 @@
   text-decoration: line-through;
   color: var(--text-tertiary);
   opacity: 0.6;
+}
+
+/* Blocked reason indicator */
+.subtask-blocked-reason {
+  margin-left: 6px;
+  cursor: help;
+  opacity: 0.8;
+}
+
+/* Has blocked subtasks indicator */
+.subtask-list.has-blocked {
+  border-left: 3px solid #ef4444;
+  padding-left: 8px;
 }
 
 /* Review note indicator */

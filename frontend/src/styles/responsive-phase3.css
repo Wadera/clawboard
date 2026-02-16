@@ -8,24 +8,41 @@
    1 & 2. DASHBOARD HOME
    ======================================== */
 
-/* Tablet: stats 2x2, system status 2-col */
+/* Tablet: stats 3x2, system status 2-col */
 @media (max-width: 1024px) {
   .dashboard-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
   .dashboard-system-status-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Mobile: stats 1-col, status stacks vertically */
+/* Mobile: stats 6 compact in single row */
 @media (max-width: 767px) {
   .dashboard-page {
     padding: var(--space-4);
     gap: var(--space-5);
   }
   .dashboard-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-1);
+  }
+  .dashboard-stats-grid .stats-card {
+    padding: var(--space-1) var(--space-1);
+    min-width: 0;
+  }
+  .dashboard-stats-grid .stats-card-icon {
+    font-size: 16px;
+  }
+  .dashboard-stats-grid .stats-card-label {
+    font-size: 0.5rem;
+  }
+  .dashboard-stats-grid .stats-card-value {
+    font-size: 0.75rem;
+  }
+  .dashboard-stats-grid .stats-card-description {
+    display: none;
   }
   .dashboard-system-status-grid {
     grid-template-columns: 1fr;

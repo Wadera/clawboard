@@ -2,6 +2,7 @@
 import { Task } from '../services/TaskManager';
 import { toolManager } from '../services/ToolManager';
 import { projectService } from '../services/ProjectService';
+import { taskManagerDB } from '../services/TaskManagerDB';
 
 /**
  * Generate agent prompt with optional DB-backed tool context.
@@ -20,8 +21,79 @@ export async function generateTaskPromptWithTools(task: Task): Promise<string> {
     );
     if (!project) return basePrompt;
 
+    // Fetch project context
+    const projectContext: string[] = [];
+    projectContext.push('## Project Context');
+    projectContext.push('');
+    
+    if (project.description) {
+      projectContext.push(project.description);
+      projectContext.push('');
+    }
+    
+    if (project.source_dir) {
+      projectContext.push(`**Source Directory:** ${project.source_dir}`);
+    }
+    
+    if (project.nfs_dir) {
+      projectContext.push(`**NFS Directory:** ${project.nfs_dir}`);
+    }
+    
+    // Add project links (docs, git repos, etc.)
+    if (project.links && project.links.length > 0) {
+      projectContext.push('');
+      projectContext.push('### Project Resources');
+      projectContext.push('');
+      const linksByType: Record<string, typeof project.links> = {};
+      project.links.forEach(link => {
+        if (!linksByType[link.type]) linksByType[link.type] = [];
+        linksByType[link.type].push(link);
+      });
+      
+      const typeLabels: Record<string, string> = {
+        git: 'Git Repositories',
+        doc: 'Documentation',
+        url: 'URLs',
+        api: 'APIs',
+        file: 'Files',
+        dashboard: 'Dashboards',
+        notebooklm: 'NotebookLM'
+      };
+      
+      Object.keys(linksByType).sort().forEach(type => {
+        const label = typeLabels[type] || type.toUpperCase();
+        projectContext.push(`**${label}:**`);
+        linksByType[type].forEach(link => {
+          projectContext.push(`- [${link.title}](${link.url})`);
+        });
+        projectContext.push('');
+      });
+    }
+    
+    // Fetch task dependencies
+    const blockingTasks = await taskManagerDB.getBlockingTasks(task.id);
+    if (blockingTasks.length > 0) {
+      projectContext.push('### Dependencies');
+      projectContext.push('');
+      projectContext.push('This task depends on the following tasks being completed:');
+      projectContext.push('');
+      blockingTasks.forEach((dep: Task) => {
+        const statusIcon = dep.status === 'completed' ? '✅' : dep.status === 'in-progress' ? '🔄' : '⏳';
+        projectContext.push(`- ${statusIcon} **${dep.title}** (${dep.status})`);
+      });
+      projectContext.push('');
+    }
+
     const effectiveTools = await toolManager.getEffectiveToolsForProject(project.id);
-    if (!effectiveTools || effectiveTools.length === 0) return basePrompt;
+    if (!effectiveTools || effectiveTools.length === 0) {
+      // Insert project context even if no tools
+      const footerMarker = '---\n## Standard Instructions (auto-generated)';
+      const idx = basePrompt.indexOf(footerMarker);
+      if (idx >= 0) {
+        return basePrompt.slice(0, idx) + projectContext.join('\n') + '\n\n' + basePrompt.slice(idx);
+      }
+      return basePrompt + '\n\n' + projectContext.join('\n');
+    }
 
     // Build tool context section
     const toolSections: string[] = [];
@@ -56,15 +128,18 @@ export async function generateTaskPromptWithTools(task: Task): Promise<string> {
       }
     }
 
-    // Insert tool context before the standard footer
+    // Combine project context and tool context
+    const enrichedContext = projectContext.join('\n') + '\n\n' + toolSections.join('\n');
+
+    // Insert before the standard footer
     const footerMarker = '---\n## Standard Instructions (auto-generated)';
     const idx = basePrompt.indexOf(footerMarker);
     if (idx >= 0) {
-      return basePrompt.slice(0, idx) + toolSections.join('\n') + '\n\n' + basePrompt.slice(idx);
+      return basePrompt.slice(0, idx) + enrichedContext + '\n\n' + basePrompt.slice(idx);
     }
     
     // If no footer found, append at end
-    return basePrompt + '\n\n' + toolSections.join('\n');
+    return basePrompt + '\n\n' + enrichedContext;
   } catch (err) {
     // If tools DB isn't available yet, gracefully fall back
     console.warn('[promptTemplate] Could not fetch tools from DB:', err instanceof Error ? err.message : err);

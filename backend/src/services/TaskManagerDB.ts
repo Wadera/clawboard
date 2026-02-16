@@ -9,7 +9,21 @@ import { taskHistoryService } from './TaskHistoryService';
 export type TaskStatus = 'ideas' | 'todo' | 'in-progress' | 'stuck' | 'completed' | 'archived';
 export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low' | 'someday';
 export type TaskLinkType = 'project' | 'tool' | 'git' | 'doc' | 'memory' | 'session';
-export type SubtaskStatus = 'new' | 'in_review' | 'completed';
+
+// Phase 4: 6-state subtask lifecycle
+// empty       - Not started
+// in_progress - Agent working on it
+// review      - Awaiting orchestrator review
+// blocked     - Cannot proceed, needs intervention
+// skipped     - Intentionally skipped (counts as "done")
+// completed   - Approved by orchestrator
+export type SubtaskStatus = 'empty' | 'in_progress' | 'review' | 'blocked' | 'skipped' | 'completed';
+
+// Valid statuses for different roles
+export const AGENT_ALLOWED_STATUSES: SubtaskStatus[] = ['in_progress', 'review'];
+export const ORCHESTRATOR_ALLOWED_STATUSES: SubtaskStatus[] = ['empty', 'in_progress', 'review', 'blocked', 'skipped', 'completed'];
+// "Done" statuses for completion checks
+export const DONE_STATUSES: SubtaskStatus[] = ['completed', 'skipped'];
 
 export interface Subtask {
   id: string;
@@ -17,6 +31,7 @@ export interface Subtask {
   completed?: boolean; // Legacy field
   status: SubtaskStatus;
   reviewNote?: string;
+  blockedReason?: string; // Why is this subtask blocked?
   completedAt?: string;
   sessionRef?: string;
 }
@@ -182,9 +197,10 @@ export class TaskManagerDB extends EventEmitter {
       text: s.title,
       status: s.status as SubtaskStatus,
       reviewNote: s.note || undefined,
+      blockedReason: s.blocked_reason || undefined,
       completedAt: s.completed_at || undefined,
       // Legacy field for backward compat
-      completed: s.status === 'completed',
+      completed: s.status === 'completed' || s.status === 'skipped',
     }));
 
     // Fetch tags
@@ -761,14 +777,22 @@ export class TaskManagerDB extends EventEmitter {
   // ============================================================
 
   /**
-   * Update subtask status
+   * Update subtask status with role-based permission enforcement
+   * 
+   * Agent permissions:
+   *   - CAN set: in_progress, review
+   *   - CANNOT set: completed, skipped, blocked, empty
+   * 
+   * Orchestrator permissions:
+   *   - CAN set: any status
    */
   async updateSubtaskStatus(
     taskId: string,
     subtaskIndex: number,
     newStatus: SubtaskStatus,
     role: 'agent' | 'orchestrator' = 'orchestrator',
-    reviewNote?: string
+    reviewNote?: string,
+    blockedReason?: string
   ): Promise<Task> {
     const task = await this.getTask(taskId);
     if (!task) {
@@ -782,27 +806,36 @@ export class TaskManagerDB extends EventEmitter {
     const subtask = task.subtasks[subtaskIndex];
     const currentStatus = subtask.status;
 
-    // Permission checks
+    // Permission checks for agents
     if (role === 'agent') {
-      if (newStatus === 'completed') {
-        throw new Error('Agents cannot mark subtasks as completed. Mark as in_review instead.');
+      if (!AGENT_ALLOWED_STATUSES.includes(newStatus)) {
+        throw new Error(`Agents cannot set subtask status to '${newStatus}'. Allowed: ${AGENT_ALLOWED_STATUSES.join(', ')}`);
       }
-      if (currentStatus === 'completed') {
-        throw new Error('Cannot change status of completed subtasks');
+      // Agents cannot modify completed/skipped subtasks
+      if (DONE_STATUSES.includes(currentStatus)) {
+        throw new Error(`Cannot change status of ${currentStatus} subtasks`);
+      }
+      // Agents cannot modify blocked subtasks (orchestrator must unblock)
+      if (currentStatus === 'blocked') {
+        throw new Error('Cannot modify blocked subtask. Orchestrator must unblock first.');
       }
     }
 
     const now = new Date().toISOString();
 
+    // Determine completed_at: set when status becomes completed, clear otherwise
+    const completedAt = newStatus === 'completed' ? now : null;
+
     // Update in database
     await this.pool.query(
       `UPDATE subtasks
-       SET status = $1, note = $2, completed_at = $3, updated_at = $4
-       WHERE task_id = $5 AND index = $6`,
+       SET status = $1, note = $2, blocked_reason = $3, completed_at = $4, updated_at = $5
+       WHERE task_id = $6 AND index = $7`,
       [
         newStatus,
         reviewNote || subtask.reviewNote || null,
-        newStatus === 'completed' ? now : null,
+        newStatus === 'blocked' ? (blockedReason || null) : null,
+        completedAt,
         now,
         taskId,
         subtaskIndex
@@ -822,12 +855,16 @@ export class TaskManagerDB extends EventEmitter {
 
     this.emit('task:updated', updatedTask);
 
-    console.log(`[TaskManagerDB] Subtask ${subtaskIndex} of task ${taskId} changed to '${newStatus}' by ${role}`);
+    console.log(`[TaskManagerDB] Subtask ${subtaskIndex} of task ${taskId} changed from '${currentStatus}' to '${newStatus}' by ${role}`);
     return updatedTask;
   }
 
   async markSubtaskInReview(taskId: string, subtaskIndex: number, reviewNote?: string): Promise<Task> {
-    return this.updateSubtaskStatus(taskId, subtaskIndex, 'in_review', 'agent', reviewNote);
+    return this.updateSubtaskStatus(taskId, subtaskIndex, 'review', 'agent', reviewNote);
+  }
+
+  async markSubtaskInProgress(taskId: string, subtaskIndex: number): Promise<Task> {
+    return this.updateSubtaskStatus(taskId, subtaskIndex, 'in_progress', 'agent');
   }
 
   async approveSubtask(taskId: string, subtaskIndex: number): Promise<Task> {
@@ -835,7 +872,7 @@ export class TaskManagerDB extends EventEmitter {
   }
 
   async rejectSubtask(taskId: string, subtaskIndex: number, note?: string): Promise<Task> {
-    const task = await this.updateSubtaskStatus(taskId, subtaskIndex, 'new', 'orchestrator');
+    const task = await this.updateSubtaskStatus(taskId, subtaskIndex, 'empty', 'orchestrator');
     if (note && task.subtasks && task.subtasks[subtaskIndex]) {
       task.subtasks[subtaskIndex].reviewNote = `REJECTED: ${note}`;
       await this.pool.query(
@@ -844,6 +881,14 @@ export class TaskManagerDB extends EventEmitter {
       );
     }
     return task;
+  }
+
+  async blockSubtask(taskId: string, subtaskIndex: number, reason?: string): Promise<Task> {
+    return this.updateSubtaskStatus(taskId, subtaskIndex, 'blocked', 'orchestrator', undefined, reason);
+  }
+
+  async skipSubtask(taskId: string, subtaskIndex: number): Promise<Task> {
+    return this.updateSubtaskStatus(taskId, subtaskIndex, 'skipped', 'orchestrator');
   }
 
   /**
@@ -857,7 +902,7 @@ export class TaskManagerDB extends EventEmitter {
    * Uncomplete a subtask (legacy method)
    */
   async uncompleteSubtask(taskId: string, subtaskIndex: number): Promise<Task> {
-    return this.updateSubtaskStatus(taskId, subtaskIndex, 'new', 'orchestrator');
+    return this.updateSubtaskStatus(taskId, subtaskIndex, 'empty', 'orchestrator');
   }
 
   allSubtasksCompleted(_id: string): boolean {
@@ -866,28 +911,45 @@ export class TaskManagerDB extends EventEmitter {
     throw new Error('Use allSubtasksCompletedAsync instead');
   }
 
+  /**
+   * Check if all subtasks are in a "done" state (completed or skipped)
+   */
   async allSubtasksCompletedAsync(taskId: string): Promise<boolean> {
     const task = await this.getTask(taskId);
     if (!task || !task.subtasks || task.subtasks.length === 0) {
       return true;
     }
-    return task.subtasks.every(s => s.status === 'completed');
+    return task.subtasks.every(s => DONE_STATUSES.includes(s.status));
   }
 
-  getSubtaskSummary(_id: string): { total: number; new: number; in_review: number; completed: number } {
+  /**
+   * Check if any subtask is blocked
+   */
+  async hasBlockedSubtasks(taskId: string): Promise<boolean> {
+    const task = await this.getTask(taskId);
+    if (!task || !task.subtasks) {
+      return false;
+    }
+    return task.subtasks.some(s => s.status === 'blocked');
+  }
+
+  getSubtaskSummary(_id: string): { total: number; empty: number; in_progress: number; review: number; blocked: number; skipped: number; completed: number } {
     // Sync method - throw error
     throw new Error('Use getSubtaskSummaryAsync instead');
   }
 
-  async getSubtaskSummaryAsync(taskId: string): Promise<{ total: number; new: number; in_review: number; completed: number }> {
+  async getSubtaskSummaryAsync(taskId: string): Promise<{ total: number; empty: number; in_progress: number; review: number; blocked: number; skipped: number; completed: number }> {
     const task = await this.getTask(taskId);
     if (!task || !task.subtasks) {
-      return { total: 0, new: 0, in_review: 0, completed: 0 };
+      return { total: 0, empty: 0, in_progress: 0, review: 0, blocked: 0, skipped: 0, completed: 0 };
     }
     return {
       total: task.subtasks.length,
-      new: task.subtasks.filter(s => s.status === 'new').length,
-      in_review: task.subtasks.filter(s => s.status === 'in_review').length,
+      empty: task.subtasks.filter(s => s.status === 'empty').length,
+      in_progress: task.subtasks.filter(s => s.status === 'in_progress').length,
+      review: task.subtasks.filter(s => s.status === 'review').length,
+      blocked: task.subtasks.filter(s => s.status === 'blocked').length,
+      skipped: task.subtasks.filter(s => s.status === 'skipped').length,
       completed: task.subtasks.filter(s => s.status === 'completed').length,
     };
   }

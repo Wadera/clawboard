@@ -15,11 +15,14 @@ Usage:
   clawboard breakdown ID
   clawboard auto-archive
 
-  # Subtask management (tri-state: new → in_review → completed)
-  clawboard complete-subtask TASK_ID INDEX       # Agent: marks in_review
+  # Subtask management (6-state: empty → in_progress → review → completed)
+  clawboard start-subtask TASK_ID INDEX          # Agent: marks in_progress
+  clawboard complete-subtask TASK_ID INDEX       # Agent: marks review (ready for approval)
   clawboard approve-subtask TASK_ID INDEX        # Orchestrator: marks completed
-  clawboard reject-subtask TASK_ID INDEX --note  # Orchestrator: back to new
-  clawboard uncomplete-subtask TASK_ID INDEX     # Legacy: marks as new
+  clawboard reject-subtask TASK_ID INDEX --note  # Orchestrator: back to empty
+  clawboard block-subtask TASK_ID INDEX --reason # Orchestrator: marks blocked
+  clawboard skip-subtask TASK_ID INDEX           # Orchestrator: marks skipped (counts as done)
+  clawboard uncomplete-subtask TASK_ID INDEX     # Legacy: marks as empty
 
   # Project management
   clawboard projects [--include-stats]
@@ -137,7 +140,9 @@ VALID_PROJECT_STATUSES = ["active", "paused", "completed", "archived"]
 VALID_LINK_TYPES = ["git", "doc", "url", "api", "project", "dashboard", "notebooklm", "file"]
 VALID_LINK_CATEGORIES = ["repository", "environment", "documentation", "research", "reference", "tool"]
 VALID_NOTEBOOK_TYPES = ["documentation", "research", "reference"]
-VALID_SUBTASK_STATUSES = ["new", "in_review", "completed"]
+VALID_SUBTASK_STATUSES = ["empty", "in_progress", "review", "blocked", "skipped", "completed"]
+AGENT_ALLOWED_STATUSES = ["in_progress", "review"]
+DONE_STATUSES = ["completed", "skipped"]
 VALID_THINKING_LEVELS = ["low", "medium", "high"]
 VALID_TOOL_CATEGORIES = ["ai", "development", "infrastructure", "communication", "monitoring", "documentation", "testing", "deployment"]
 
@@ -346,15 +351,32 @@ def parse_subtasks(text):
     return [{"text": item} for item in items]
 
 def format_subtask_status(s):
-    """Format subtask status with appropriate icon."""
-    status = s.get("status", "new")
+    """Format subtask status with appropriate icon.
+    
+    6-state lifecycle:
+      ⬜ empty       - Not started
+      🔄 in_progress - Agent working on it
+      🟡 review      - Awaiting orchestrator review
+      🔴 blocked     - Cannot proceed
+      ⏭️ skipped     - Intentionally skipped
+      ✅ completed   - Approved
+    """
+    status = s.get("status", "empty")
     # Legacy support: if no status field, check completed boolean
-    if status == "new" and s.get("completed"):
+    if status in ("new", "empty") and s.get("completed"):
         status = "completed"
+    # Map old status names to new
+    if status == "new":
+        status = "empty"
+    if status == "in_review":
+        status = "review"
     
     icons = {
-        "new": "⬜",
-        "in_review": "🔄",
+        "empty": "⬜",
+        "in_progress": "🔄",
+        "review": "🟡",
+        "blocked": "🔴",
+        "skipped": "⏭️",
         "completed": "✅"
     }
     return icons.get(status, "❓")
@@ -374,14 +396,18 @@ def format_task(t, verbose=False):
     tags = f" 🏷️{','.join(t['tags'])}" if t.get("tags") else ""
     subtask_count = len(t.get("subtasks") or [])
     
-    # Count subtasks by status
+    # Count subtasks by status (6-state)
     subtasks = t.get("subtasks") or []
-    done = sum(1 for s in subtasks if s.get("status") == "completed" or s.get("completed"))
-    in_review = sum(1 for s in subtasks if s.get("status") == "in_review")
+    done = sum(1 for s in subtasks if s.get("status") in ("completed", "skipped") or s.get("completed"))
+    in_progress = sum(1 for s in subtasks if s.get("status") == "in_progress")
+    review = sum(1 for s in subtasks if s.get("status") in ("review", "in_review"))
+    blocked = sum(1 for s in subtasks if s.get("status") == "blocked")
     
     if subtask_count:
-        if in_review > 0:
-            subs = f" [{done}/{subtask_count} ✅ {in_review} 🔄]"
+        if blocked > 0:
+            subs = f" [{done}/{subtask_count} ✅ {blocked} 🔴]"
+        elif review > 0 or in_progress > 0:
+            subs = f" [{done}/{subtask_count} ✅ {review} 🟡 {in_progress} 🔄]"
         else:
             subs = f" [{done}/{subtask_count}]"
     else:
@@ -726,7 +752,8 @@ def cmd_move(args):
     task_id = resolve_task_id(args.id)
     status = validate_status(args.status)
     
-    # Guardrail: block move to completed if subtasks not approved (unless --force)
+    # Guardrail: block move to completed if subtasks not done (unless --force)
+    # Done = completed OR skipped
     force = getattr(args, 'force', False)
     if status == "completed" and not force:
         # Fetch current task to check subtasks
@@ -735,17 +762,22 @@ def cmd_move(args):
         subtasks = task.get("subtasks") or []
         
         if subtasks:
-            # Check if all subtasks are completed
-            unapproved = []
+            # Check if all subtasks are done (completed or skipped)
+            not_done = []
             for i, s in enumerate(subtasks):
-                s_status = s.get("status", "new")
-                if s_status != "completed":
-                    unapproved.append((i, s_status, s.get("text", "???")))
+                s_status = s.get("status", "empty")
+                # Normalize old status names
+                if s_status == "new":
+                    s_status = "empty"
+                if s_status == "in_review":
+                    s_status = "review"
+                if s_status not in ("completed", "skipped"):
+                    not_done.append((i, s_status, s.get("text", "???")))
             
-            if unapproved:
+            if not_done:
                 # Block the move and show helpful error
-                print(f"❌ Cannot move to completed — subtasks not approved:", file=sys.stderr)
-                for idx, s_status, text in unapproved:
+                print(f"❌ Cannot move to completed — {len(not_done)} subtask(s) not done:", file=sys.stderr)
+                for idx, s_status, text in not_done:
                     icon = format_subtask_status({"status": s_status})
                     print(f"  [{idx}] {icon} {s_status}: \"{text}\"", file=sys.stderr)
                 print(f"\nRun: clawboard review {task_id[:8]}", file=sys.stderr)
@@ -797,13 +829,17 @@ def cmd_auto_archive(args):
     print(f"✅ Auto-archived {archived} completed task(s)")
 
 def cmd_complete_subtask(args):
-    """Agent marks subtask as in_review (NOT completed)."""
+    """Agent marks subtask as 'review' (NOT completed).
+    
+    In the 6-state lifecycle, agents mark work as ready for review.
+    The orchestrator then approves (completed) or rejects (empty).
+    """
     task_id = resolve_task_id(args.task_id)
     index = int(args.index)
     
-    # Use the new tri-state API: mark as in_review with agent role
+    # Agents mark as 'review' when done with their work
     result = api("PATCH", f"/tasks/{task_id}/subtasks/{index}/status", {
-        "status": "in_review",
+        "status": "review",
         "role": "agent"
     })
     
@@ -811,19 +847,21 @@ def cmd_complete_subtask(args):
     subtasks = task.get("subtasks") or []
     
     if index < len(subtasks):
-        print(f"🔄 Marked subtask [{index}] as in_review: {subtasks[index].get('text', '')}")
+        print(f"🟡 Marked subtask [{index}] as review: {subtasks[index].get('text', '')}")
     else:
-        print(f"🔄 Marked subtask [{index}] as in_review")
+        print(f"🟡 Marked subtask [{index}] as review")
     
     summary = result.get("subtaskSummary", {})
-    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('review', 0)} 🟡 | {summary.get('in_progress', 0)} 🔄 | {summary.get('empty', 0)} ⬜")
+    if summary.get('blocked', 0) > 0:
+        print(f"   ⚠️ {summary.get('blocked', 0)} subtask(s) blocked!")
     print(format_task(task, verbose=True))
 
 def cmd_approve_subtask(args):
     """Orchestrator approves subtask → marks as completed."""
     # Block if running in agent context
     if is_agent_context():
-        print("❌ Agents cannot approve subtasks. Use 'complete-subtask' to mark as in_review.", file=sys.stderr)
+        print("❌ Agents cannot approve subtasks. Use 'complete-subtask' to mark as review.", file=sys.stderr)
         print("   The orchestrator will review and approve.", file=sys.stderr)
         sys.exit(1)
     
@@ -842,15 +880,17 @@ def cmd_approve_subtask(args):
     
     summary = result.get("subtaskSummary", {})
     all_completed = result.get("allCompleted", False)
-    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('skipped', 0)} ⏭️ | {summary.get('review', 0)} 🟡 | {summary.get('in_progress', 0)} 🔄 | {summary.get('empty', 0)} ⬜")
+    if summary.get('blocked', 0) > 0:
+        print(f"   ⚠️ {summary.get('blocked', 0)} subtask(s) blocked!")
     
     if all_completed:
-        print(f"   🎉 All subtasks completed! Task can be marked as completed.")
+        print(f"   🎉 All subtasks done! Task can be marked as completed.")
     
     print(format_task(task, verbose=True))
 
 def cmd_reject_subtask(args):
-    """Orchestrator rejects subtask → marks as new with note."""
+    """Orchestrator rejects subtask → marks as empty with note."""
     task_id = resolve_task_id(args.task_id)
     index = int(args.index)
     
@@ -870,25 +910,106 @@ def cmd_reject_subtask(args):
         print(f"↩️ Rejected subtask [{index}]{note_text}")
     
     summary = result.get("subtaskSummary", {})
-    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_review', 0)} 🔄 | {summary.get('new', 0)} ⬜")
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('review', 0)} 🟡 | {summary.get('empty', 0)} ⬜")
     print(format_task(task, verbose=True))
 
 def cmd_uncomplete_subtask(args):
-    """Legacy: mark subtask as new (uncompleted)."""
+    """Legacy: mark subtask as empty (uncompleted)."""
     task_id = resolve_task_id(args.task_id)
     index = int(args.index)
     
     # Use legacy PUT endpoint for backward compat
     result = api("PUT", f"/tasks/{task_id}/subtasks/{index}", {
-        "status": "new"
+        "status": "empty",
+        "orchestrator": True
     })
     
     task = result.get("task", {})
     subtasks = task.get("subtasks") or []
     
     if index < len(subtasks):
-        print(f"⬜ Reset subtask [{index}] to new: {subtasks[index].get('text', '')}")
+        print(f"⬜ Reset subtask [{index}] to empty: {subtasks[index].get('text', '')}")
     
+    print(format_task(task, verbose=True))
+
+def cmd_block_subtask(args):
+    """Orchestrator marks subtask as blocked with reason."""
+    # Block if running in agent context
+    if is_agent_context():
+        print("❌ Agents cannot block subtasks. Only orchestrators can block.", file=sys.stderr)
+        sys.exit(1)
+    
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    data = {}
+    if args.reason:
+        data["reason"] = args.reason
+    
+    result = api("POST", f"/tasks/{task_id}/subtasks/{index}/block", data)
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    reason_text = f" (Reason: {args.reason})" if args.reason else ""
+    if index < len(subtasks):
+        print(f"🔴 Blocked subtask [{index}]: {subtasks[index].get('text', '')}{reason_text}")
+    else:
+        print(f"🔴 Blocked subtask [{index}]{reason_text}")
+    
+    summary = result.get("subtaskSummary", {})
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('blocked', 0)} 🔴 | {summary.get('review', 0)} 🟡 | {summary.get('empty', 0)} ⬜")
+    print(format_task(task, verbose=True))
+
+def cmd_skip_subtask(args):
+    """Orchestrator skips subtask (counts as done)."""
+    # Block if running in agent context
+    if is_agent_context():
+        print("❌ Agents cannot skip subtasks. Only orchestrators can skip.", file=sys.stderr)
+        sys.exit(1)
+    
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    result = api("POST", f"/tasks/{task_id}/subtasks/{index}/skip")
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    if index < len(subtasks):
+        print(f"⏭️ Skipped subtask [{index}]: {subtasks[index].get('text', '')}")
+    else:
+        print(f"⏭️ Skipped subtask [{index}]")
+    
+    summary = result.get("subtaskSummary", {})
+    all_completed = result.get("allCompleted", False)
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('skipped', 0)} ⏭️ | {summary.get('review', 0)} 🟡 | {summary.get('empty', 0)} ⬜")
+    
+    if all_completed:
+        print(f"   🎉 All subtasks done! Task can be marked as completed.")
+    
+    print(format_task(task, verbose=True))
+
+def cmd_start_subtask(args):
+    """Agent marks subtask as in_progress (starting work)."""
+    task_id = resolve_task_id(args.task_id)
+    index = int(args.index)
+    
+    result = api("PATCH", f"/tasks/{task_id}/subtasks/{index}/status", {
+        "status": "in_progress",
+        "role": "agent"
+    })
+    
+    task = result.get("task", {})
+    subtasks = task.get("subtasks") or []
+    
+    if index < len(subtasks):
+        print(f"🔄 Started subtask [{index}]: {subtasks[index].get('text', '')}")
+    else:
+        print(f"🔄 Started subtask [{index}]")
+    
+    summary = result.get("subtaskSummary", {})
+    print(f"   Summary: {summary.get('completed', 0)} ✅ | {summary.get('in_progress', 0)} 🔄 | {summary.get('empty', 0)} ⬜")
     print(format_task(task, verbose=True))
 
 def cmd_review(args):
@@ -901,47 +1022,71 @@ def cmd_review(args):
     title = task.get("title", "Unknown")
     status = task.get("status", "unknown")
     
-    # Count subtasks by status
+    # Count subtasks by status (6-state)
     completed = sum(1 for s in subtasks if s.get("status") == "completed")
-    in_review = sum(1 for s in subtasks if s.get("status") == "in_review")
-    new = sum(1 for s in subtasks if s.get("status") == "new")
+    skipped = sum(1 for s in subtasks if s.get("status") == "skipped")
+    review = sum(1 for s in subtasks if s.get("status") in ("review", "in_review"))
+    in_progress = sum(1 for s in subtasks if s.get("status") == "in_progress")
+    blocked = sum(1 for s in subtasks if s.get("status") == "blocked")
+    empty = sum(1 for s in subtasks if s.get("status") in ("empty", "new"))
     total = len(subtasks)
+    done = completed + skipped
     
     short_id = task_id[:8]
     
     print(f"\n📋 Review: {title} ({short_id})")
-    print(f"Status: {status} | Subtasks: {completed}/{total} approved")
+    print(f"Status: {status} | Subtasks: {done}/{total} done")
+    if blocked > 0:
+        print(f"⚠️ WARNING: {blocked} subtask(s) BLOCKED!")
     print()
     
     # Display subtasks with clear markers
     for i, s in enumerate(subtasks):
-        s_status = s.get("status", "new")
+        s_status = s.get("status", "empty")
+        # Normalize old status names
+        if s_status == "new":
+            s_status = "empty"
+        if s_status == "in_review":
+            s_status = "review"
+            
         icon = format_subtask_status(s)
         text = s.get("text", "???")
         note = f" — {s.get('reviewNote')}" if s.get("reviewNote") else ""
+        blocked_note = f" [{s.get('blockedReason')}]" if s.get("blockedReason") else ""
         
         marker = ""
-        if s_status == "in_review":
+        if s_status == "review":
             marker = "  ← NEEDS REVIEW"
-        elif s_status == "new":
+        elif s_status == "blocked":
+            marker = "  ← BLOCKED"
+        elif s_status == "in_progress":
+            marker = "  ← IN PROGRESS"
+        elif s_status == "empty":
             marker = "  ← NOT STARTED"
         
-        print(f"  [{i}] {icon} {s_status}: {text}{note}{marker}")
+        print(f"  [{i}] {icon} {s_status}: {text}{note}{blocked_note}{marker}")
     
     print()
     print("Actions:")
     
     # Show approve/reject for subtasks in review
     for i, s in enumerate(subtasks):
-        if s.get("status") == "in_review":
-            print(f"  clawboard approve-subtask {short_id} {i}    # Approve subtask [{i}]")
-            print(f"  clawboard reject-subtask {short_id} {i}     # Reject subtask [{i}]")
+        if s.get("status") in ("review", "in_review"):
+            print(f"  clawboard approve-subtask {short_id} {i}    # Approve → completed")
+            print(f"  clawboard reject-subtask {short_id} {i}     # Reject → empty")
     
-    # Show move to completed if all approved
-    if completed == total and total > 0:
-        print(f"  clawboard move {short_id} completed       # Complete (all approved)")
+    # Show unblock for blocked subtasks
+    for i, s in enumerate(subtasks):
+        if s.get("status") == "blocked":
+            print(f"  clawboard uncomplete-subtask {short_id} {i} # Unblock → empty")
+            print(f"  clawboard skip-subtask {short_id} {i}       # Skip (counts as done)")
+    
+    # Show move to completed if all done
+    if done == total and total > 0:
+        print(f"  clawboard move {short_id} completed       # Complete (all done)")
     elif total > 0:
-        print(f"  # Cannot complete yet — {total - completed} subtask(s) not approved")
+        remaining = total - done
+        print(f"  # Cannot complete yet — {remaining} subtask(s) not done")
     
     print(f"  clawboard move {short_id} in-progress     # Send back for more work")
     print()
@@ -2533,18 +2678,25 @@ def main():
         description="ClawBoard — task, project, and tool management CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Subtask Workflow (tri-state):
-  ⬜ new → 🔄 in_review → ✅ completed
+Subtask Workflow (6-state lifecycle):
+  ⬜ empty → 🔄 in_progress → 🟡 review → ✅ completed
+                                      ↘ 🔴 blocked
+                                      ↘ ⏭️ skipped
 
   Agent workflow:
-    1. Work on subtask
-    2. clawboard complete-subtask TASK_ID INDEX  (marks in_review)
-    3. When all done: clawboard move TASK_ID stuck --notes "Ready for review"
+    1. clawboard start-subtask TASK_ID INDEX     (marks in_progress)
+    2. Work on subtask...
+    3. clawboard complete-subtask TASK_ID INDEX  (marks review)
+    4. When all done: clawboard move TASK_ID stuck --notes "Ready for review"
 
   Orchestrator workflow:
-    1. Review subtask
-    2. clawboard approve-subtask TASK_ID INDEX   (marks completed)
-       OR clawboard reject-subtask TASK_ID INDEX --note "Reason"
+    1. clawboard review TASK_ID                  (see all subtasks)
+    2. For each subtask in review:
+       clawboard approve-subtask TASK_ID INDEX   (marks completed)
+       clawboard reject-subtask TASK_ID INDEX    (back to empty)
+       clawboard block-subtask TASK_ID INDEX     (marks blocked)
+       clawboard skip-subtask TASK_ID INDEX      (marks skipped, counts as done)
+    3. clawboard move TASK_ID completed          (requires all subtasks done)
 """
     )
     # Global flags
@@ -2651,9 +2803,25 @@ Subtask Workflow (tri-state):
     p_reject_sub.add_argument("--note", help="Rejection reason/feedback")
     
     # uncomplete-subtask (legacy)
-    p_uncomp_sub = sub.add_parser("uncomplete-subtask", help="Reset subtask to new (legacy)")
+    p_uncomp_sub = sub.add_parser("uncomplete-subtask", help="Reset subtask to empty (legacy)")
     p_uncomp_sub.add_argument("task_id")
     p_uncomp_sub.add_argument("index", help="0-based subtask index")
+    
+    # block-subtask (orchestrator: marks blocked)
+    p_block_sub = sub.add_parser("block-subtask", help="Block subtask with reason (orchestrator)")
+    p_block_sub.add_argument("task_id")
+    p_block_sub.add_argument("index", help="0-based subtask index")
+    p_block_sub.add_argument("--reason", "-r", help="Why is this blocked?")
+    
+    # skip-subtask (orchestrator: marks skipped, counts as done)
+    p_skip_sub = sub.add_parser("skip-subtask", help="Skip subtask (counts as done, orchestrator)")
+    p_skip_sub.add_argument("task_id")
+    p_skip_sub.add_argument("index", help="0-based subtask index")
+    
+    # start-subtask (agent: marks in_progress)
+    p_start_sub = sub.add_parser("start-subtask", help="Start working on subtask (agent)")
+    p_start_sub.add_argument("task_id")
+    p_start_sub.add_argument("index", help="0-based subtask index")
     
     # projects
     p_projects = sub.add_parser("projects", help="List projects")
@@ -2911,6 +3079,12 @@ Subtask Workflow (tri-state):
         cmd_reject_subtask(args)
     elif cmd == "uncomplete-subtask":
         cmd_uncomplete_subtask(args)
+    elif cmd == "block-subtask":
+        cmd_block_subtask(args)
+    elif cmd == "skip-subtask":
+        cmd_skip_subtask(args)
+    elif cmd == "start-subtask":
+        cmd_start_subtask(args)
     elif cmd == "projects":
         cmd_projects(args)
     elif cmd == "create-multiphase":

@@ -15,6 +15,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface DashboardSummary {
   ideas: number;
+  todo: number;
   inProgress: number;
   stuck: number;
   completed: number;
@@ -25,6 +26,7 @@ interface DashboardSummary {
 export const DashboardPage: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary>({
     ideas: 0,
+    todo: 0,
     inProgress: 0,
     stuck: 0,
     completed: 0,
@@ -49,6 +51,7 @@ export const DashboardPage: React.FC = () => {
         if (data.success && data.summary) {
           setSummary({
             ideas: data.summary.ideas || 0,
+            todo: data.summary.todo || 0,
             inProgress: data.summary.inProgress || 0,
             stuck: data.summary.stuck || 0,
             completed: data.summary.completed || 0,
@@ -75,6 +78,7 @@ export const DashboardPage: React.FC = () => {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
         const ideas = tasks.filter(t => t.status === 'ideas').length;
+        const todo = tasks.filter(t => t.status === 'todo').length;
         const inProgress = tasks.filter(t => t.status === 'in-progress').length;
         const stuck = tasks.filter(t => t.status === 'stuck').length;
         const completed = tasks.filter(t => t.status === 'completed').length;
@@ -84,7 +88,7 @@ export const DashboardPage: React.FC = () => {
                t.completedAt && new Date(t.completedAt) >= weekAgo
         ).length;
 
-        setSummary({ ideas, inProgress, stuck, completed, archived, recentCompleted });
+        setSummary({ ideas, todo, inProgress, stuck, completed, archived, recentCompleted });
         setError(null);
       }
     } catch (err) {
@@ -125,7 +129,7 @@ export const DashboardPage: React.FC = () => {
       {/* Hero Section */}
       <HeroCard />
 
-      {/* Stats Grid - 4 cards */}
+      {/* Stats Grid - 6 cards */}
       <div className="dashboard-stats-grid">
         <StatsCard
           icon="💡"
@@ -137,8 +141,17 @@ export const DashboardPage: React.FC = () => {
         />
 
         <StatsCard
+          icon="📝"
+          label="Todo"
+          value={summary.todo}
+          description="ready to start"
+          color="blue"
+          to="/tasks?focus=todo"
+        />
+
+        <StatsCard
           icon="🔄"
-          label="In Progress"
+          label="Progress"
           value={summary.inProgress}
           description="actively working"
           color="orange"
@@ -159,10 +172,19 @@ export const DashboardPage: React.FC = () => {
         <StatsCard
           icon="✅"
           label="Completed"
-          value={completedTotal}
+          value={summary.completed}
           description={summary.recentCompleted > 0 ? `${summary.recentCompleted} recent` : 'all time'}
           color="green"
           to="/tasks?focus=completed"
+        />
+
+        <StatsCard
+          icon="📦"
+          label="Archived"
+          value={summary.archived}
+          description="filed away"
+          color="gray"
+          to="/tasks?focus=archived"
         />
       </div>
 

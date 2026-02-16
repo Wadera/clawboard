@@ -34,11 +34,11 @@ services:
       NODE_ENV: development
       NODE_OPTIONS: "--max-old-space-size=512"
       PORT: 3006
-      DB_HOST: db
+      DB_HOST: clawboard-db
       DB_PORT: 5432
-      DB_NAME: clawboard_dev
-      DB_USER: clawboard_dev
-      DB_PASSWORD: ${DB_PASSWORD_DEV:-dev_password_change_me}
+      DB_NAME: clawboard
+      DB_USER: clawboard
+      DB_PASSWORD: ${DB_PASSWORD:-password_change_me}
       JWT_SECRET: ${JWT_SECRET_DEV:-dev_secret_change_me}
       DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
       CORS_ORIGIN: http://localhost:8085
@@ -75,6 +75,7 @@ services:
         condition: service_healthy
     networks:
       - clawboard-network-dev
+      - clawboard_network
     command: npm run dev
 
   # Frontend (Development)
@@ -134,3 +135,5 @@ volumes:
 networks:
   clawboard-network-dev:
     driver: bridge
+  clawboard_network:
+    external: true

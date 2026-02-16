@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../types/task';
-import { Cpu, Folder, Tag, Brain, Lock, Link } from 'lucide-react';
+import { Cpu, Folder, Tag, Brain, Lock, Link, Radio } from 'lucide-react';
 import { EditTaskModal } from './EditTaskModal';
 import { TaskDetailModal } from './TaskDetailModal';
 import './TaskCard.css';
@@ -30,6 +30,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+
+  // Check if any subtask is blocked
+  const hasBlockedSubtask = task.subtasks?.some(s => s.status === 'blocked') || false;
 
   const getPriorityClass = (): string => {
     switch (task.priority) {
@@ -131,7 +134,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         onDragStart={disableDrag ? undefined : () => { setIsDragging(true); onDragStart(); }}
         onDragEnd={disableDrag ? undefined : () => { setIsDragging(false); onDragEnd(); }}
         onClick={handleCardClick}
-        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''}`}
+        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''} ${hasBlockedSubtask ? 'subtask-blocked' : ''} ${task.activeAgent && task.status === 'in-progress' ? 'agent-active' : ''}`}
         role="button"
         tabIndex={0}
         aria-label={`Task: ${task.title}, Priority: ${task.priority}, Status: ${task.status}`}
@@ -156,6 +159,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <h3 className="task-card-title-compact">
             {task.title}
           </h3>
+          
+          {/* Active Agent Session Link */}
+          {task.activeAgent && typeof task.activeAgent === 'object' && task.activeAgent.sessionKey && task.activeAgent.sessionKey !== 'pending' && (
+            <button
+              className="task-card-session-link"
+              onClick={(e) => {
+                e.stopPropagation();
+                const sessionKey = typeof task.activeAgent === 'object' && task.activeAgent ? task.activeAgent.sessionKey : '';
+                navigate(`/sessions?session=${sessionKey}`);
+              }}
+              title={`View agent session: ${typeof task.activeAgent === 'object' ? task.activeAgent.sessionKey : ''}`}
+              aria-label="View active agent session"
+            >
+              <Radio size={14} />
+            </button>
+          )}
         </div>
         
         {/* Project Badge */}

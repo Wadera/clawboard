@@ -63,6 +63,25 @@
   z-index: 100;
 }
 
+/* Agent Active State - Pulsing Glow */
+.task-card.agent-active {
+  animation: agent-pulse 2s ease-in-out infinite;
+  border-color: #f59e0b;
+}
+
+@keyframes agent-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 2px 8px rgba(0, 0, 0, 0.1),
+      0 0 5px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 2px 8px rgba(0, 0, 0, 0.1),
+      0 0 20px rgba(245, 158, 11, 0.6);
+  }
+}
+
 /* Compact Card Layout */
 .task-card-compact {
   padding: var(--space-4);
@@ -168,6 +187,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+}
+
+/* Agent Session Link Button */
+.task-card-session-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  color: #f59e0b;
+  cursor: pointer;
+  transition: all var(--transition-base) ease;
+  flex-shrink: 0;
+}
+
+.task-card-session-link:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.5);
+  transform: scale(1.05);
+}
+
+.task-card-session-link:active {
+  transform: scale(0.95);
 }
 
 /* Agent Indicator (Compact) */
@@ -378,6 +422,21 @@
   background: rgba(0, 0, 0, 0.2);
   pointer-events: none;
   border-radius: var(--radius-md);
+}
+
+/* Subtask Blocked State - red border */
+.task-card.subtask-blocked {
+  border-left: 3px solid #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.task-card.subtask-blocked::before {
+  content: '🔴';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  z-index: 10;
 }
 
 /* Accessibility */
