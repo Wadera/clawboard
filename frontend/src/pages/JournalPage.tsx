@@ -1,13 +1,47 @@
 import { authenticatedFetch } from '../utils/auth';
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, LayoutGrid, List, Clock, X } from 'lucide-react';
 import { marked } from 'marked';
 import './JournalPage.css';
 import { useRealtimeStatus } from '../hooks/useRealtimeStatus';
 import { useBotStatus } from '../hooks/useBotStatus';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+interface BotStatusEntry {
+  id: string;
+  mood: string;
+  status_text: string;
+  avatar_url: string | null;
+  updated_at: string;
+}
+
+interface HistoryResponse {
+  success: boolean;
+  history: BotStatusEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+/**
+ * Resolve avatar URL — ensures relative paths get the API base prefix.
+ * Handles: full URLs (https://...), already-prefixed paths (/api/...),
+ * and relative paths (/media/generated/...).
+ */
+function resolveAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Full URL — use as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // Already has /api prefix
+  if (url.startsWith('/api/')) return url;
+  // Relative path like /media/generated/foo.png → prepend API base
+  if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
+  // Bare filename — assume generated
+  return `${API_BASE_URL}/media/generated/${url}`;
+}
 
 interface JournalEntry {
   id: string;
@@ -93,6 +127,16 @@ export function JournalPage() {
   // Model status state
   const [modelStatus, setModelStatus] = useState<{ model: string; contextPercent: number } | null>(null);
 
+  // Lightbox state
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Status history state
+  const [showHistory, setShowHistory] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<BotStatusEntry[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+
   // Fetch model status
   useEffect(() => {
     const fetchModelStatus = async () => {
@@ -116,10 +160,56 @@ export function JournalPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch status history
+  const fetchHistory = useCallback(async (pg: number = 1) => {
+    setHistoryLoading(true);
+    try {
+      const res = await authenticatedFetch(
+        `${API_BASE_URL}/nim-status/history?page=${pg}&limit=10`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: HistoryResponse = await res.json();
+      if (data.success) {
+        setStatusHistory(prev => pg === 1 ? data.history : [...prev, ...data.history]);
+        setHasMoreHistory(data.hasMore);
+        setHistoryPage(pg);
+      }
+    } catch (err) {
+      console.error('Failed to fetch status history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const handleShowHistory = () => {
+    if (!showHistory && statusHistory.length === 0) {
+      fetchHistory(1);
+    }
+    setShowHistory(prev => !prev);
+  };
+
+  const handleLoadMore = () => {
+    if (!historyLoading && hasMoreHistory) {
+      fetchHistory(historyPage + 1);
+    }
+  };
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxUrl) {
+        setLightboxUrl(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxUrl]);
+
   // Get status message and state
   const statusMessage = botStatus?.status_text || "Building something amazing...";
   const currentState = realtimeStatus?.main?.state || 'idle';
   const stateDisplay = getStateDisplay(currentState);
+  const resolvedAvatarUrl = resolveAvatarUrl(botStatus?.avatar_url);
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -191,7 +281,7 @@ export function JournalPage() {
             "{statusMessage}"
           </p>
 
-          {/* Model info row */}
+          {/* Model info row + History button */}
           <div className="journal-status-model-row">
             <div className="journal-status-model">
               <span className="journal-status-model-icon">🤖</span>
@@ -203,14 +293,27 @@ export function JournalPage() {
                 {modelStatus ? `${modelStatus.contextPercent}% context` : '—'}
               </span>
             </div>
+            <button
+              className="journal-history-toggle-btn"
+              onClick={handleShowHistory}
+              aria-label={showHistory ? 'Hide status history' : 'Show status history'}
+            >
+              <Clock size={14} />
+              <span>{showHistory ? 'Hide history' : 'History'}</span>
+            </button>
           </div>
         </div>
 
-        {/* Avatar image on the right */}
-        <div className="journal-status-avatar">
-          {botStatus?.avatar_url ? (
+        {/* Avatar image on the right — clickable for lightbox */}
+        <div
+          className="journal-status-avatar"
+          onClick={() => resolvedAvatarUrl && setLightboxUrl(resolvedAvatarUrl)}
+          style={{ cursor: resolvedAvatarUrl ? 'pointer' : 'default' }}
+          title={resolvedAvatarUrl ? 'Click to enlarge' : undefined}
+        >
+          {resolvedAvatarUrl ? (
             <img 
-              src={botStatus.avatar_url} 
+              src={resolvedAvatarUrl} 
               alt="Current mood" 
               className="journal-avatar-image"
             />
@@ -221,6 +324,119 @@ export function JournalPage() {
           )}
         </div>
       </div>
+
+      {/* Status History Timeline */}
+      {showHistory && (
+        <div className="journal-status-history">
+          <h3 className="journal-history-title">Status History</h3>
+          <div className="journal-history-timeline">
+            {statusHistory.map((item, idx) => {
+              const itemAvatarUrl = resolveAvatarUrl(item.avatar_url);
+              const itemDate = new Date(item.updated_at);
+              const dateLabel = itemDate.toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
+              const timeLabel = itemDate.toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+
+              return (
+                <div key={item.id} className="journal-history-entry">
+                  {/* Date column (left of line) */}
+                  <div className="journal-history-date">
+                    <span className="journal-history-date-label">{dateLabel}</span>
+                    <span className="journal-history-time-label">{timeLabel}</span>
+                  </div>
+
+                  {/* Timeline dot + connecting line */}
+                  <div className="journal-history-line">
+                    <span className="journal-history-dot" />
+                    {idx < statusHistory.length - 1 && (
+                      <span className="journal-history-connector" />
+                    )}
+                  </div>
+
+                  {/* Content card (right of line) */}
+                  <div className="journal-history-card">
+                    <div className="journal-history-card-header" data-date={`${dateLabel} ${timeLabel}`}>
+                      <span className="journal-history-mood-emoji">
+                        {getMoodEmoji(item.mood)}
+                      </span>
+                      <span className="journal-history-mood-label">{item.mood}</span>
+                    </div>
+                    <p className="journal-history-text">{item.status_text}</p>
+                  </div>
+
+                  {/* Avatar thumbnail (far right, clickable) */}
+                  {itemAvatarUrl ? (
+                    <div
+                      className="journal-history-thumb"
+                      onClick={() => setLightboxUrl(itemAvatarUrl)}
+                      title="Click to enlarge"
+                    >
+                      <img
+                        src={itemAvatarUrl}
+                        alt={`Avatar from ${dateLabel}`}
+                        loading="lazy"
+                      />
+                    </div>
+                  ) : (
+                    <div className="journal-history-thumb journal-history-thumb-empty">
+                      <span>🌀</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Loading indicator */}
+          {historyLoading && (
+            <div className="journal-history-loading">
+              <div className="journal-loading-spinner" />
+            </div>
+          )}
+
+          {/* Load more button */}
+          {hasMoreHistory && !historyLoading && (
+            <button
+              className="journal-history-load-more"
+              onClick={handleLoadMore}
+            >
+              Load more
+            </button>
+          )}
+
+          {!historyLoading && statusHistory.length === 0 && (
+            <p className="journal-history-empty">No status history available.</p>
+          )}
+        </div>
+      )}
+
+      {/* Avatar Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="journal-lightbox-overlay"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="journal-lightbox-close"
+            onClick={() => setLightboxUrl(null)}
+            aria-label="Close lightbox"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full size avatar"
+            className="journal-lightbox-image"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="journal-loading">
