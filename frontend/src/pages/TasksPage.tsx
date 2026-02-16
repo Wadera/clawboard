@@ -1,7 +1,7 @@
 import { authenticatedFetch } from '../utils/auth';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Archive } from 'lucide-react';
+import { Plus, Archive, Search } from 'lucide-react';
 import { Task } from '../types/task';
 import { TaskColumn } from '../components/tasks/TaskColumn';
 import { CreateTaskModal } from '../components/tasks/CreateTaskModal';
@@ -68,6 +68,12 @@ export const TasksPage: React.FC = () => {
   const [_quickAddStatus, _setQuickAddStatus] = useState<ColumnKey | null>(null);
   const [_selectedCardIndex, _setSelectedCardIndex] = useState(-1);
   const [filters, setFilters] = useState<TaskFilters>(() => loadFiltersFromStorage(searchParams.get('tag')));
+  const [searchPanelOpen, setSearchPanelOpen] = useState(() => {
+    // Auto-open if page loads with active filters (URL tag or localStorage)
+    const initial = loadFiltersFromStorage(searchParams.get('tag'));
+    return !!(initial.searchQuery || initial.priorities.length || initial.tags.length || initial.projects.length);
+  });
+  const autoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
@@ -172,6 +178,45 @@ export const TasksPage: React.FC = () => {
       tags: [tag] // Set single tag filter (replaces any existing)
     }));
   }, []);
+
+  // Count active filters for badge
+  const activeFilterCount = 
+    (filters.searchQuery ? 1 : 0) +
+    filters.priorities.length +
+    filters.tags.length +
+    filters.projects.length;
+
+  // Auto-open search panel when tag is clicked from a card
+  // (since FilterBar is now hidden by default)
+  const handleFiltersChange = useCallback((newFilters: TaskFilters) => {
+    setFilters(newFilters);
+  }, []);
+
+  // Auto-collapse search panel when all filters are cleared
+  useEffect(() => {
+    if (autoCollapseTimerRef.current) {
+      clearTimeout(autoCollapseTimerRef.current);
+      autoCollapseTimerRef.current = null;
+    }
+    if (searchPanelOpen && activeFilterCount === 0) {
+      autoCollapseTimerRef.current = setTimeout(() => {
+        setSearchPanelOpen(false);
+      }, 1500);
+    }
+    return () => {
+      if (autoCollapseTimerRef.current) {
+        clearTimeout(autoCollapseTimerRef.current);
+      }
+    };
+  }, [searchPanelOpen, activeFilterCount]);
+
+  // When a tag is clicked on a card, open the search panel
+  const originalHandleTagClick = handleTagClick;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleTagClickWithPanel = useCallback((tag: string) => {
+    setSearchPanelOpen(true);
+    originalHandleTagClick(tag);
+  }, [originalHandleTagClick]);
 
   // Detect mobile
   useEffect(() => {
@@ -541,6 +586,18 @@ export const TasksPage: React.FC = () => {
           </div>
           
           <div className="tasks-page-header-actions">
+            <button
+              className={`search-toggle-btn ${activeFilterCount > 0 ? 'has-filters' : ''} ${searchPanelOpen ? 'active' : ''}`}
+              onClick={() => setSearchPanelOpen(!searchPanelOpen)}
+              title={activeFilterCount > 0 ? `${activeFilterCount} filter(s) active` : 'Search & Filter'}
+            >
+              <Search size={18} />
+              <span className="search-toggle-label">Search</span>
+              {activeFilterCount > 0 && (
+                <span className="search-toggle-badge">{activeFilterCount}</span>
+              )}
+            </button>
+
             <Button
               onClick={handleArchiveCompleted}
               variant="secondary"
@@ -559,12 +616,16 @@ export const TasksPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <FilterBar
-          tasks={tasks}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        {/* Collapsible Search/Filter Panel */}
+        <div className={`search-filter-panel ${searchPanelOpen ? 'search-filter-panel-open' : ''}`}>
+          <div className="search-filter-panel-inner">
+            <FilterBar
+              tasks={tasks}
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+            />
+          </div>
+        </div>
 
         {/* Mobile Tab Bar */}
         {isMobile && (
@@ -613,7 +674,7 @@ export const TasksPage: React.FC = () => {
                 onMoveTask={isMobile ? handleMoveTask : undefined}
                 allColumns={COLUMNS}
                 columnLabels={COLUMN_LABELS}
-                onTagClick={handleTagClick}
+                onTagClick={handleTagClickWithPanel}
               />
             ))}
           </div>

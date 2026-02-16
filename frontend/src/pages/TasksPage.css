@@ -55,6 +55,93 @@
 }
 
 /* ========================================
+   SEARCH TOGGLE BUTTON
+   ======================================== */
+.search-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-primary, #111827);
+  border: 1px solid var(--border-color, #374151);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text-secondary, #d1d5db);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  position: relative;
+}
+
+.search-toggle-btn:hover {
+  border-color: var(--accent-primary, #06b6d4);
+  background: rgba(6, 182, 212, 0.08);
+  color: var(--text-primary, #e5e7eb);
+}
+
+.search-toggle-btn.active {
+  border-color: var(--accent-primary, #06b6d4);
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-primary, #06b6d4);
+}
+
+.search-toggle-btn.has-filters {
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(139, 92, 246, 0.1);
+  color: #a78bfa;
+}
+
+.search-toggle-btn.has-filters:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.search-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #8b5cf6;
+  color: white;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ========================================
+   COLLAPSIBLE SEARCH/FILTER PANEL
+   ======================================== */
+.search-filter-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.search-filter-panel-open {
+  max-height: 300px;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-filter-panel-inner {
+  padding: 0 var(--space-6, 24px);
+  padding-bottom: var(--space-2, 8px);
+}
+
+.search-filter-panel-inner .filter-bar {
+  margin-bottom: 0;
+  animation: searchPanelFadeIn 0.25s ease;
+}
+
+@keyframes searchPanelFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
    KANBAN BOARD - Desktop: fit viewport
    ======================================== */
 .tasks-page-board {
@@ -111,6 +198,9 @@
   }
   .tasks-page-header-actions .btn {
     padding: var(--space-3);
+  }
+  .search-toggle-label {
+    display: none;
   }
   
   .tasks-page-header-title h1 {
@@ -195,6 +285,22 @@
 
   .tasks-mobile-tab.active .tasks-mobile-tab-count {
     background: rgba(139, 92, 246, 0.7);
+  }
+}
+
+/* Mobile: Search toggle */
+@media (max-width: 767px) {
+  .search-toggle-label {
+    display: none;
+  }
+  
+  .search-toggle-btn {
+    padding: 8px 10px;
+  }
+
+  .search-filter-panel-inner {
+    padding: 0 12px;
+    padding-bottom: 4px;
   }
 }
 
