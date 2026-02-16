@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { FileBrowser } from './FileBrowser';
 import { TaskDetailModal } from '../tasks/TaskDetailModal';
-import { EditTaskModal } from '../tasks/EditTaskModal';
 import { ProjectResources } from './ProjectResources';
 import { ProjectResourcesEditModal } from './ProjectResourcesEditModal';
 import { ContextPreview } from './ContextPreview';
@@ -53,7 +52,6 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ project,
   const [newLink, setNewLink] = useState({ type: 'url' as ProjectLink['type'], title: '', url: '', category: '' as LinkCategory | '' });
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' as string });
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const navigate = useNavigate();
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef);
@@ -1531,33 +1529,21 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ project,
         </div>
       )}
       
-      {/* Task Detail Modal */}
+      {/* Task Detail Modal (unified view/edit) */}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onEdit={() => {
-            setEditingTask(selectedTask);
-            setSelectedTask(null);
-          }}
           onSubtaskToggle={() => {}}
-        />
-      )}
-      
-      {/* Task Edit Modal */}
-      {editingTask && (
-        <EditTaskModal
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
           onSave={async (_taskId, updates) => {
             try {
-              await authenticatedFetch(`${API_BASE_URL}/tasks/${editingTask.id}`, {
+              await authenticatedFetch(`${API_BASE_URL}/tasks/${selectedTask.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates),
               });
-              setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updates } : t));
-              setEditingTask(null);
+              setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...updates } : t));
+              setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
             } catch (err) {
               console.error('Failed to update task:', err);
             }
@@ -1566,7 +1552,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ project,
             try {
               await authenticatedFetch(`${API_BASE_URL}/tasks/${taskId}`, { method: 'DELETE' });
               setTasks(prev => prev.filter(t => t.id !== taskId));
-              setEditingTask(null);
+              setSelectedTask(null);
             } catch (err) {
               console.error('Failed to delete task:', err);
             }

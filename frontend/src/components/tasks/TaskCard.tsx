@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Task } from '../../types/task';
 import { Cpu, Folder, Tag, Brain, Lock, Link, Radio, Flag, AlertTriangle } from 'lucide-react';
-import { EditTaskModal } from './EditTaskModal';
 import { TaskDetailModal } from './TaskDetailModal';
 import './TaskCard.css';
 
@@ -31,7 +30,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
 
   // Check if any subtask is blocked
   const hasBlockedSubtask = task.subtasks?.some(s => s.status === 'blocked') || false;
@@ -100,21 +98,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         <TaskDetailModal
           task={task}
           onClose={() => setShowDetail(false)}
-          onEdit={() => {
-            setShowDetail(false);
-            setShowEdit(true);
-          }}
           onSubtaskToggle={handleSubtaskToggle}
           onSubtaskEdit={handleSubtaskEdit}
           onSubtaskReorder={handleSubtaskReorder}
-        />
-      )}
-      {showEdit && (
-        <EditTaskModal
-          task={task}
-          onClose={() => setShowEdit(false)}
           onSave={(_taskId, updates) => onUpdate(updates)}
-          onDelete={() => { onDelete(); setShowEdit(false); }}
+          onDelete={() => { onDelete(); setShowDetail(false); }}
         />
       )}
 
