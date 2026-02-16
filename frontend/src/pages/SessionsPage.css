@@ -3,12 +3,12 @@
 .sessions-page {
   display: grid;
   grid-template-columns: 300px 1fr;
-  height: calc(100vh - 70px - 2rem); /* Subtract fixed header + padding */
+  height: calc(100vh - 2rem); /* Subtract top padding only (no header) */
   gap: 0;
   background: var(--bg-app);
   overflow: hidden;
   margin: -2rem;
-  margin-top: 0; /* Don't negate top padding — fixed header needs it */
+  margin-top: 0; /* Keep top padding for spacing */
 }
 
 /* Left Panel - Session List */
@@ -914,7 +914,7 @@
   .sessions-page {
     grid-template-columns: 1fr;
     position: fixed;
-    top: 70px; /* Below fixed header */
+    top: 0; /* No fixed header */
     left: 0;
     right: 0;
     bottom: 0;

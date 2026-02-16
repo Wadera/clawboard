@@ -4,13 +4,13 @@
 .tasks-page-container {
   display: flex;
   flex-direction: row;
-  height: calc(100vh - 70px - 4rem);
+  height: calc(100vh - 2rem); /* Subtract top padding only (no header) */
   min-height: 0;
   background: var(--bg-app);
   color: var(--text-primary);
   overflow: hidden;
   margin: -2rem;
-  margin-top: 0; /* Don't negate top padding — fixed header needs it */
+  margin-top: 0; /* Keep top padding for spacing */
 }
 
 /* Main Content Area (Kanban) */
@@ -310,7 +310,7 @@
 /* Mobile: Single column view */
 @media (max-width: 767px) {
   .tasks-page-container {
-    height: calc(100vh - 70px - 2rem);
+    height: calc(100vh - 1rem); /* Subtract top padding only (no header) */
     margin: -1rem;
     margin-top: 0;
   }

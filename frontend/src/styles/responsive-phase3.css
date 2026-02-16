@@ -413,7 +413,7 @@
     border-radius: 0;
   }
   .modal-overlay {
-    z-index: 10000 !important; /* Above fixed header (z-50) on all mobile browsers */
+    z-index: 10000 !important; /* Above sidebar on all mobile browsers */
   }
   .project-detail-header {
     padding-top: calc(var(--space-6) + 12px); /* Extra breathing room on mobile */

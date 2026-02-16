@@ -225,7 +225,7 @@
      ======================================== */
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 80px;
-  --header-height: 64px;
+  --header-height: 0px; /* Header removed — kept for any remaining references */
   --max-content-width: 1440px;
 
   /* ========================================
