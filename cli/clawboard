@@ -367,7 +367,7 @@ def parse_subtasks(text):
     if not text:
         return None
     items = [s.strip() for s in text.split(";") if s.strip()]
-    return [{"text": item} for item in items]
+    return [{"text": item, "status": "empty"} for item in items]
 
 def format_subtask_status(s):
     """Format subtask status with appropriate icon.
