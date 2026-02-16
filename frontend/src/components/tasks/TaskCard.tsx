@@ -15,6 +15,7 @@ interface TaskCardProps {
   onSpawn?: () => void;
   disableDrag?: boolean;
   onTagClick?: (tag: string) => void;
+  sessionActivityState?: 'active' | 'stale' | null;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -25,6 +26,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   disableDrag = false,
   onTagClick,
+  sessionActivityState,
 }) => {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
@@ -134,7 +136,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         onDragStart={disableDrag ? undefined : () => { setIsDragging(true); onDragStart(); }}
         onDragEnd={disableDrag ? undefined : () => { setIsDragging(false); onDragEnd(); }}
         onClick={handleCardClick}
-        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''} ${hasBlockedSubtask ? 'subtask-blocked' : ''} ${task.activeAgent && task.status === 'in-progress' ? 'agent-active' : ''}`}
+        className={`task-card task-card-compact ${isDragging ? 'dragging' : ''} ${task.blocked ? 'task-blocked' : ''} ${hasBlockedSubtask ? 'subtask-blocked' : ''} ${task.activeAgent && task.status === 'in-progress' ? 'agent-active' : ''} ${sessionActivityState === 'active' ? 'session-active' : ''} ${sessionActivityState === 'stale' ? 'session-stale' : ''}`}
         role="button"
         tabIndex={0}
         aria-label={`Task: ${task.title}, Priority: ${task.priority}, Status: ${task.status}`}

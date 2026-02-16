@@ -82,6 +82,22 @@
   }
 }
 
+/* Session Activity: Active (activity <10min) — orange left border */
+.task-card.session-active {
+  border-left: 3px solid #f59e0b;
+}
+
+/* Session Activity: Stale (in-progress, no activity >10min) — dimmed */
+.task-card.session-stale {
+  opacity: 0.5;
+  filter: grayscale(0.25);
+}
+
+.task-card.session-stale:hover {
+  opacity: 0.75;
+  filter: grayscale(0.1);
+}
+
 /* Compact Card Layout */
 .task-card-compact {
   padding: var(--space-4);

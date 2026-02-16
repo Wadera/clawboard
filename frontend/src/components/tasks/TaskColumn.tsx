@@ -31,6 +31,33 @@ interface TaskColumnProps {
   allColumns?: string[];
   columnLabels?: Record<string, string>;
   onTagClick?: (tag: string) => void;
+  sessionActivityMap?: Map<string, number>;
+}
+
+// Stale threshold: 10 minutes in milliseconds
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
+function getSessionActivityState(
+  task: Task,
+  sessionActivityMap?: Map<string, number>
+): 'active' | 'stale' | null {
+  if (task.status !== 'in-progress' || !task.activeAgent) return null;
+  
+  const sessionKey = typeof task.activeAgent === 'object' ? task.activeAgent.sessionKey : null;
+  if (!sessionKey || sessionKey === 'pending' || !sessionActivityMap) {
+    // Has activeAgent but no session data — treat as stale if in-progress
+    if (task.status === 'in-progress' && task.activeAgent) return 'stale';
+    return null;
+  }
+  
+  const lastActivity = sessionActivityMap.get(sessionKey);
+  if (lastActivity === undefined) {
+    // Session not found in gateway — agent may have finished, treat as stale
+    return 'stale';
+  }
+  
+  const elapsed = Date.now() - lastActivity;
+  return elapsed <= STALE_THRESHOLD_MS ? 'active' : 'stale';
 }
 
 export const TaskColumn: React.FC<TaskColumnProps> = ({
@@ -51,6 +78,7 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
   allColumns = [],
   columnLabels = {},
   onTagClick,
+  sessionActivityMap,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
@@ -138,6 +166,7 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
                   onSpawn={onSpawnTask ? () => onSpawnTask(task.id) : undefined}
                   disableDrag={isMobile}
                   onTagClick={onTagClick}
+                  sessionActivityState={getSessionActivityState(task, sessionActivityMap)}
                 />
                 {isMobile && onMoveTask && (
                   <div className="task-card-mobile-actions">

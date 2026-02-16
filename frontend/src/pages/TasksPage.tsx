@@ -80,6 +80,7 @@ export const TasksPage: React.FC = () => {
   const scrollPositionRef = useRef<number>(0);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const [sessionActivityMap, setSessionActivityMap] = useState<Map<string, number>>(new Map());
   const { subscribe } = useWebSocket();
   const { toasts, success, warning } = useToast();
 
@@ -133,6 +134,17 @@ export const TasksPage: React.FC = () => {
     setTasks(msg.tasks);
   }, []);
 
+  // Build session activity map from gateway queue data
+  const handleGatewayQueueUpdate = useCallback((msg: { data: { sessions: Array<{ sessionKey: string; lastActivity: number }> } }) => {
+    const map = new Map<string, number>();
+    for (const s of msg.data?.sessions || []) {
+      if (s.sessionKey && s.lastActivity) {
+        map.set(s.sessionKey, s.lastActivity);
+      }
+    }
+    setSessionActivityMap(map);
+  }, []);
+
   useEffect(() => {
     const unsubs = [
       subscribe('task:created', handleTaskCreated),
@@ -140,9 +152,31 @@ export const TasksPage: React.FC = () => {
       subscribe('task:deleted', handleTaskRemoved),
       subscribe('task:archived', handleTaskRemoved),
       subscribe('tasks:updated', handleTasksUpdated),
+      subscribe('gateway:queue-update', handleGatewayQueueUpdate),
     ];
     return () => unsubs.forEach(fn => fn());
-  }, [subscribe, handleTaskCreated, handleTaskUpdated, handleTaskRemoved, handleTasksUpdated]);
+  }, [subscribe, handleTaskCreated, handleTaskUpdated, handleTaskRemoved, handleTasksUpdated, handleGatewayQueueUpdate]);
+
+  // Fetch initial gateway queue for session activity data
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/gateway/queue`);
+        const data = await response.json();
+        if (data.sessions) {
+          const map = new Map<string, number>();
+          for (const s of data.sessions) {
+            if (s.sessionKey && s.lastActivity) {
+              map.set(s.sessionKey, s.lastActivity);
+            }
+          }
+          setSessionActivityMap(map);
+        }
+      } catch {
+        // Gateway may not be available — that's fine
+      }
+    })();
+  }, []);
 
   // Persist filters to localStorage and sync URL params
   useEffect(() => {
@@ -680,6 +714,7 @@ export const TasksPage: React.FC = () => {
                 allColumns={COLUMNS}
                 columnLabels={COLUMN_LABELS}
                 onTagClick={handleTagClickWithPanel}
+                sessionActivityMap={sessionActivityMap}
               />
             ))}
           </div>
