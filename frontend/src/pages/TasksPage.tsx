@@ -74,7 +74,7 @@ export const TasksPage: React.FC = () => {
     return !!(initial.searchQuery || initial.priorities.length || initial.tags.length || initial.projects.length);
   });
   const autoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevFilterCountRef = useRef<number>(activeFilterCount);
+  const prevFilterCountRef = useRef<number>(0);
   const boardRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
