@@ -454,7 +454,7 @@ export const SessionsPage: React.FC = () => {
           onClick={() => setSidebarVisible(true)}
           aria-label="Open sessions sidebar"
         >
-          <Menu size={20} />
+          <Radio size={18} />
           <span>Sessions</span>
         </button>
 
