@@ -125,6 +125,10 @@
   flex-shrink: 0;
   width: 18px;
   height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  aspect-ratio: 1;
+  box-sizing: border-box;
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-sm);
   background: transparent;
