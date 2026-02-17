@@ -897,7 +897,7 @@
 
 @media (max-width: 767px) {
   .journal-header {
-    padding-left: 52px; /* Space for fixed hamburger button */
+    padding-left: 60px; /* Space for fixed hamburger button */
     flex-wrap: wrap;
   }
 

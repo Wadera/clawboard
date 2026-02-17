@@ -540,7 +540,7 @@
     padding: 12px;
   }
   .audit-header {
-    padding-left: 52px; /* Space for fixed hamburger button */
+    padding-left: 60px; /* Space for fixed hamburger button */
   }
   .audit-stats-grid {
     grid-template-columns: repeat(2, 1fr);

@@ -362,7 +362,7 @@
     align-items: flex-start;
     gap: var(--space-4);
     padding: var(--space-4);
-    padding-left: 64px; /* Space for fixed hamburger button */
+    padding-left: 60px; /* Space for fixed hamburger button */
   }
 
   .tools-page-header-actions {

@@ -913,11 +913,11 @@
   .sessions-page {
     grid-template-columns: 1fr;
     position: fixed;
-    top: 60px; /* Below hamburger area */
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(100vh - 60px);
+    height: auto;
     margin: 0;
     z-index: 5;
   }
