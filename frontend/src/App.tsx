@@ -13,6 +13,8 @@ import { ImageGenerationPage } from './pages/ImageGenerationPage';
 import { JournalPage } from './pages/JournalPage';
 import { JournalPostPage } from './pages/JournalPostPage';
 import { ToolsPage } from './pages/ToolsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { ReportDetailPage } from './pages/ReportDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { FileViewerProvider } from './contexts/FileViewerContext';
 import { ModelSwitchProvider } from './contexts/ModelSwitchContext';
@@ -117,6 +119,8 @@ function AppRoutes({ config }: { config: ReturnType<typeof useClawBoardConfig>['
       {config.features.auditLog && <Route path="/audit" element={<AuditPage />} />}
       {config.features.journal && <Route path="/journal" element={<JournalPage />} />}
       {config.features.journal && <Route path="/journal/:id" element={<JournalPostPage />} />}
+      <Route path="/reports" element={<ReportsPage />} />
+      <Route path="/reports/:id" element={<ReportDetailPage />} />
       {config.features.tools && <Route path="/tools" element={<ToolsPage />} />}
       {config.features.stats && <Route path="/stats" element={<StatsPage />} />}
       

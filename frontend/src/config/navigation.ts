@@ -9,6 +9,7 @@ import {
   Wrench,
   Radio,
   Briefcase,
+  ClipboardList,
   LucideIcon
 } from 'lucide-react';
 
@@ -106,13 +107,23 @@ export const navigationItems: NavItem[] = [
     group: 'main',
   },
   {
+    id: 'reports',
+    path: '/reports',
+    label: 'Reports',
+    icon: ClipboardList,
+    showInSidebar: true,
+    showInHero: true,
+    order: 4,
+    group: 'main',
+  },
+  {
     id: 'journal',
     path: '/journal',
     label: 'Journal',
     icon: BookOpen,
     showInSidebar: true,
     showInHero: true,
-    order: 4,
+    order: 5,
     group: 'main',
   },
 
@@ -124,7 +135,7 @@ export const navigationItems: NavItem[] = [
     icon: Wand2,
     showInSidebar: true,
     showInHero: true,
-    order: 5,
+    order: 6,
     group: 'workspace',
   },
   {
@@ -134,7 +145,7 @@ export const navigationItems: NavItem[] = [
     icon: Wrench,
     showInSidebar: true,
     showInHero: true,
-    order: 6,
+    order: 7,
     group: 'workspace',
   },
   {
@@ -144,7 +155,7 @@ export const navigationItems: NavItem[] = [
     icon: Activity,
     showInSidebar: true,
     showInHero: true,
-    order: 7,
+    order: 8,
     group: 'workspace',
   },
   {
@@ -154,7 +165,7 @@ export const navigationItems: NavItem[] = [
     icon: BarChart3,
     showInSidebar: true,
     showInHero: true,
-    order: 8,
+    order: 9,
     group: 'workspace',
   },
 ];

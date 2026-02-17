@@ -7,6 +7,7 @@ import { MessageQueueCard } from '../components/widgets/MessageQueueCard';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { ProjectOverview } from '../components/dashboard/ProjectOverview';
 import { SystemStatus } from '../components/dashboard/SystemStatus';
+import { ReportsCard } from '../components/dashboard/ReportsCard';
 import { Task } from '../types/task';
 import { authenticatedFetch } from '../utils/auth';
 import './DashboardPage.css';
@@ -183,6 +184,9 @@ export const DashboardPage: React.FC = () => {
           to="/tasks?focus=archived"
         />
       </div>
+
+      {/* Reports - Recent reports preview */}
+      <ReportsCard />
 
       {/* Message Queue - Compact card linking to Sessions page */}
       <MessageQueueCard />
