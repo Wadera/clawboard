@@ -462,6 +462,10 @@
     height: 100vh;
   }
   
+  .image-gen-header {
+    padding-left: 52px; /* Space for fixed hamburger button */
+  }
+  
   .image-gen-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: var(--space-3);

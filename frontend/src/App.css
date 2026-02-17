@@ -322,6 +322,7 @@
   
   .main-content {
     padding: 1rem;
+    padding-top: 72px; /* 16px top + 44px hamburger + 12px gap */
   }
 }
 
@@ -329,5 +330,6 @@
 @media (max-width: 480px) {
   .main-content {
     padding: 0.75rem;
+    padding-top: 72px; /* Preserve hamburger offset */
   }
 }

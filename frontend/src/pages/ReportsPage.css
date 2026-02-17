@@ -721,7 +721,12 @@
 @media (max-width: 768px) {
   .reports-page {
     padding: var(--space-4);
+    padding-top: var(--space-2);
     gap: var(--space-4);
+  }
+
+  .reports-page-header {
+    padding-left: 52px; /* Space for fixed hamburger button */
   }
 
   .reports-page-header h1 {

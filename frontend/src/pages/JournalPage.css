@@ -895,6 +895,21 @@
    RESPONSIVE — Mobile adjustments
    ============================================ */
 
+@media (max-width: 767px) {
+  .journal-header {
+    padding-left: 52px; /* Space for fixed hamburger button */
+    flex-wrap: wrap;
+  }
+
+  .journal-title {
+    font-size: 1.4rem;
+  }
+
+  .journal-page {
+    padding: 1.5rem 0.75rem;
+  }
+}
+
 @media (max-width: 640px) {
   .journal-page {
     padding: 1rem 0.5rem;

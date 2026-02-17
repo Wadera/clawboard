@@ -172,6 +172,9 @@
   .stats-page {
     padding: 12px;
   }
+  .stats-header {
+    padding-left: 52px; /* Space for fixed hamburger button */
+  }
   .stats-cards-grid {
     grid-template-columns: repeat(2, 1fr);
   }

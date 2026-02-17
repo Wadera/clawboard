@@ -539,6 +539,9 @@
   .audit-page {
     padding: 12px;
   }
+  .audit-header {
+    padding-left: 52px; /* Space for fixed hamburger button */
+  }
   .audit-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -548,11 +551,18 @@
   .event-command {
     width: 100%;
     order: 10;
+    max-width: calc(100vw - 80px);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .model-stats-summary {
     grid-template-columns: 1fr;
   }
   .model-table-container {
-    overflow-x: scroll;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .model-stats-table {
+    min-width: 500px;
   }
 }

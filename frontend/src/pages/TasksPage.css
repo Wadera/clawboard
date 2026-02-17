@@ -330,6 +330,7 @@
   
   .tasks-page-header {
     padding: 12px;
+    padding-left: 64px; /* Space for fixed hamburger button */
   }
   
   .tasks-page-header-title h1 {

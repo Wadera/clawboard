@@ -913,11 +913,11 @@
   .sessions-page {
     grid-template-columns: 1fr;
     position: fixed;
-    top: 0; /* No fixed header */
+    top: 60px; /* Below hamburger area */
     left: 0;
     right: 0;
     bottom: 0;
-    height: auto;
+    height: calc(100vh - 60px);
     margin: 0;
     z-index: 5;
   }
@@ -962,6 +962,7 @@
   .sessions-mobile-toggle {
     display: flex;
     margin: 8px 12px;
+    margin-left: 60px; /* Don't overlap with global hamburger */
   }
 
   .sessions-sidebar-close {
