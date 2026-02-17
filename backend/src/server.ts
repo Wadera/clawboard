@@ -169,6 +169,7 @@ import dashboardRoutes from './routes/dashboard';
 import modelsRoutes, { setModelsGatewayConnector } from './routes/models';
 import pluginsRoutes, { setPluginLoader } from './routes/plugins';
 import imagesRoutes from './routes/images';
+import reportsRoutes from './routes/reports';
 import { authMiddleware } from './middleware/auth';
 import { createPluginProxy } from './middleware/pluginProxy';
 
@@ -231,6 +232,7 @@ app.use('/dashboard', authMiddleware, dashboardRoutes);
 app.use('/models', authMiddleware, modelsRoutes);
 app.use('/images', authMiddleware, imagesRoutes);
 app.use('/sessions', authMiddleware, sessionsRoutes);
+app.use('/reports', authMiddleware, reportsRoutes);
 // Note: nginx strips /api/ prefix, so routes are registered without it
 // app.use('/approvals', approvalsRoutes);
 // app.use('/thoughts', thoughtsRoutes);

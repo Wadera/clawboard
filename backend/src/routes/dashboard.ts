@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { taskManager } from '../services/TaskManager';
 import { taskHistoryService } from '../services/TaskHistoryService';
+import { reportManager } from '../services/ReportManager';
 
 const router = Router();
 
@@ -9,7 +10,7 @@ const router = Router();
  * GET /dashboard/summary
  * Returns aggregated stats for dashboard cards
  */
-router.get('/summary', (_req: Request, res: Response): void => {
+router.get('/summary', async (_req: Request, res: Response): Promise<void> => {
   try {
     const allTasks = taskManager.getAllTasks();
 
@@ -46,6 +47,14 @@ router.get('/summary', (_req: Request, res: Response): void => {
     // completed = completed + archived combined (real total of done work)
     const completed = recentCompleted + archived;
 
+    // Get report count (gracefully handle if table doesn't exist yet)
+    let reportCount = 0;
+    try {
+      reportCount = await reportManager.getCount();
+    } catch {
+      // Table may not exist yet — that's fine
+    }
+
     res.json({
       ideas,
       todo,
@@ -54,6 +63,7 @@ router.get('/summary', (_req: Request, res: Response): void => {
       completed,
       recentCompleted,
       total: allTasks.length,
+      reportCount,
     });
   } catch (err) {
     console.error('[Dashboard API] Error getting summary:', err);
