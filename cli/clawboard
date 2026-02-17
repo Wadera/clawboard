@@ -1882,6 +1882,301 @@ def cmd_journal_get(args):
     if reflection:
         print(f"\n{reflection}\n")
 
+# ─── Report Commands ───
+
+def resolve_report_id(short_id):
+    """Resolve a short ID prefix to a full report ID."""
+    if len(short_id) >= 36:
+        return short_id
+    result = api("GET", "/reports?limit=100")
+    reports = result.get("reports", [])
+    matches = [r for r in reports if r["id"].startswith(short_id)]
+    if len(matches) == 1:
+        return matches[0]["id"]
+    elif len(matches) == 0:
+        print(f"❌ No report found with ID prefix: {short_id}", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print(f"❌ Ambiguous ID prefix \"{short_id}\", matches:", file=sys.stderr)
+        for m in matches:
+            print(f"   {m['id'][:12]}  {m.get('title', '')[:50]}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_report_list(args):
+    """List reports."""
+    params = []
+    if hasattr(args, 'tags') and args.tags:
+        params.append(f"tags={args.tags}")
+    if hasattr(args, 'project') and args.project:
+        project_id = resolve_project_id(args.project)
+        params.append(f"project_id={project_id}")
+    if hasattr(args, 'pinned') and args.pinned:
+        params.append("pinned=true")
+    limit = getattr(args, 'limit', 20) or 20
+    params.append(f"limit={limit}")
+    params.append("offset=0")
+
+    query = "&".join(params)
+    result = api("GET", f"/reports?{query}")
+    reports = result.get("reports", [])
+    total = result.get("total", len(reports))
+
+    if not reports:
+        print("No reports found.")
+        return
+
+    print(f"\n📋 Reports ({total})\n")
+
+    # Table header
+    print(f"  {'ID':<10} {'Title':<40} {'Date':<12} {'Tags':<20} {'Project':<15}")
+    print(f"  {'─'*10} {'─'*40} {'─'*12} {'─'*20} {'─'*15}")
+
+    for r in reports:
+        rid = r.get("id", "")[:8]
+        title = r.get("title", "")[:38]
+        created = r.get("created_at", "")
+        if created:
+            try:
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d")
+            except:
+                date_str = created[:10]
+        else:
+            date_str = ""
+        tags = ",".join(r.get("tags", []))[:18]
+        project = r.get("project_name", r.get("project", ""))
+        if isinstance(project, dict):
+            project = project.get("name", "")
+        project = (project or "")[:13]
+        pinned = "📌 " if r.get("pinned") else ""
+        print(f"  {rid:<10} {pinned}{title:<40} {date_str:<12} {tags:<20} {project:<15}")
+
+    if result.get("hasMore"):
+        print(f"\n  ... and more. Use --limit to see more.")
+    print()
+
+
+def cmd_report_create(args):
+    """Create a report."""
+    if not args.content and not args.file:
+        print("❌ --content or --file is required", file=sys.stderr)
+        sys.exit(1)
+
+    content = args.content
+    if args.file:
+        try:
+            with open(args.file, "r") as f:
+                content = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.file}", file=sys.stderr)
+            sys.exit(1)
+
+    data = {
+        "title": args.title,
+        "content": content,
+    }
+
+    if args.summary:
+        data["summary"] = args.summary
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    if args.project:
+        data["project_id"] = resolve_project_id(args.project)
+    if args.tasks:
+        task_ids = []
+        for tid in args.tasks.split(","):
+            tid = tid.strip()
+            if tid:
+                task_ids.append(resolve_task_id(tid))
+        data["task_ids"] = task_ids
+    if args.pinned:
+        data["pinned"] = True
+
+    result = api("POST", "/reports", data)
+    report = result.get("report", result)
+
+    print(f"✅ Created report: {args.title}")
+    print(f"   ID: {report.get('id', 'N/A')[:8]}")
+    if report.get("tags"):
+        print(f"   Tags: {', '.join(report['tags'])}")
+    if report.get("pinned"):
+        print(f"   📌 Pinned")
+
+
+def cmd_report_get(args):
+    """Get a report by ID."""
+    report_id = resolve_report_id(args.id)
+    result = api("GET", f"/reports/{report_id}")
+    report = result.get("report", result)
+
+    title = report.get("title", "Untitled")
+    rid = report.get("id", "")[:8]
+    created = report.get("created_at", "")
+    updated = report.get("updated_at", "")
+
+    if created:
+        try:
+            dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            created_str = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            created_str = created[:16]
+    else:
+        created_str = ""
+
+    if updated:
+        try:
+            dt = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            updated_str = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            updated_str = updated[:16]
+    else:
+        updated_str = ""
+
+    print(f"\n📋 {title}")
+    print(f"   ID: {rid}")
+    if created_str:
+        print(f"   Created: {created_str}")
+    if updated_str and updated_str != created_str:
+        print(f"   Updated: {updated_str}")
+    if report.get("pinned"):
+        print(f"   📌 Pinned")
+    if report.get("tags"):
+        print(f"   Tags: {', '.join(report['tags'])}")
+    if report.get("project_name") or report.get("project"):
+        project = report.get("project_name", report.get("project", ""))
+        if isinstance(project, dict):
+            project = project.get("name", "")
+        if project:
+            print(f"   Project: {project}")
+    if report.get("summary"):
+        print(f"   Summary: {report['summary']}")
+    if report.get("task_ids"):
+        print(f"   Tasks: {', '.join(t[:8] for t in report['task_ids'])}")
+
+    content = report.get("content", "")
+    if content:
+        print(f"\n{content}\n")
+
+
+def cmd_report_update(args):
+    """Update a report."""
+    report_id = resolve_report_id(args.id)
+    data = {}
+
+    if args.title:
+        data["title"] = args.title
+    if args.content:
+        data["content"] = args.content
+    if args.file:
+        try:
+            with open(args.file, "r") as f:
+                data["content"] = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.file}", file=sys.stderr)
+            sys.exit(1)
+    if args.tags:
+        data["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+    if args.summary:
+        data["summary"] = args.summary
+    if args.pinned:
+        data["pinned"] = True
+    if args.unpinned:
+        data["pinned"] = False
+
+    # Handle task additions/removals
+    if args.add_task or args.remove_task:
+        # Fetch current report to get existing task_ids
+        current = api("GET", f"/reports/{report_id}")
+        report = current.get("report", current)
+        existing_tasks = report.get("task_ids", [])
+
+        if args.add_task:
+            new_id = resolve_task_id(args.add_task)
+            if new_id not in existing_tasks:
+                existing_tasks.append(new_id)
+        if args.remove_task:
+            rm_id = resolve_task_id(args.remove_task)
+            existing_tasks = [t for t in existing_tasks if t != rm_id]
+
+        data["task_ids"] = existing_tasks
+
+    if not data:
+        print("❌ No update fields specified", file=sys.stderr)
+        sys.exit(1)
+
+    result = api("PATCH", f"/reports/{report_id}", data)
+    report = result.get("report", result)
+
+    print(f"✅ Updated report: {report.get('title', report_id[:8])}")
+
+
+def cmd_report_delete(args):
+    """Delete a report."""
+    report_id = resolve_report_id(args.id)
+
+    if not _GLOBAL_YES and not getattr(args, 'yes', False):
+        # Fetch report title for confirmation
+        try:
+            current = api("GET", f"/reports/{report_id}")
+            report = current.get("report", current)
+            title = report.get("title", report_id)
+        except:
+            title = report_id
+
+        confirm = input(f"Delete report \"{title}\"? [y/N] ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print("Cancelled.")
+            return
+
+    api("DELETE", f"/reports/{report_id}")
+    print(f"✅ Deleted report {report_id[:8]}")
+
+
+def cmd_report_search(args):
+    """Search reports."""
+    params = [f"q={urllib.parse.quote(args.query)}"]
+    if hasattr(args, 'tags') and args.tags:
+        params.append(f"tags={args.tags}")
+    if hasattr(args, 'project') and args.project:
+        project_id = resolve_project_id(args.project)
+        params.append(f"project_id={project_id}")
+    limit = getattr(args, 'limit', 20) or 20
+    params.append(f"limit={limit}")
+
+    query = "&".join(params)
+    result = api("GET", f"/reports?{query}")
+    reports = result.get("reports", [])
+    total = result.get("total", len(reports))
+
+    if not reports:
+        print(f"No reports found matching \"{args.query}\".")
+        return
+
+    print(f"\n🔍 Search results for \"{args.query}\" ({total})\n")
+
+    print(f"  {'ID':<10} {'Title':<40} {'Date':<12} {'Tags':<20}")
+    print(f"  {'─'*10} {'─'*40} {'─'*12} {'─'*20}")
+
+    for r in reports:
+        rid = r.get("id", "")[:8]
+        title = r.get("title", "")[:38]
+        created = r.get("created_at", "")
+        if created:
+            try:
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d")
+            except:
+                date_str = created[:10]
+        else:
+            date_str = ""
+        tags = ",".join(r.get("tags", []))[:18]
+        pinned = "📌 " if r.get("pinned") else ""
+        print(f"  {rid:<10} {pinned}{title:<40} {date_str:<12} {tags:<20}")
+
+    print()
+
+
 # ─── Status/Health Commands ───
 
 def cmd_status(args):
@@ -2578,7 +2873,7 @@ _clawboard_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Top-level commands
-    local commands="list next current get create update move archive delete spawn breakdown auto-archive complete-subtask approve-subtask reject-subtask uncomplete-subtask projects project create-multiphase journal tools status completion help"
+    local commands="list next current get create update move archive delete spawn breakdown auto-archive complete-subtask approve-subtask reject-subtask uncomplete-subtask projects project create-multiphase journal report tools status completion help"
     
     # If we're completing the first argument
     if [ $COMP_CWORD -eq 1 ]; then
@@ -2612,6 +2907,12 @@ _clawboard_completion() {
             local journal_cmds="list create get"
             if [ $COMP_CWORD -eq 2 ]; then
                 COMPREPLY=( $(compgen -W "${journal_cmds}" -- ${cur}) )
+            fi
+            ;;
+        report)
+            local report_cmds="list create get update delete search"
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${report_cmds}" -- ${cur}) )
             fi
             ;;
         tools)
@@ -2698,6 +2999,7 @@ _clawboard() {
         'create-multiphase:Create multi-phase job'
         'tools:Tools management'
         'journal:Journal commands'
+        'report:Report management'
         'status:Show system status and health'
         'completion:Generate shell completion'
         'help:Show help'
@@ -2760,6 +3062,18 @@ _clawboard() {
                         'get:Get journal entry'
                     )
                     _describe 'journal commands' journal_commands
+                    ;;
+                report)
+                    local -a report_commands
+                    report_commands=(
+                        'list:List reports'
+                        'create:Create a report'
+                        'get:Get a report'
+                        'update:Update a report'
+                        'delete:Delete a report'
+                        'search:Search reports'
+                    )
+                    _describe 'report commands' report_commands
                     ;;
                 completion)
                     _arguments '1:shell:(bash zsh)'
@@ -3156,6 +3470,57 @@ Subtask Workflow (6-state lifecycle):
     p_journal_get = journal_sub.add_parser("get", help="Get a journal entry by ID")
     p_journal_get.add_argument("id", help="Journal entry ID")
     
+    # report
+    p_report = sub.add_parser("report", help="Report management commands")
+    report_sub = p_report.add_subparsers(dest="report_command")
+
+    # report list
+    p_report_list = report_sub.add_parser("list", help="List reports")
+    p_report_list.add_argument("--tags", help="Filter by tags (comma-separated)")
+    p_report_list.add_argument("--project", "-p", help="Filter by project name")
+    p_report_list.add_argument("--limit", "-l", type=int, default=20, help="Max results (default 20)")
+    p_report_list.add_argument("--pinned", action="store_true", help="Show only pinned reports")
+
+    # report create
+    p_report_create = report_sub.add_parser("create", help="Create a report")
+    p_report_create.add_argument("title", help="Report title")
+    p_report_create.add_argument("--content", "-c", help="Report content (markdown)")
+    p_report_create.add_argument("--file", "-f", help="Read content from file")
+    p_report_create.add_argument("--tags", help="Tags (comma-separated)")
+    p_report_create.add_argument("--project", "-p", help="Project name")
+    p_report_create.add_argument("--tasks", help="Task IDs (comma-separated, 8-char prefixes)")
+    p_report_create.add_argument("--pinned", action="store_true", help="Pin this report")
+    p_report_create.add_argument("--summary", "-s", help="Short summary text")
+
+    # report get
+    p_report_get = report_sub.add_parser("get", help="Get a report by ID")
+    p_report_get.add_argument("id", help="Report ID (8-char prefix)")
+
+    # report update
+    p_report_update = report_sub.add_parser("update", help="Update a report")
+    p_report_update.add_argument("id", help="Report ID (8-char prefix)")
+    p_report_update.add_argument("--title", help="New title")
+    p_report_update.add_argument("--content", "-c", help="New content (markdown)")
+    p_report_update.add_argument("--file", "-f", help="Read new content from file")
+    p_report_update.add_argument("--tags", help="Replace tags (comma-separated)")
+    p_report_update.add_argument("--summary", "-s", help="New summary")
+    p_report_update.add_argument("--add-task", help="Add task ID (8-char prefix)")
+    p_report_update.add_argument("--remove-task", help="Remove task ID (8-char prefix)")
+    p_report_update.add_argument("--pinned", action="store_true", default=False, help="Pin this report")
+    p_report_update.add_argument("--unpinned", action="store_true", default=False, help="Unpin this report")
+
+    # report delete
+    p_report_delete = report_sub.add_parser("delete", help="Delete a report")
+    p_report_delete.add_argument("id", help="Report ID (8-char prefix)")
+    p_report_delete.add_argument("--yes", "-y", action="store_true", help="Skip confirmation")
+
+    # report search
+    p_report_search = report_sub.add_parser("search", help="Search reports")
+    p_report_search.add_argument("query", help="Search query")
+    p_report_search.add_argument("--tags", help="Filter by tags (comma-separated)")
+    p_report_search.add_argument("--project", "-p", help="Filter by project name")
+    p_report_search.add_argument("--limit", "-l", type=int, default=20, help="Max results (default 20)")
+
     # status
     sub.add_parser("status", help="Show API status and system health")
     
@@ -3266,6 +3631,22 @@ Subtask Workflow (6-state lifecycle):
             cmd_journal_create(args)
         elif args.journal_command == "get":
             cmd_journal_get(args)
+    elif cmd == "report":
+        if not args.report_command:
+            p_report.print_help()
+            sys.exit(0)
+        if args.report_command == "list":
+            cmd_report_list(args)
+        elif args.report_command == "create":
+            cmd_report_create(args)
+        elif args.report_command == "get":
+            cmd_report_get(args)
+        elif args.report_command == "update":
+            cmd_report_update(args)
+        elif args.report_command == "delete":
+            cmd_report_delete(args)
+        elif args.report_command == "search":
+            cmd_report_search(args)
     elif cmd == "status":
         cmd_status(args)
     elif cmd == "completion":
