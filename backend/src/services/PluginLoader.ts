@@ -362,7 +362,9 @@ export class PluginLoader {
     const routes: Array<{ pathPrefix: string; target: string; pluginName: string }> = [];
 
     for (const [, plugin] of this.plugins) {
-      if (!plugin.manifest || !plugin.healthy) continue;
+      if (!plugin.manifest) continue;
+      // Always expose proxy routes even for unhealthy plugins
+      // so that health checks through the proxy can succeed (avoids chicken-and-egg)
 
       const port = plugin.manifest.api.internal_port;
       const host = plugin.manifest.docker.network_mode === 'host'
