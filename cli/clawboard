@@ -134,6 +134,7 @@ from datetime import datetime
 # API URL: --api flag > CLAWBOARD_API_URL env > default
 # Default port 3001 = backend direct (matches clawbeat). Override via CLAWBOARD_API_URL.
 API = os.environ.get("CLAWBOARD_API_URL", "http://localhost:3001")
+DASHBOARD_URL = os.environ.get("CLAWBOARD_DASHBOARD_URL", "")  # e.g. https://nimspace.skyday.eu/dashboard
 CONFIG_DIR = os.path.expanduser(os.environ.get("CLAWBOARD_CONFIG_DIR", "~/.config/clawboard"))
 TOKEN_FILE = os.path.join(CONFIG_DIR, "token.json")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
@@ -229,6 +230,22 @@ def _login_with_password(password):
     except urllib.error.HTTPError as e:
         print(f"❌ Auth failed: {e.code}", file=sys.stderr)
         sys.exit(1)
+
+def get_dashboard_url():
+    """Get dashboard base URL for generating links. Env > config.json > empty."""
+    if DASHBOARD_URL:
+        return DASHBOARD_URL.rstrip("/")
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE) as f:
+                cfg = json.load(f)
+            url = cfg.get("dashboard_url", "")
+            if url:
+                return url.rstrip("/")
+        except:
+            pass
+    return ""
+
 
 def cmd_login(args):
     """Login to ClawBoard and cache the token."""
@@ -750,8 +767,12 @@ def cmd_create(args):
     
     result = api("POST", "/tasks", data)
     task = result.get("task", {})
+    full_id = task.get('id', '')
     print(f"✅ Created: {format_task(task)}")
-    print(f"   ID: {task['id']}")
+    print(f"   ID: {full_id}")
+    dash = get_dashboard_url()
+    if dash:
+        print(f"   🔗 {dash}/tasks?focus={full_id}")
 
 def cmd_update(args):
     task_id = resolve_task_id(args.id)
@@ -1996,12 +2017,16 @@ def cmd_report_create(args):
     result = api("POST", "/reports", data)
     report = result.get("report", result)
 
+    full_id = report.get('id', 'N/A')
     print(f"✅ Created report: {args.title}")
-    print(f"   ID: {report.get('id', 'N/A')[:8]}")
+    print(f"   ID: {full_id}")
     if report.get("tags"):
         print(f"   Tags: {', '.join(report['tags'])}")
     if report.get("pinned"):
         print(f"   📌 Pinned")
+    dash = get_dashboard_url()
+    if dash:
+        print(f"   🔗 {dash}/reports/{full_id}")
 
 
 def cmd_report_get(args):
@@ -2011,7 +2036,7 @@ def cmd_report_get(args):
     report = result.get("report", result)
 
     title = report.get("title", "Untitled")
-    rid = report.get("id", "")[:8]
+    rid = report.get("id", "")
     created = report.get("created_at", "")
     updated = report.get("updated_at", "")
 
@@ -2053,6 +2078,9 @@ def cmd_report_get(args):
         print(f"   Summary: {report['summary']}")
     if report.get("task_ids"):
         print(f"   Tasks: {', '.join(t[:8] for t in report['task_ids'])}")
+    dash = get_dashboard_url()
+    if dash:
+        print(f"   🔗 {dash}/reports/{rid}")
 
     content = report.get("content", "")
     if content:
