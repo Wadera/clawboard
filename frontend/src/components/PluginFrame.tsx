@@ -24,6 +24,7 @@ export function PluginFrame({ pluginName, proxyPath, apiBase }: PluginFrameProps
   const { plugins } = usePlugins();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [iframeHeight, setIframeHeight] = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Find this plugin to check health status
@@ -39,6 +40,51 @@ export function PluginFrame({ pluginName, proxyPath, apiBase }: PluginFrameProps
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setIframeHeight(null);
+  }, [iframeSrc]);
+
+  // Auto-resize iframe to its content height (mobile scrollability fix).
+  // Uses two complementary mechanisms:
+  //   1. Direct DOM polling via setInterval (same-origin access, reliable)
+  //   2. postMessage listener (for plugins that send iframeResize events)
+  useEffect(() => {
+    // postMessage listener (kept for any plugin that sends it)
+    const msgHandler = (e: MessageEvent) => {
+      if (e.data?.type === 'iframeResize' && typeof e.data.height === 'number') {
+        setIframeHeight(h => Math.max(h ?? 0, e.data.height));
+      }
+    };
+    window.addEventListener('message', msgHandler);
+
+    // Direct DOM polling — reads iframe content scrollHeight directly.
+    // Runs every 500ms, stops once height is stable for 4 cycles (~2s).
+    let stableCount = 0;
+    let lastHeight = 0;
+    const poll = setInterval(() => {
+      try {
+        const body = iframeRef.current?.contentDocument?.body;
+        if (!body) return;
+        const h = body.scrollHeight;
+        if (h > 0) {
+          setIframeHeight(prev => Math.max(prev ?? 0, h));
+          if (h === lastHeight) {
+            stableCount++;
+            if (stableCount >= 4) clearInterval(poll);
+          } else {
+            lastHeight = h;
+            stableCount = 0;
+          }
+        }
+      } catch {
+        // Cross-origin iframe — stop polling
+        clearInterval(poll);
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('message', msgHandler);
+      clearInterval(poll);
+    };
   }, [iframeSrc]);
 
   const handleLoad = () => {
@@ -113,6 +159,7 @@ export function PluginFrame({ pluginName, proxyPath, apiBase }: PluginFrameProps
         onLoad={handleLoad}
         onError={handleError}
         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+        style={iframeHeight ? { height: `${iframeHeight}px`, minHeight: `${iframeHeight}px` } : undefined}
       />
     </div>
   );

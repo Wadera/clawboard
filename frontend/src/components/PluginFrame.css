@@ -130,10 +130,17 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .plugin-frame-container {
-    min-height: 300px;
+    /* JS (iframeResize postMessage) will set the exact height;
+       600px is just the initial minimum before first resize message */
+    min-height: 600px;
     border-radius: 0;
   }
-  
+
+  .plugin-iframe {
+    /* Allow the iframe to grow beyond its flex container via inline style */
+    min-height: 600px;
+  }
+
   .plugin-frame-error {
     padding: var(--space-4);
   }
