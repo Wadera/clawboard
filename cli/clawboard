@@ -885,6 +885,16 @@ def cmd_spawn(args):
                 print("Aborted.", file=sys.stderr)
                 sys.exit(1)
     
+    # Auto-move to in-progress if currently in ideas/todo/stuck
+    task_data = task_data if 'task_data' in dir() else api("GET", f"/tasks/{task_id}")
+    task_status = (task_data.get("task", task_data)).get("status", "")
+    if task_status in ("ideas", "todo", "stuck"):
+        try:
+            api("PATCH", f"/tasks/{task_id}", {"status": "in-progress"})
+            print(f"📌 Moved task to in-progress", file=sys.stderr)
+        except Exception as e:
+            print(f"⚠️ Could not auto-move task: {e}", file=sys.stderr)
+
     result = api("POST", f"/tasks/{task_id}/spawn")
     prompt = result.get("prompt", "")
     print("─── Agent Spawn Prompt ───")
