@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronRight,
   Archive,
-  Menu,
   X,
 } from 'lucide-react';
 import { authenticatedFetch } from '../utils/auth';
