@@ -3,6 +3,7 @@ import { GatewayConnector } from '../services/GatewayConnector';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { pool } from '../db/connection';
 
 const router = Router();
 const TRANSCRIPTS_DIR = process.env.OPENCLAW_TRANSCRIPTS_DIR || process.env.CLAWDBOT_TRANSCRIPTS_DIR || '/clawdbot/sessions';
@@ -237,131 +238,68 @@ router.get('/session/:sessionId/messages', (req: Request, res: Response) => {
   }
 });
 
-// GET /gateway/sessions/archive — returns all past sessions from transcript files on disk
-router.get('/sessions/archive', (req: Request, res: Response) => {
+// GET /gateway/sessions/archive — returns past sessions from PostgreSQL (indexed)
+router.get('/sessions/archive', async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const offset = parseInt(req.query.offset as string) || 0;
-    const hours = req.query.hours ? parseInt(req.query.hours as string) : undefined;
+    const search = req.query.search as string | undefined;
 
-    let files: string[];
-    try {
-      files = fs.readdirSync(TRANSCRIPTS_DIR).filter(f => f.endsWith('.jsonl'));
-    } catch {
-      res.json({ success: true, sessions: [], total: 0 });
-      return;
+    // Build query
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (search) {
+      conditions.push(`(session_key ILIKE $${paramIndex} OR label ILIKE $${paramIndex})`);
+      params.push(`%${search}%`);
+      paramIndex++;
     }
 
-    interface ArchiveSession {
-      sessionId: string;
-      fileName: string;
-      lastModified: string;
-      fileSize: number;
-      firstActivity: string | null;
-      lastActivity: string | null;
-      label?: string;
-    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Gather file info
-    let sessions: ArchiveSession[] = [];
-    const now = Date.now();
-    const cutoff = hours ? now - hours * 3600 * 1000 : 0;
+    // Count
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as total FROM sessions ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].total);
 
-    for (const file of files) {
-      const filePath = path.join(TRANSCRIPTS_DIR, file);
-      try {
-        const stats = fs.statSync(filePath);
-        if (hours && stats.mtimeMs < cutoff) continue;
+    // Fetch page
+    const result = await pool.query(
+      `SELECT 
+        session_key, label, model, kind, status,
+        message_count, input_tokens, output_tokens, total_cost_usd,
+        transcript_path,
+        started_at, ended_at, last_activity_at
+       FROM sessions
+       ${whereClause}
+       ORDER BY last_activity_at DESC NULLS LAST
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
 
-        const sessionId = file.replace('.jsonl', '');
+    // Map to frontend's expected shape
+    const sessions = result.rows.map((row: any) => ({
+      sessionId: row.session_key,
+      fileName: row.transcript_path || `${row.session_key}.jsonl`,
+      lastModified: (row.last_activity_at || row.ended_at || row.started_at || new Date()).toISOString ? 
+        row.last_activity_at?.toISOString?.() || row.last_activity_at || '' : '',
+      fileSize: 0,
+      firstActivity: row.started_at?.toISOString?.() || row.started_at || null,
+      lastActivity: row.last_activity_at?.toISOString?.() || row.last_activity_at || null,
+      label: row.label || undefined,
+      // Extra DB fields for richer UI
+      model: row.model,
+      kind: row.kind,
+      status: row.status,
+      messageCount: row.message_count,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      totalCost: row.total_cost_usd ? parseFloat(row.total_cost_usd) : null,
+    }));
 
-        // Read first line for first activity timestamp
-        let firstActivity: string | null = null;
-        let lastActivity: string | null = null;
-        try {
-          // First line
-          const fd = fs.openSync(filePath, 'r');
-          const buf = Buffer.alloc(4096);
-          const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
-          fs.closeSync(fd);
-          const firstLine = buf.toString('utf-8', 0, bytesRead).split('\n')[0];
-          if (firstLine.trim()) {
-            try {
-              const parsed = JSON.parse(firstLine);
-              firstActivity = parsed.timestamp || null;
-            } catch { /* skip */ }
-          }
-
-          // Last lines via tail
-          const tail = execSync(`tail -5 "${filePath}"`, { encoding: 'utf-8', timeout: 2000, maxBuffer: 5 * 1024 * 1024 });
-          const tailLines = tail.trim().split('\n').filter(l => l.trim());
-          for (let i = tailLines.length - 1; i >= 0; i--) {
-            try {
-              const parsed = JSON.parse(tailLines[i]);
-              if (parsed.timestamp) { lastActivity = parsed.timestamp; break; }
-            } catch { /* skip */ }
-          }
-        } catch { /* skip */ }
-
-        sessions.push({
-          sessionId,
-          fileName: file,
-          lastModified: stats.mtime.toISOString(),
-          fileSize: stats.size,
-          firstActivity,
-          lastActivity,
-        });
-      } catch { /* skip individual file errors */ }
-    }
-
-    // Sort by modification time, newest first
-    sessions.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-
-    const total = sessions.length;
-    const paginated = sessions.slice(offset, offset + limit);
-
-    // Extract labels from first user message (only for paginated results, perf-safe)
-    for (const session of paginated) {
-      try {
-        const filePath = path.join(TRANSCRIPTS_DIR, session.fileName);
-        const head = execSync(`head -30 "${filePath}"`, { encoding: 'utf-8', timeout: 2000, maxBuffer: 1024 * 1024 });
-        const headLines = head.split('\n').filter(l => l.trim());
-        for (const line of headLines) {
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.type === 'message' && parsed.message?.role === 'user') {
-              let content = parsed.message.content;
-              if (Array.isArray(content)) {
-                content = content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join(' ');
-              }
-              if (typeof content === 'string' && content.length > 0) {
-                // Skip heartbeat prompts and system event messages
-                if (content.includes('HEARTBEAT') || content.startsWith('System:') || content.startsWith('Read HEARTBEAT')) continue;
-
-                // Extract task name from "## Task: <name>" pattern
-                const taskMatch = content.match(/##\s*Task:\s*(.+?)(?:\n|$)/i);
-                if (taskMatch) {
-                  session.label = taskMatch[1].trim().slice(0, 60);
-                  break;
-                }
-                // Otherwise use first meaningful line (skip timestamps/metadata)
-                const contentLines = content.split('\n');
-                const firstLine = contentLines.find((l: string) => {
-                  const t = l.trim();
-                  return t.length > 5 && !t.startsWith('[') && !t.startsWith('System:') && !t.startsWith('#');
-                });
-                if (firstLine) {
-                  session.label = firstLine.trim().slice(0, 60);
-                  break;
-                }
-              }
-            }
-          } catch { /* skip line */ }
-        }
-      } catch { /* skip label extraction */ }
-    }
-
-    res.json({ success: true, sessions: paginated, total });
+    res.json({ success: true, sessions, total });
   } catch (err: any) {
     console.error('Failed to get session archive:', err);
     res.status(500).json({ success: false, error: err.message });

@@ -324,7 +324,7 @@ router.post('/:id/spawn', async (req: Request, res: Response): Promise<void> => 
     }
 
     // Only allow spawning from certain statuses
-    const spawnableStatuses = ['ideas', 'todo', 'stuck'];
+    const spawnableStatuses = ['ideas', 'todo', 'stuck', 'in-progress'];
     if (!spawnableStatuses.includes(task.status)) {
       res.status(400).json({ 
         success: false, 
