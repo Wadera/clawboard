@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { pool } from './db/connection';
 import { WebSocketService } from './services/websocket';
 import { SessionMonitor } from './services/sessionMonitor';
+import { startSessionIndexer, stopSessionIndexer } from './services/SessionIndexer';
 import { taskManagerDB as taskManager } from './services/TaskManagerDB';
 import { WorkspaceWatcher } from './services/workspaceWatcher';
 import { ModelStatusService } from './services/modelStatus';
@@ -290,6 +291,7 @@ server.listen(PORT, async () => {
   try {
     sessionMonitor.start();
     console.log('✅ Session monitor started');
+    startSessionIndexer();
   } catch (err: any) {
     console.warn(`⚠️ Session monitor failed to start (${err.code || err.message}). Status updates unavailable.`);
   }
@@ -370,8 +372,9 @@ server.listen(PORT, async () => {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
   
-  // Stop session monitor
+  // Stop session monitor + indexer
   sessionMonitor.stop();
+  stopSessionIndexer();
   
   // Stop Phase 3 services
   workspaceWatcher.stop();
