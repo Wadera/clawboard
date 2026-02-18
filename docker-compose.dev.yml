@@ -41,7 +41,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-password_change_me}
       JWT_SECRET: ${JWT_SECRET_DEV:-dev_secret_change_me}
       DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
-      CORS_ORIGIN: http://localhost:8085
+      CORS_ORIGIN: https://nimspace.skyday.eu
       CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
       CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
       CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
@@ -124,7 +124,7 @@ services:
     networks:
       - clawboard-network-dev
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3030/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3030/health"]
       interval: 30s
       timeout: 5s
       retries: 3

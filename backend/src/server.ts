@@ -310,8 +310,12 @@ server.listen(PORT, async () => {
   }
   
   // Initialize task manager
-  await taskManager.initialize();
-  console.log('✅ Task manager initialized');
+  try {
+    await taskManager.initialize();
+    console.log('✅ Task manager initialized');
+  } catch (err: any) {
+    console.warn(`⚠️ Task manager failed to initialize (${err.code || err.message}). Task features unavailable.`);
+  }
   
   // Start Phase 4 services
   workMonitor.start();

@@ -295,7 +295,7 @@ export class PluginLoader {
         
         // If plugin uses host network mode, use localhost
         const host = plugin.manifest.docker.network_mode === 'host' 
-          ? 'localhost' 
+          ? (process.env.DOCKER_HOST_ALIAS || 'host.docker.internal') 
           : plugin.manifest.name;
         
         const url = `http://${host}:${port}${healthPath}`;
@@ -366,7 +366,7 @@ export class PluginLoader {
 
       const port = plugin.manifest.api.internal_port;
       const host = plugin.manifest.docker.network_mode === 'host'
-        ? 'localhost'
+        ? (process.env.DOCKER_HOST_ALIAS || 'host.docker.internal')
         : plugin.manifest.name;
 
       // API routes

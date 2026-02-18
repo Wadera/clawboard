@@ -10,7 +10,7 @@
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: transparent;
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -115,7 +115,7 @@
   min-height: 400px;
   flex: 1;
   border: none;
-  background: var(--bg-app);
+  background: transparent;
   transition: opacity var(--transition-base) var(--ease-out);
 }
 

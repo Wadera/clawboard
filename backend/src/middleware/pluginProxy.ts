@@ -38,7 +38,31 @@ export function createPluginProxy(pluginLoader: PluginLoader) {
             },
           },
           (proxyRes) => {
-            // Forward status and headers
+            // Clear helmet/cors middleware headers that were set via res.setHeader()
+            // before writeHead() merges them — plugins manage their own security headers
+            const helmetHeaders = [
+              'content-security-policy',
+              'cross-origin-opener-policy',
+              'cross-origin-resource-policy',
+              'origin-agent-cluster',
+              'referrer-policy',
+              'strict-transport-security',
+              'x-content-type-options',
+              'x-dns-prefetch-control',
+              'x-download-options',
+              'x-frame-options',
+              'x-permitted-cross-domain-policies',
+              'x-powered-by',
+              'x-xss-protection',
+              'access-control-allow-origin',
+              'access-control-allow-credentials',
+              'vary',
+            ];
+            for (const h of helmetHeaders) {
+              res.removeHeader(h);
+            }
+
+            // Forward status and headers from the plugin
             res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
             proxyRes.pipe(res);
           }
