@@ -138,7 +138,7 @@ def output_wake(reason: str, message: str, task_id: str = None,
         if not DRY_RUN:
             try:
                 with open(ORCHESTRATION_LOG, "a") as f:
-                    ts = datetime.now(timezone.utc).strftime("%H:%M")
+                    ts = datetime.now(timezone.utc).isoformat()
                     wt = wake_type or "unknown"
                     f.write(f"{ts} | {task_id[:8]} | WAKE sent by clawbeat ({wt})\n")
                 log(f"Wrote dedup entry for {task_id[:8]} ({wt})")
@@ -724,7 +724,7 @@ def build_spawn_prompt(task: dict, context: dict) -> str:
         "",
         "**4. Log your action:**",
         "```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | Spawned agent" '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | Spawned agent" '
         f">> /tmp/orchestration-actions.log",
         "```",
     ])
@@ -817,7 +817,7 @@ def build_review_prompt(task: dict, context: dict,
         "",
         "**6. Log your action:**",
         "```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | Reviewed — '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | Reviewed — '
         f'approved/rejected" >> /tmp/orchestration-actions.log',
         "```",
     ])
@@ -911,7 +911,7 @@ def build_stale_agent_prompt(task: dict, context: dict,
     lines.extend([
         "**Log your action:**",
         "```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | ACTION" '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | ACTION" '
         f">> /tmp/orchestration-actions.log",
         "```",
     ])
@@ -976,7 +976,7 @@ def build_complete_task_prompt(task: dict, context: dict,
         "",
         "**Log your action:**",
         "```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | Completed — '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | Completed — '
         f'all subtasks done" >> /tmp/orchestration-actions.log',
         "```",
     ])
@@ -1031,7 +1031,7 @@ def build_escalate_human_prompt(task: dict, context: dict,
         "",
         "**Log your action:**",
         "```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | ESCALATED — '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | ESCALATED — '
         f'blocked subtask, notified human" >> /tmp/orchestration-actions.log',
         "```",
     ])
@@ -1091,7 +1091,7 @@ def build_stuck_prompt(task: dict, context: dict, retry_count: int) -> str:
         "",
         "**Log your action:**",
         f"```bash",
-        f'echo "$(date -u +%H:%M) | {task_id} | ACTION" '
+        f'echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) | {task_id} | ACTION" '
         f">> /tmp/orchestration-actions.log",
         f"```",
     ])
@@ -1426,7 +1426,8 @@ def parse_orchestration_log(max_lines: int = 50
                             ) -> list[tuple[datetime, str, str]]:
     """Parse orchestration actions log.
 
-    Format: HH:MM | TASK_ID | ACTION_TAKEN
+    Format: ISO_TIMESTAMP | TASK_ID | ACTION_TAKEN
+    Also supports legacy HH:MM format (assumes today, with midnight rollback).
     Returns list of (datetime, task_id, action).
     """
     if not ORCHESTRATION_LOG.exists():
@@ -1434,7 +1435,7 @@ def parse_orchestration_log(max_lines: int = 50
         return []
 
     entries = []
-    today = datetime.now(timezone.utc).date()
+    now = datetime.now(timezone.utc)
 
     try:
         with open(ORCHESTRATION_LOG) as f:
@@ -1452,10 +1453,17 @@ def parse_orchestration_log(max_lines: int = 50
                 action = parts[2] if len(parts) > 2 else ""
 
                 try:
-                    hour, minute = map(int, time_str.split(":"))
-                    entry_time = datetime(
-                        today.year, today.month, today.day,
-                        hour, minute, tzinfo=timezone.utc)
+                    # Try ISO format first (new format)
+                    entry_time = _parse_iso_timestamp(time_str)
+                    if entry_time is None:
+                        # Legacy HH:MM format — assume today, but roll back
+                        # to yesterday if result would be in the future
+                        hour, minute = map(int, time_str.split(":"))
+                        entry_time = datetime(
+                            now.year, now.month, now.day,
+                            hour, minute, tzinfo=timezone.utc)
+                        if entry_time > now:
+                            entry_time -= timedelta(days=1)
                     entries.append((entry_time, task_id, action))
                 except ValueError:
                     log(f"Failed to parse log line: {line}")
