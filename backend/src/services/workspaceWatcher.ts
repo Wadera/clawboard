@@ -9,7 +9,7 @@ export interface WorkspaceFile {
   size: number;
   modified: string;
   lines: number;
-  category: 'core' | 'memory' | 'other';
+  category: 'core' | 'memory' | 'skills' | 'other';
   description: string;
 }
 
@@ -29,6 +29,7 @@ export class WorkspaceWatcher {
     'AGENTS.md': 'Agent operating instructions',
     'HEARTBEAT.md': 'Heartbeat checklist',
     'IDENTITY.md': 'Agent identity & persona',
+    'SKILLS.md': 'Custom workspace skills index',
     'SOUL.md': 'Personality & tone',
     'TOOLS.md': 'Local tool notes',
     'USER.md': 'User information',
@@ -53,7 +54,7 @@ export class WorkspaceWatcher {
     // Watch workspace root for core file changes
     try {
       const rootWatcher = watch(this.workspacePath, { persistent: true }, (_event, filename) => {
-        if (filename && (filename.endsWith('.md') || filename === 'memory')) {
+        if (filename && (filename.endsWith('.md') || filename === 'memory' || filename === 'skills')) {
           this.handleFileChange(filename);
         }
       });
@@ -74,6 +75,20 @@ export class WorkspaceWatcher {
       this.watchers.push(memWatcher);
     } catch {
       console.log('⚠️  memory/ directory not found, will check periodically');
+    }
+
+    // Watch skills directory (SKILL.md files inside skill subdirs)
+    const skillsDir = path.join(this.workspacePath, 'skills');
+    try {
+      await access(skillsDir);
+      const skillWatcher = watch(skillsDir, { recursive: true, persistent: true }, (_event, filename) => {
+        if (filename && filename.endsWith('.md')) {
+          this.handleFileChange(`skills/${filename}`);
+        }
+      });
+      this.watchers.push(skillWatcher);
+    } catch {
+      console.log('⚠️  skills/ directory not found, will check periodically');
     }
 
     // Poll every 30s for changes fs.watch might miss
@@ -189,6 +204,33 @@ export class WorkspaceWatcher {
       // memory/ doesn't exist
     }
 
+    // Scan skills directory (SKILL.md files in subdirectories)
+    const skillsDir = path.join(this.workspacePath, 'skills');
+    try {
+      const skillDirs = await readdir(skillsDir);
+      for (const dirName of skillDirs) {
+        const skillMdPath = path.join(skillsDir, dirName, 'SKILL.md');
+        try {
+          const stats = await stat(skillMdPath);
+          const content = await readFile(skillMdPath, 'utf-8');
+          const name = `skills/${dirName}/SKILL.md`;
+          newCache.set(name, {
+            name,
+            path: skillMdPath,
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+            lines: content.split('\n').length,
+            category: 'skills',
+            description: `${dirName} skill`,
+          });
+        } catch {
+          // No SKILL.md in this dir
+        }
+      }
+    } catch {
+      // skills/ doesn't exist
+    }
+
     // Check for changes and broadcast
     let changed = false;
     for (const [key, file] of newCache) {
@@ -231,9 +273,10 @@ export class WorkspaceWatcher {
     });
   }
 
-  private getCategory(name: string): 'core' | 'memory' | 'other' {
+  private getCategory(name: string): 'core' | 'memory' | 'skills' | 'other' {
     if (WorkspaceWatcher.CORE_FILES[name]) return 'core';
     if (name.startsWith('memory/')) return 'memory';
+    if (name.startsWith('skills/')) return 'skills';
     return 'other';
   }
 }

@@ -200,7 +200,7 @@ def deliver_to_gateway(message: str, wake_now: bool = True) -> bool:
 
     cmd = [
         get_openclaw_bin(), "cron", "add",
-        "--at", "+0m",
+        "--at", "1m",
         "--session", "main",
         "--system-event", message,
         "--wake", wake_mode,

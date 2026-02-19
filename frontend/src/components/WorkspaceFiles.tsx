@@ -9,7 +9,7 @@ interface WorkspaceFile {
   size: number;
   modified: string;
   lines: number;
-  category: 'core' | 'memory' | 'other';
+  category: 'core' | 'memory' | 'skills' | 'other';
   description: string;
 }
 
@@ -32,11 +32,13 @@ function getFileIcon(name: string): string {
   if (name === 'HEARTBEAT.md') return '💓';
   if (name === 'IDENTITY.md') return '🌀';
   if (name === 'SOUL.md') return '✨';
+  if (name === 'SKILLS.md') return '🎯';
   if (name === 'TOOLS.md') return '🔧';
   if (name === 'USER.md') return '👤';
   if (name === 'MEMORY.md') return '🧠';
   if (name === 'BOOT.md') return '🚀';
   if (name.startsWith('memory/')) return '📝';
+  if (name.startsWith('skills/')) return '🎯';
   return '📄';
 }
 
@@ -44,6 +46,7 @@ export function WorkspaceFiles() {
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [sectionExpanded, setSectionExpanded] = useState(false);
+  const [skillsExpanded, setSkillsExpanded] = useState(false);
   const [memoryExpanded, setMemoryExpanded] = useState(false);
   const { openFile } = useFileViewer();
 
@@ -80,6 +83,7 @@ export function WorkspaceFiles() {
   }, []);
 
   const coreFiles = files.filter(f => f.category === 'core');
+  const skillsFiles = files.filter(f => f.category === 'skills');
   const memoryFiles = files.filter(f => f.category === 'memory');
 
   return (
@@ -110,6 +114,31 @@ export function WorkspaceFiles() {
                 <span className="workspace-file-meta">{formatRelativeTime(file.modified)}</span>
               </div>
             ))}
+
+            {skillsFiles.length > 0 && (
+              <>
+                <div
+                  className="workspace-memory-header"
+                  onClick={() => setSkillsExpanded(!skillsExpanded)}
+                >
+                  <span className={`workspace-memory-chevron ${skillsExpanded ? 'open' : ''}`}>▶</span>
+                  <span>🎯 skills/ ({skillsFiles.length} files)</span>
+                </div>
+                {skillsExpanded && skillsFiles.map(file => (
+                  <div
+                    key={file.name}
+                    className="workspace-file-item"
+                    onClick={() => openFile(file.name)}
+                    title={`${file.lines} lines · ${formatSize(file.size)}`}
+                    style={{ paddingLeft: '24px' }}
+                  >
+                    <span className="workspace-file-icon">🎯</span>
+                    <span className="workspace-file-name">{file.name.replace('skills/', '')}</span>
+                    <span className="workspace-file-meta">{formatRelativeTime(file.modified)}</span>
+                  </div>
+                ))}
+              </>
+            )}
 
             {memoryFiles.length > 0 && (
               <>

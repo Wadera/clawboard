@@ -212,36 +212,43 @@ export function generateTaskPrompt(task: Task): string {
     sections.push(`**Attempt:** #${task.attemptCount}${note}`);
   }
 
-  // Standard footer
+  // Standard footer — Agent workflow instructions
+  const shortId = task.id.substring(0, 8);
   sections.push(`
 ---
-## Standard Instructions (auto-generated)
+## Agent Workflow Instructions (auto-generated)
 
-**Task ID:** ${task.id}
-**API:** http://localhost:8082/api
-**Project:** /workspace/projects/clawboard/
-**Branch:** dev
+**Task ID:** ${shortId} (${task.id})
+**CLI:** \`python3 /home/clawd/clawd/projects/clawboard-nim/repo/cli/clawboard\`
 
-**As you complete each subtask**, update via API:
+### ⚠️ CRITICAL: Use the CLI, never raw API calls!
+
+**Before starting each subtask:**
 \`\`\`bash
-curl -s -X PATCH http://localhost:8082/api/tasks/${task.id} \\
-  -H 'Content-Type: application/json' \\
-  -d '{updated subtasks array with completed: true}'
+export CLAWBOARD_AGENT=1
+CB="python3 /home/clawd/clawd/projects/clawboard-nim/repo/cli/clawboard"
+$CB start-subtask ${shortId} <INDEX>
 \`\`\`
 
-**When ALL subtasks are done**, mark task completed:
+**When you finish working on a subtask (ready for review):**
 \`\`\`bash
-curl -s -X PATCH http://localhost:8082/api/tasks/${task.id} \\
-  -H 'Content-Type: application/json' \\
-  -d '{"status": "completed", "completedAt": "..."}'
+$CB complete-subtask ${shortId} <INDEX>
+\`\`\`
+This marks the subtask as **in-review** (🟡), NOT completed.
+
+**When ALL subtasks are in-review, move the task to review:**
+\`\`\`bash
+$CB review ${shortId}
 \`\`\`
 
-**Rules:**
-- NO Tailwind — plain CSS with variables from frontend/src/styles/variables.css
-- TypeScript strict mode — no unused variables
-- Git commit changes to dev branch and push to origin/dev
-- Use React Portal for any modals
-- Test by rebuilding: sudo docker compose -f docker-compose.dev.yml -p clawboard-dev up -d --build`);
+### Rules for Agents
+- You can ONLY set subtasks to: **in-progress** or **in-review**
+- You can ONLY move the task to: **review** or **stuck**
+- You CANNOT mark subtasks as completed, skipped, or blocked
+- You CANNOT move the task to completed — only the orchestrator can
+- The orchestrator will review your work, approve or reject each subtask
+- If you get stuck, move the task to stuck: \`$CB move ${shortId} stuck\`
+- Always use the CLI — never call the API directly with curl`);
 
   return sections.join('\n\n');
 }

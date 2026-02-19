@@ -979,13 +979,15 @@ export class TaskManagerDB extends EventEmitter {
   }
 
   private async hasCircularDependency(taskId: string, depId: string, visited = new Set<string>(), client?: PoolClient): Promise<boolean> {
-    if (visited.has(taskId)) {
-      return true;
+    // Track which nodes we've already explored to avoid infinite loops
+    if (visited.has(depId)) {
+      return false;
     }
     
-    visited.add(taskId);
+    visited.add(depId);
     const executor = client || this.pool;
     
+    // Follow the dependency chain from depId: what does depId depend on?
     const result = await executor.query(
       'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = $1',
       [depId]
@@ -997,7 +999,8 @@ export class TaskManagerDB extends EventEmitter {
     
     for (const row of result.rows) {
       const nextDep = row.depends_on_task_id;
-      if (nextDep === taskId || await this.hasCircularDependency(taskId, nextDep, new Set(visited), client)) {
+      // If we reach taskId, adding taskId->depId would create a cycle
+      if (nextDep === taskId || await this.hasCircularDependency(taskId, nextDep, visited, client)) {
         return true;
       }
     }

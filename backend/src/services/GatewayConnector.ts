@@ -211,7 +211,9 @@ export class GatewayConnector {
     }
 
     try {
-      this.ws = new WebSocket(this.gatewayUrl);
+      // Set origin to match gateway host so Control UI origin check passes
+      const gatewayOrigin = this.gatewayUrl.replace(/^ws/, 'http').replace(/\/ws\/?$/, '');
+      this.ws = new WebSocket(this.gatewayUrl, { headers: { origin: gatewayOrigin } });
 
       this.ws.on('open', () => {
         console.log('🔌 GatewayConnector: WebSocket connected');
@@ -309,7 +311,7 @@ export class GatewayConnector {
       params: {
         minProtocol: 3,
         maxProtocol: 3,
-        client: { id: 'cli', version: '1.0.0', platform: 'linux', mode: 'backend' },
+        client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'linux', mode: 'backend', displayName: 'ClawBoard Backend' },
         role: 'operator',
         scopes: ['operator.read', 'operator.admin'],
         caps: [],
