@@ -153,6 +153,7 @@ VALID_SUBTASK_STATUSES = ["empty", "in_progress", "review", "blocked", "skipped"
 AGENT_ALLOWED_STATUSES = ["in_progress", "review"]
 DONE_STATUSES = ["completed", "skipped"]
 VALID_THINKING_LEVELS = ["low", "medium", "high"]
+VALID_MODELS = ["sonnet", "opus", "sonnet-1m", "opus-1m"]
 VALID_TOOL_CATEGORIES = ["ai", "development", "infrastructure", "communication", "monitoring", "documentation", "testing", "deployment"]
 
 # ─── Auth ───
@@ -765,11 +766,24 @@ def cmd_create(args):
     if args.thinking:
         data["thinking"] = args.thinking
     
+    if getattr(args, 'model', None):
+        data["model"] = args.model
+    
     result = api("POST", "/tasks", data)
     task = result.get("task", {})
     full_id = task.get('id', '')
     print(f"✅ Created: {format_task(task)}")
     print(f"   ID: {full_id}")
+    
+    # Remind about model and thinking if not set
+    reminders = []
+    if not data.get("model"):
+        reminders.append("--model (sonnet/opus)")
+    if not data.get("thinking"):
+        reminders.append("--thinking (low/medium/high)")
+    if reminders:
+        print(f"   💡 Consider setting: {', '.join(reminders)} — agents default to sonnet/low if unset")
+    
     dash = get_dashboard_url()
     if dash:
         print(f"   🔗 {dash}/tasks?focus={full_id}")
@@ -798,6 +812,8 @@ def cmd_update(args):
         data["notes"] = args.notes
     if args.thinking:
         data["thinking"] = args.thinking
+    if getattr(args, 'model', None):
+        data["model"] = args.model
     if hasattr(args, 'auto_start') and args.auto_start is not None:
         data["autoStart"] = args.auto_start == "true"
     if args.add_subtask:
@@ -3208,6 +3224,7 @@ Subtask Workflow (6-state lifecycle):
     p_create.add_argument("--blocked-by", help="Comma-separated blocker IDs")
     p_create.add_argument("--depends-on", help="Comma-separated task IDs this task depends on")
     p_create.add_argument("--auto-start", type=bool, default=None)
+    p_create.add_argument("--model", "-m", choices=VALID_MODELS, help="AI model alias (sonnet/opus/sonnet-1m/opus-1m)")
     p_create.add_argument("--thinking", choices=VALID_THINKING_LEVELS, help="AI reasoning depth (low/medium/high)")
     p_create.add_argument("--no-subtasks", action="store_true", help="Suppress warning about missing subtasks")
     
@@ -3224,6 +3241,7 @@ Subtask Workflow (6-state lifecycle):
     p_update.add_argument("--tags", help="Comma-separated tags")
     p_update.add_argument("--depends-on", help="Comma-separated task IDs this task depends on")
     p_update.add_argument("--notes", help="Task notes")
+    p_update.add_argument("--model", "-m", choices=VALID_MODELS, help="AI model alias (sonnet/opus/sonnet-1m/opus-1m)")
     p_update.add_argument("--thinking", choices=VALID_THINKING_LEVELS, help="AI reasoning depth (low/medium/high)")
     p_update.add_argument("--auto-start", choices=["true", "false"], help="Enable/disable auto-start flag")
     

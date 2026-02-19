@@ -26,10 +26,11 @@ const LINK_TYPE_OPTIONS: { value: TaskLinkType; label: string; icon: string }[] 
 ];
 
 const MODEL_OPTIONS = [
-  { value: '', label: 'Default (no preference)' },
-  { value: 'anthropic/claude-opus-4-5', label: '🧠 Claude Opus 4.5' },
-  { value: 'anthropic/claude-sonnet-4-5', label: '⚡ Claude Sonnet 4.5' },
-  { value: 'google-gemini-cli/gemini-3-pro-preview', label: '💎 Gemini 3 Pro Preview' },
+  { value: '', label: 'Default (sonnet)' },
+  { value: 'sonnet', label: '⚡ Sonnet' },
+  { value: 'opus', label: '🧠 Opus' },
+  { value: 'sonnet-1m', label: '⚡ Sonnet 1M' },
+  { value: 'opus-1m', label: '🧠 Opus 1M' },
 ];
 
 const EXECUTION_MODE_OPTIONS = [

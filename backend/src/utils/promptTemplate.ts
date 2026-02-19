@@ -169,10 +169,9 @@ export function generateTaskPrompt(task: Task): string {
     sections.push(`**Project:** ${task.project}`);
   }
 
-  // Model
-  if (task.model) {
-    sections.push(`**Model:** ${task.model}`);
-  }
+  // Model (default: sonnet for sub-agents)
+  sections.push(`**Model:** ${task.model || 'sonnet'}`);
+
 
   // Tags
   if (task.tags && task.tags.length > 0) {
