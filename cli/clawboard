@@ -308,7 +308,7 @@ def resolve_project(name):
     """Fuzzy-match project name. Returns the canonical project name string."""
     if not name:
         return None
-    projects = api("GET", "/projects").get("projects", [])
+    projects = api("GET", "/projects?includeHidden=true").get("projects", [])
     
     # Exact match first
     for p in projects:
@@ -341,7 +341,7 @@ def resolve_project(name):
 
 def resolve_project_id(name_or_id):
     """Resolve project name or ID to a full project ID."""
-    projects = api("GET", "/projects").get("projects", [])
+    projects = api("GET", "/projects?includeHidden=true").get("projects", [])
     
     # Try ID match first (full or prefix)
     for p in projects:
@@ -514,7 +514,8 @@ def format_project(p, include_stats=False, stats=None):
     icon = status_icons.get(p.get("status", "active"), "⚪")
     desc = f" - {p['description'][:50]}..." if p.get("description") and len(p.get("description", "")) > 50 else (f" - {p['description']}" if p.get("description") else "")
     
-    line = f"  {icon} {p['name']}{desc}  (ID: {p['id'][:12]})"
+    hidden = " 🔒" if p.get("is_hidden") else ""
+    line = f"  {icon} {p['name']}{hidden}{desc}  (ID: {p['id'][:12]})"
     
     if include_stats and stats:
         total = stats.get("total", 0)
@@ -1256,7 +1257,7 @@ def cmd_review(args):
     print()
 
 def cmd_projects(args):
-    result = api("GET", "/projects")
+    result = api("GET", "/projects?includeHidden=true")
     projects = result.get("projects", [])
     
     for p in projects:
