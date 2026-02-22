@@ -41,3 +41,4 @@ temp/
 clawboard.config.json
 clawboard.plugins.json
 data/device-identity.json
+backend/data/device/
