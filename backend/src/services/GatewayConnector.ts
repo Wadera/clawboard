@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { createHash, generateKeyPairSync } from 'crypto';
 import { WebSocketService } from './websocket';
 
 const HISTORY_FILE = join(process.env.DATA_DIR || '/app/data', 'session-history.json');
@@ -74,6 +75,10 @@ export class GatewayConnector {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
   private requestId: number = 0;
+  private deviceId: string = '';
+  private publicKeyPem: string = '';
+  private privateKeyPem: string = '';
+  private challengeNonce: string = '';
   private sessionStates: Map<string, SessionQueueState> = new Map();
   private historicalSessions: Array<{
     sessionId: string;
@@ -112,6 +117,79 @@ export class GatewayConnector {
 
     // Load persisted session history
     this.loadHistory();
+
+    // Initialize device identity (keypair for gateway auth)
+    this.initDeviceIdentity();
+  }
+
+  /**
+   * Initialize or load device identity keypair (ed25519, matching OpenClaw protocol)
+   */
+  private initDeviceIdentity(): void {
+    const dataDir = process.env.DATA_DIR || '/app/data';
+    const identityPath = join(dataDir, 'device-identity.json');
+
+    try {
+      if (existsSync(identityPath)) {
+        const parsed = JSON.parse(readFileSync(identityPath, 'utf-8'));
+        if (parsed?.version === 1 && parsed.publicKeyPem && parsed.privateKeyPem) {
+          this.publicKeyPem = parsed.publicKeyPem;
+          this.privateKeyPem = parsed.privateKeyPem;
+          this.deviceId = this.fingerprintPublicKey(this.publicKeyPem);
+          console.log(`🔑 GatewayConnector: Loaded device identity: ${this.deviceId.substring(0, 8)}...`);
+          return;
+        }
+      }
+
+      console.log('🔑 GatewayConnector: Generating new ed25519 device keypair...');
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      this.publicKeyPem = (publicKey as any).export({ type: 'spki', format: 'pem' }).toString();
+      this.privateKeyPem = (privateKey as any).export({ type: 'pkcs8', format: 'pem' }).toString();
+      this.deviceId = this.fingerprintPublicKey(this.publicKeyPem);
+
+      mkdirSync(dataDir, { recursive: true });
+      writeFileSync(identityPath, JSON.stringify({
+        version: 1,
+        deviceId: this.deviceId,
+        publicKeyPem: this.publicKeyPem,
+        privateKeyPem: this.privateKeyPem,
+        createdAt: new Date().toISOString(),
+      }, null, 2), { mode: 0o600 });
+      console.log(`🔑 GatewayConnector: Device keypair generated: ${this.deviceId.substring(0, 8)}...`);
+    } catch (err) {
+      console.error('⚠️  GatewayConnector: Failed to init device identity:', err);
+    }
+  }
+
+  /**
+   * Fingerprint a public key PEM: sha256 of raw SPKI DER bytes
+   */
+  private fingerprintPublicKey(pem: string): string {
+    const { createPublicKey } = require('crypto');
+    const spki = createPublicKey(pem).export({ type: 'spki', format: 'der' });
+    // For ed25519, strip the SPKI prefix (12 bytes) to get raw 32-byte key
+    const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+    let raw = spki;
+    if (spki.length === ED25519_SPKI_PREFIX.length + 32 &&
+        spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)) {
+      raw = spki.subarray(ED25519_SPKI_PREFIX.length);
+    }
+    return createHash('sha256').update(raw).digest('hex');
+  }
+
+  /**
+   * Get raw public key bytes as base64url
+   */
+  private publicKeyBase64Url(): string {
+    const { createPublicKey } = require('crypto');
+    const spki = createPublicKey(this.publicKeyPem).export({ type: 'spki', format: 'der' });
+    const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+    let raw = spki;
+    if (spki.length === ED25519_SPKI_PREFIX.length + 32 &&
+        spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)) {
+      raw = spki.subarray(ED25519_SPKI_PREFIX.length);
+    }
+    return raw.toString('base64url');
   }
 
   /**
@@ -260,6 +338,7 @@ export class GatewayConnector {
   private handleMessage(msg: any): void {
     // Handle challenge-response auth
     if (msg.type === 'event' && msg.event === 'connect.challenge') {
+      this.challengeNonce = msg.payload?.nonce || '';
       this.authenticate();
       return;
     }
@@ -304,23 +383,64 @@ export class GatewayConnector {
   private authenticate(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
+    // Sign the challenge nonce with our ed25519 private key
+    // Payload format: "v2|deviceId|clientId|clientMode|role|scopes|signedAtMs|token|nonce"
+    let signature = '';
+    const signedAt = Date.now();
+    const role = 'operator';
+    const scopes = ['operator.read', 'operator.admin'];
+    if (this.privateKeyPem && this.challengeNonce) {
+      try {
+        const { createPrivateKey, sign } = require('crypto');
+        const key = createPrivateKey(this.privateKeyPem);
+        const payload = [
+          'v2',
+          this.deviceId,
+          'openclaw-control-ui',
+          'backend',
+          role,
+          scopes.join(','),
+          String(signedAt),
+          this.gatewayPassword || '',
+          this.challengeNonce,
+        ].join('|');
+        const sigBuf = sign(null, Buffer.from(payload, 'utf8'), key);
+        signature = sigBuf.toString('base64url');
+      } catch (err) {
+        console.error('⚠️  GatewayConnector: Failed to sign challenge:', err);
+      }
+    }
+
+    const params: any = {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'linux', mode: 'backend', displayName: 'ClawBoard Backend' },
+      role: 'operator',
+      scopes: ['operator.read', 'operator.admin'],
+      caps: [],
+      commands: [],
+      permissions: {},
+      auth: { password: this.gatewayPassword, token: this.gatewayPassword },
+      locale: 'en-US',
+      userAgent: 'clawboard-backend/1.0.0',
+    };
+
+    // Include device identity if we have a keypair
+    if (this.deviceId && this.publicKeyPem && signature) {
+      params.device = {
+        id: this.deviceId,
+        publicKey: this.publicKeyBase64Url(),
+        signature,
+        signedAt,
+        nonce: this.challengeNonce,
+      };
+    }
+
     this.ws.send(JSON.stringify({
       type: 'req',
       id: 'auth',
       method: 'connect',
-      params: {
-        minProtocol: 3,
-        maxProtocol: 3,
-        client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'linux', mode: 'backend', displayName: 'ClawBoard Backend' },
-        role: 'operator',
-        scopes: ['operator.read', 'operator.admin'],
-        caps: [],
-        commands: [],
-        permissions: {},
-        auth: { password: this.gatewayPassword, token: this.gatewayPassword },
-        locale: 'en-US',
-        userAgent: 'clawboard-backend/1.0.0',
-      },
+      params,
     }));
   }
 
