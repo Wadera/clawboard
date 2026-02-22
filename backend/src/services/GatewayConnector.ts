@@ -126,7 +126,8 @@ export class GatewayConnector {
    * Initialize or load device identity keypair (ed25519, matching OpenClaw protocol)
    */
   private initDeviceIdentity(): void {
-    const dataDir = process.env.DATA_DIR || '/app/data';
+    // Use persistent volume (/data is bind-mounted), fall back to /app/data
+    const dataDir = process.env.DEVICE_IDENTITY_DIR || process.env.DATA_DIR || '/data';
     const identityPath = join(dataDir, 'device-identity.json');
 
     try {

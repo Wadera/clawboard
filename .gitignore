@@ -40,3 +40,4 @@ temp/
 # Config files (use .example as template)
 clawboard.config.json
 clawboard.plugins.json
+data/device-identity.json
