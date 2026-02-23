@@ -129,20 +129,13 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ project,
   const fetchProjectSessions = async () => {
     try {
       setSessionsLoading(true);
-      // Fetch all agent history, then filter by task IDs belonging to this project
-      const [historyRes, tasksRes] = await Promise.all([
-        authenticatedFetch(`${API_BASE_URL}/agents/history`),
-        authenticatedFetch(`${API_BASE_URL}/tasks?project=${encodeURIComponent(project.name)}`)
-      ]);
-      const history: AgentHistoryRecord[] = await historyRes.json();
-      const tasksData = await tasksRes.json();
+      // Use dedicated endpoint that joins tasks→sessions in the backend
+      // This covers both agent-history.json records AND tasks with session refs in DB
+      const response = await authenticatedFetch(`${API_BASE_URL}/projects/${project.id}/sessions`);
+      const data = await response.json();
       
-      if (Array.isArray(history) && tasksData.success) {
-        const taskIds = new Set((tasksData.tasks || []).map((t: Task) => t.id));
-        const projectSessions = history.filter(h => taskIds.has(h.taskId));
-        // Sort by startedAt descending
-        projectSessions.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-        setSessions(projectSessions);
+      if (data.success && Array.isArray(data.sessions)) {
+        setSessions(data.sessions as AgentHistoryRecord[]);
       }
     } catch (error) {
       console.error('Failed to fetch sessions:', error);

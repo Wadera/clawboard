@@ -14,7 +14,7 @@
 
 import { readFile } from 'fs/promises';
 import { EventEmitter } from 'events';
-import { taskManager, Task } from './TaskManager';
+import { taskManagerDB as taskManager, Task } from './TaskManagerDB';
 import { agentHistoryService } from './AgentHistoryService';
 
 interface SessionData {
@@ -79,8 +79,8 @@ export class SubAgentTaskUpdater extends EventEmitter {
    */
   private async checkSessionsAndUpdateTasks() {
     try {
-      // 1. Find all tasks with activeAgent set
-      const activeTasks = this.findTasksWithActiveAgent();
+      // 1. Find all tasks with activeAgent set (from PostgreSQL via TaskManagerDB)
+      const activeTasks = await this.findTasksWithActiveAgent();
 
       // 2. Read current session states
       const sessions = await this.readSessions();
@@ -166,10 +166,10 @@ export class SubAgentTaskUpdater extends EventEmitter {
   }
 
   /**
-   * Find all tasks with activeAgent.sessionKey set
+   * Find all tasks with activeAgent.sessionKey set (queries PostgreSQL via TaskManagerDB)
    */
-  private findTasksWithActiveAgent(): Task[] {
-    const allTasks = taskManager.getAllTasks();
+  private async findTasksWithActiveAgent(): Promise<Task[]> {
+    const allTasks = await taskManager.getAllTasks();
     return allTasks.filter(task => 
       task.activeAgent && 
       task.activeAgent.sessionKey &&

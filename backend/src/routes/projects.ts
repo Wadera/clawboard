@@ -4,6 +4,8 @@ import { projectService, ProjectResources, ToolInstructions } from '../services/
 import { projectStatsService } from '../services/ProjectStatsService';
 import { contextService } from '../services/ContextService';
 import { toolManager } from '../services/ToolManager';
+import { pool } from '../db/connection';
+import { agentHistoryService } from '../services/AgentHistoryService';
 
 const router = Router();
 
@@ -668,6 +670,127 @@ router.put('/:id/tools', async (req: Request, res: Response): Promise<void> => {
       res.status(404).json({ success: false, error: err.message });
     } else {
       console.error('[Projects API] Error updating project tools:', err);
+      res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/projects/:id/sessions
+ * Get all agent sessions linked to tasks in this project.
+ *
+ * Combines two sources:
+ *   1. agent-history.json — records created by SubAgentTaskUpdater while tasks are in-progress
+ *   2. tasks.completed_by / tasks.active_agent columns — covers tasks that ran before history
+ *      tracking was working or where the history record was never created
+ *
+ * Returns records shaped like AgentHistoryRecord for compatibility with the frontend.
+ */
+router.get('/:id/sessions', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Verify project exists
+    await projectService.getById(id);
+
+    // --- Source 1: agent-history.json filtered by project task IDs ---
+    // Get all task IDs for this project
+    const tasksResult = await pool.query(
+      `SELECT id, title, status, active_agent, completed_by, started_at, updated_at
+       FROM tasks WHERE project_id = $1`,
+      [id]
+    );
+
+    const taskIds = new Set<string>(tasksResult.rows.map((r: any) => r.id));
+
+    // Load all agent history and filter to this project's tasks
+    const allHistory = await agentHistoryService.getAll();
+    const historyByTaskId = new Map<string, typeof allHistory[0][]>();
+    for (const record of allHistory) {
+      if (taskIds.has(record.taskId)) {
+        const list = historyByTaskId.get(record.taskId) || [];
+        list.push(record);
+        historyByTaskId.set(record.taskId, list);
+      }
+    }
+
+    // Collect history records for this project
+    const sessionRecords: any[] = [];
+    const seenSessionKeys = new Set<string>();
+
+    for (const records of historyByTaskId.values()) {
+      for (const r of records) {
+        if (r.sessionKey && r.sessionKey !== 'pending') {
+          seenSessionKeys.add(r.sessionKey);
+        }
+        sessionRecords.push(r);
+      }
+    }
+
+    // --- Source 2: tasks.active_agent / completed_by for tasks missing from history ---
+    // These are tasks where SubAgentTaskUpdater never created a history record (e.g., old tasks
+    // that ran before the fix or tasks that completed too fast to be captured)
+    for (const task of tasksResult.rows) {
+      const taskId = task.id;
+      const hasHistory = historyByTaskId.has(taskId);
+
+      // Check active_agent
+      const activeAgent = task.active_agent ? (() => {
+        try { return JSON.parse(task.active_agent); } catch { return null; }
+      })() : null;
+
+      // Check completed_by
+      const completedBy = task.completed_by ? (() => {
+        try { return JSON.parse(task.completed_by); } catch { return null; }
+      })() : null;
+
+      const agentInfo = completedBy || activeAgent;
+
+      if (agentInfo?.sessionKey && agentInfo.sessionKey !== 'pending' && !seenSessionKeys.has(agentInfo.sessionKey)) {
+        // This task has a session reference not captured in history — synthesize a record
+        seenSessionKeys.add(agentInfo.sessionKey);
+        sessionRecords.push({
+          name: agentInfo.name || 'sub-agent',
+          label: agentInfo.name || task.title,
+          sessionKey: agentInfo.sessionKey,
+          taskId,
+          taskTitle: task.title,
+          startedAt: task.started_at || task.updated_at,
+          outcome: completedBy ? 'completed' : (task.status === 'stuck' ? 'stuck' : 'running'),
+        });
+      } else if (!hasHistory && !agentInfo?.sessionKey && ['completed', 'stuck'].includes(task.status)) {
+        // Task was worked on but we have no session reference at all — add a placeholder
+        // Only if it was actually processed (has started_at)
+        if (task.started_at) {
+          sessionRecords.push({
+            name: 'sub-agent',
+            label: task.title,
+            sessionKey: `task-${taskId}`,
+            taskId,
+            taskTitle: task.title,
+            startedAt: task.started_at,
+            outcome: task.status === 'completed' ? 'completed' : 'stuck',
+          });
+        }
+      }
+    }
+
+    // Sort by startedAt descending
+    sessionRecords.sort((a, b) => {
+      const aTime = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+      const bTime = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({ success: true, sessions: sessionRecords });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('not found')) {
+      res.status(404).json({ success: false, error: err.message });
+    } else {
+      console.error('[Projects API] Error getting project sessions:', err);
       res.status(500).json({
         success: false,
         error: err instanceof Error ? err.message : 'Unknown error',
