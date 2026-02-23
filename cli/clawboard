@@ -872,22 +872,25 @@ def cmd_delete(args):
     print(f"✅ Deleted: {task_id}")
 
 def cmd_spawn(args):
+    import shutil
+    import subprocess as _subprocess
+
     task_id = resolve_task_id(args.id)
-    
+    dry_run = getattr(args, 'dry_run', False)
+    model_override = getattr(args, 'model', None)
+
     # Warn if task has no subtasks (unless suppressed)
     force = getattr(args, 'force', False)
-    if not force:
-        task_data = api("GET", f"/tasks/{task_id}")
-        task = task_data.get("task", task_data)
-        subtasks = task.get("subtasks") or []
-        if len(subtasks) == 0:
-            if not confirm_prompt("⚠️ This task has no subtasks. Agents work better with clear checkpoints. Spawn anyway? (y/N): "):
-                print("Aborted.", file=sys.stderr)
-                sys.exit(1)
-    
+    task_data = api("GET", f"/tasks/{task_id}")
+    task = task_data.get("task", task_data)
+    subtasks = task.get("subtasks") or []
+    if not force and len(subtasks) == 0:
+        if not confirm_prompt("⚠️ This task has no subtasks. Agents work better with clear checkpoints. Spawn anyway? (y/N): "):
+            print("Aborted.", file=sys.stderr)
+            sys.exit(1)
+
     # Auto-move to in-progress if currently in ideas/todo/stuck
-    task_data = task_data if 'task_data' in dir() else api("GET", f"/tasks/{task_id}")
-    task_status = (task_data.get("task", task_data)).get("status", "")
+    task_status = task.get("status", "")
     if task_status in ("ideas", "todo", "stuck"):
         try:
             api("PATCH", f"/tasks/{task_id}", {"status": "in-progress"})
@@ -897,9 +900,86 @@ def cmd_spawn(args):
 
     result = api("POST", f"/tasks/{task_id}/spawn")
     prompt = result.get("prompt", "")
-    print("─── Agent Spawn Prompt ───")
-    print(prompt)
-    print("───────────────────────────")
+
+    # --dry-run: just print the prompt, don't actually spawn
+    if dry_run:
+        print("─── Agent Spawn Prompt (dry-run) ───")
+        print(prompt)
+        print("────────────────────────────────────")
+        return
+
+    # Check openclaw is available
+    openclaw_bin = shutil.which("openclaw")
+    if not openclaw_bin:
+        print("❌ openclaw CLI not found in PATH. Cannot spawn agent.", file=sys.stderr)
+        print("   Run with --dry-run to just print the prompt.", file=sys.stderr)
+        sys.exit(1)
+
+    # Determine model: CLI flag > task field > default
+    task_model = task.get("model") or "anthropic/claude-sonnet-4-6"
+    model = model_override or task_model
+
+    # Spawn the agent via OpenClaw gateway
+    params = json.dumps({"task": prompt, "model": model})
+    print(f"🚀 Spawning agent for task {task_id}...", file=sys.stderr)
+    try:
+        spawn_result = _subprocess.run(
+            [openclaw_bin, "gateway", "call", "sessions_spawn", "--params", params, "--json"],
+            capture_output=True, text=True, timeout=30
+        )
+    except _subprocess.TimeoutExpired:
+        print("❌ Timed out waiting for sessions_spawn response.", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Failed to call openclaw gateway: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if spawn_result.returncode != 0:
+        print(f"❌ sessions_spawn failed (exit {spawn_result.returncode}):", file=sys.stderr)
+        print(spawn_result.stderr, file=sys.stderr)
+        sys.exit(1)
+
+    # Parse the response
+    try:
+        spawn_data = json.loads(spawn_result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"❌ Could not parse sessions_spawn response: {e}", file=sys.stderr)
+        print(f"   Raw output: {spawn_result.stdout[:500]}", file=sys.stderr)
+        sys.exit(1)
+
+    child_session_key = spawn_data.get("childSessionKey") or spawn_data.get("result", {}).get("childSessionKey")
+    run_id = spawn_data.get("runId") or spawn_data.get("result", {}).get("runId")
+
+    if not child_session_key:
+        print(f"❌ No childSessionKey in response: {spawn_data}", file=sys.stderr)
+        sys.exit(1)
+
+    # Update the task's activeAgent.sessionKey
+    try:
+        api("PATCH", f"/tasks/{task_id}", {
+            "activeAgent": {
+                "name": "sub-agent",
+                "sessionKey": child_session_key
+            }
+        })
+    except Exception as e:
+        print(f"⚠️ Agent spawned but could not update task sessionKey: {e}", file=sys.stderr)
+
+    # Print confirmation
+    base_url = get_api_url().rstrip("/")
+    # Derive dashboard URL from API base (strip :3001 port and /api suffix)
+    dashboard_base = base_url.replace("/api", "").replace(":3001", "").rstrip("/")
+    # Use known production dashboard if it looks like localhost
+    if "localhost" in dashboard_base or "127.0.0.1" in dashboard_base:
+        dashboard_url = f"https://nimspace.skyday.eu/dashboard/tasks?focus={task_id}"
+    else:
+        dashboard_url = f"{dashboard_base}/dashboard/tasks?focus={task_id}"
+
+    print(f"✅ Agent spawned for task {task_id}")
+    print(f"   Session: {child_session_key}")
+    if run_id:
+        print(f"   Run ID:  {run_id}")
+    print(f"   Dashboard: {dashboard_url}")
 
 def cmd_breakdown(args):
     task_id = resolve_task_id(args.id)
@@ -3247,9 +3327,11 @@ Subtask Workflow (6-state lifecycle):
     p_delete.add_argument("id")
     
     # spawn
-    p_spawn = sub.add_parser("spawn", help="Get agent spawn prompt for a task")
+    p_spawn = sub.add_parser("spawn", help="Spawn an agent for a task via OpenClaw")
     p_spawn.add_argument("id")
     p_spawn.add_argument("--force", "-f", action="store_true", help="Skip subtask warning")
+    p_spawn.add_argument("--dry-run", action="store_true", dest="dry_run", help="Print prompt only, do not spawn agent")
+    p_spawn.add_argument("--model", help="Model to use for agent (overrides task model)")
     
     # breakdown
     p_breakdown = sub.add_parser("breakdown", help="AI-generate subtasks for a task")
