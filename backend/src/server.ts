@@ -151,7 +151,7 @@ app.get('/', (_req: Request, res: Response) => {
 import authRoutes from './routes/auth';
 import configRoutes from './routes/config';
 import statusRoutes from './routes/status';
-import tasksRoutes from './routes/tasks';
+import tasksRoutes, { setTasksGatewayConnector } from './routes/tasks';
 import memoryRoutes from './routes/memory';
 import workspaceRoutes, { setWorkspaceWatcher } from './routes/workspace';
 import controlRoutes, { setControlService } from './routes/control';
@@ -180,6 +180,7 @@ setControlService(controlService);
 setModelStatusService(modelStatusService);
 setGatewayConnector(gatewayConnector);
 setModelsGatewayConnector(gatewayConnector);
+setTasksGatewayConnector(gatewayConnector);
 setPluginLoader(pluginLoader);
 
 // Public static file routes (MUST be before auth middleware)

@@ -872,9 +872,6 @@ def cmd_delete(args):
     print(f"✅ Deleted: {task_id}")
 
 def cmd_spawn(args):
-    import shutil
-    import subprocess as _subprocess
-
     task_id = resolve_task_id(args.id)
     dry_run = getattr(args, 'dry_run', False)
     model_override = getattr(args, 'model', None)
@@ -889,82 +886,39 @@ def cmd_spawn(args):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)
 
-    # Auto-move to in-progress if currently in ideas/todo/stuck
-    task_status = task.get("status", "")
-    if task_status in ("ideas", "todo", "stuck"):
-        try:
-            api("PATCH", f"/tasks/{task_id}", {"status": "in-progress"})
-            print(f"📌 Moved task to in-progress", file=sys.stderr)
-        except Exception as e:
-            print(f"⚠️ Could not auto-move task: {e}", file=sys.stderr)
-
-    result = api("POST", f"/tasks/{task_id}/spawn")
-    prompt = result.get("prompt", "")
-
-    # --dry-run: just print the prompt, don't actually spawn
+    # --dry-run: call /spawn to get the prompt only, then print and exit
     if dry_run:
+        result = api("POST", f"/tasks/{task_id}/spawn")
+        prompt = result.get("prompt", "")
         print("─── Agent Spawn Prompt (dry-run) ───")
         print(prompt)
         print("────────────────────────────────────")
         return
 
-    # Check openclaw is available
-    openclaw_bin = shutil.which("openclaw")
-    if not openclaw_bin:
-        print("❌ openclaw CLI not found in PATH. Cannot spawn agent.", file=sys.stderr)
-        print("   Run with --dry-run to just print the prompt.", file=sys.stderr)
-        sys.exit(1)
-
     # Determine model: CLI flag > task field > default
     task_model = task.get("model") or "anthropic/claude-sonnet-4-6"
     model = model_override or task_model
 
-    # Spawn the agent via OpenClaw gateway
-    params = json.dumps({"task": prompt, "model": model})
+    # Spawn the agent via backend endpoint (which calls OpenClaw gateway cron.add)
     print(f"🚀 Spawning agent for task {task_id}...", file=sys.stderr)
     try:
-        spawn_result = _subprocess.run(
-            [openclaw_bin, "gateway", "call", "sessions_spawn", "--params", params, "--json"],
-            capture_output=True, text=True, timeout=30
-        )
-    except _subprocess.TimeoutExpired:
-        print("❌ Timed out waiting for sessions_spawn response.", file=sys.stderr)
-        sys.exit(1)
+        spawn_result = api("POST", f"/tasks/{task_id}/spawn-agent", {"model": model})
     except Exception as e:
-        print(f"❌ Failed to call openclaw gateway: {e}", file=sys.stderr)
+        print(f"❌ Failed to spawn agent: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if spawn_result.returncode != 0:
-        print(f"❌ sessions_spawn failed (exit {spawn_result.returncode}):", file=sys.stderr)
-        print(spawn_result.stderr, file=sys.stderr)
+    if not spawn_result.get("success"):
+        print(f"❌ spawn-agent failed: {spawn_result.get('error', 'Unknown error')}", file=sys.stderr)
         sys.exit(1)
 
-    # Parse the response
-    try:
-        spawn_data = json.loads(spawn_result.stdout)
-    except json.JSONDecodeError as e:
-        print(f"❌ Could not parse sessions_spawn response: {e}", file=sys.stderr)
-        print(f"   Raw output: {spawn_result.stdout[:500]}", file=sys.stderr)
-        sys.exit(1)
-
-    child_session_key = spawn_data.get("childSessionKey") or spawn_data.get("result", {}).get("childSessionKey")
-    run_id = spawn_data.get("runId") or spawn_data.get("result", {}).get("runId")
+    child_session_key = spawn_result.get("childSessionKey")
+    run_id = spawn_result.get("runId")
 
     if not child_session_key:
-        print(f"❌ No childSessionKey in response: {spawn_data}", file=sys.stderr)
+        print(f"❌ No childSessionKey in response: {spawn_result}", file=sys.stderr)
         sys.exit(1)
 
-    # Update the task's activeAgent.sessionKey
-    try:
-        api("PATCH", f"/tasks/{task_id}", {
-            "activeAgent": {
-                "name": "sub-agent",
-                "sessionKey": child_session_key
-            }
-        })
-    except Exception as e:
-        print(f"⚠️ Agent spawned but could not update task sessionKey: {e}", file=sys.stderr)
-
+    # Task activeAgent is already updated by the backend endpoint
     # Print confirmation
     base_url = get_api_url().rstrip("/")
     # Derive dashboard URL from API base (strip :3001 port and /api suffix)
