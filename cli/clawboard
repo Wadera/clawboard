@@ -11,7 +11,7 @@ Usage:
   clawboard move ID STATUS [--notes NOTES]
   clawboard archive ID
   clawboard delete ID
-  clawboard spawn ID
+  clawboard spawn ID [--run] [--dry-run] [--model MODEL]
   clawboard breakdown ID
   clawboard auto-archive
 
@@ -79,7 +79,10 @@ Examples:
   clawboard reject-subtask abc123 0 --note "Needs more testing"
 
   # Agent spawning
-  clawboard spawn abc123
+  clawboard spawn abc123                       # Print prompt / spawn agent
+  clawboard spawn abc123 --run                 # Full auto: move to in-progress + spawn with CLAWBOARD_AGENT=1
+  clawboard spawn abc123 --run --dry-run       # Preview what --run would spawn (prompt + context)
+  clawboard spawn abc123 --run --model anthropic/claude-opus-4-6  # Override model
 
   # Project creation with NFS skeleton
   clawboard project create --name "my-project" --description "My new project" --nfs
@@ -98,8 +101,10 @@ Complete Workflows:
 
   # Orchestrator: Spawn and verify a task
   clawboard next                                  # Get next task
-  clawboard move abc123 in-progress               # Start it
-  clawboard spawn abc123                          # Get agent prompt
+  clawboard spawn abc123 --run                    # Move to in-progress + spawn agent in one shot
+  # --- OR manual two-step: ---
+  clawboard move abc123 in-progress               # Start it manually
+  clawboard spawn abc123                          # Get agent prompt / spawn
   # ... spawn agent ...
   clawboard get abc123 -v                         # Check progress
   clawboard approve-subtask abc123 0              # Approve each subtask
@@ -871,10 +876,37 @@ def cmd_delete(args):
     result = api("DELETE", f"/tasks/{task_id}")
     print(f"✅ Deleted: {task_id}")
 
+def _write_spawn_log(task_id, task_title, session_key, run_id, model, extra=None):
+    """Append a spawn action entry to the orchestration log (JSONL format).
+    
+    Log file: ~/.local/share/clawboard/spawn-log.jsonl
+    Each line is a JSON object with ts, task_id, task_title, session_key, model, etc.
+    """
+    import time
+    log_dir = os.path.expanduser("~/.local/share/clawboard")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "spawn-log.jsonl")
+    entry = {
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "epoch": int(time.time()),
+        "task_id": task_id,
+        "task_title": task_title,
+        "session_key": session_key,
+        "run_id": run_id,
+        "model": model,
+    }
+    if extra:
+        entry.update(extra)
+    with open(log_path, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    return log_path
+
+
 def cmd_spawn(args):
     task_id = resolve_task_id(args.id)
     dry_run = getattr(args, 'dry_run', False)
     model_override = getattr(args, 'model', None)
+    run_mode = getattr(args, 'run', False)  # --run: move to in-progress + spawn
 
     # Warn if task has no subtasks (unless suppressed)
     force = getattr(args, 'force', False)
@@ -886,12 +918,110 @@ def cmd_spawn(args):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)
 
+    # ── Step 1 (--run): Move task to in-progress ──────────────────────────────
+    if run_mode and not dry_run:
+        current_status = task.get("status", "")
+        if current_status == "in-progress":
+            print(f"ℹ️  Task already in-progress", file=sys.stderr)
+        else:
+            print(f"📋 [1/4] Moving task to in-progress (was: {current_status})...", file=sys.stderr)
+            try:
+                move_result = api("PATCH", f"/tasks/{task_id}", {
+                    "status": "in-progress",
+                    "notes": f"Auto-moved by clawboard spawn --run at {datetime.utcnow().isoformat()}Z"
+                })
+                moved_task = move_result.get("task", {})
+                if moved_task.get("status") == "in-progress":
+                    print(f"   ✅ Moved to in-progress", file=sys.stderr)
+                else:
+                    print(f"   ⚠️  Move may not have succeeded: status={moved_task.get('status')}", file=sys.stderr)
+            except Exception as e:
+                print(f"❌ Step 1 failed (move to in-progress): {e}", file=sys.stderr)
+                sys.exit(1)
+
+    # ── Step 2 (--run): Gather project context ────────────────────────────────
+    project_context_text = None
+    if run_mode:
+        project_name = task.get("project")
+        if project_name:
+            print(f"📁 [2/4] Fetching project context for '{project_name}'...", file=sys.stderr)
+            try:
+                project_id_for_ctx = resolve_project_id(project_name)
+                proj_ctx = api("GET", f"/projects/{project_id_for_ctx}/context?role=agent&taskId={task_id}")
+                ctx_obj = proj_ctx.get("context", {})
+                if isinstance(ctx_obj, str):
+                    project_context_text = ctx_obj
+                elif isinstance(ctx_obj, dict):
+                    # Flatten key resource info into text
+                    lines = []
+                    proj = ctx_obj.get("project", {})
+                    if proj.get("name"):
+                        lines.append(f"Project: {proj['name']}")
+                    if proj.get("description"):
+                        lines.append(f"Description: {proj['description']}")
+                    resources = ctx_obj.get("resources", {})
+                    if resources.get("repository"):
+                        lines.append(f"Repository: {resources['repository']}")
+                    for env_name, env_url in (resources.get("environments") or {}).items():
+                        lines.append(f"Env ({env_name}): {env_url}")
+                    for ptype, pval in (resources.get("paths") or {}).items():
+                        lines.append(f"Path ({ptype}): {pval}")
+                    if lines:
+                        project_context_text = "\n".join(lines)
+                print(f"   ✅ Project context fetched", file=sys.stderr)
+            except Exception as e:
+                print(f"   ⚠️  Could not fetch project context (non-fatal): {e}", file=sys.stderr)
+
+    # ── Step 3 (--run): Gather subtasks and dependencies ─────────────────────
+    subtask_summary = None
+    dep_summary = None
+    if run_mode:
+        if subtasks:
+            subtask_lines = []
+            for i, s in enumerate(subtasks):
+                icon = format_subtask_status(s)
+                status = s.get("status", "empty")
+                text = s.get("text", "???")
+                subtask_lines.append(f"[{i}] {icon} {status}: {text}")
+            subtask_summary = "\n".join(subtask_lines)
+
+        if task.get("dependsOn"):
+            print(f"🔗 [3/4] Fetching task dependencies...", file=sys.stderr)
+            try:
+                deps_result = api("GET", f"/tasks/{task_id}/dependencies")
+                dep_list = deps_result.get("dependsOn", [])
+                if dep_list:
+                    dep_lines = []
+                    for d in dep_list:
+                        dep_lines.append(f"- {d.get('title', '?')} [{d.get('status', '?')}] ({d['id'][:8]})")
+                    dep_summary = "\n".join(dep_lines)
+                    print(f"   ✅ {len(dep_list)} dependencies loaded", file=sys.stderr)
+            except Exception as e:
+                print(f"   ⚠️  Could not fetch dependencies (non-fatal): {e}", file=sys.stderr)
+
     # --dry-run: call /spawn to get the prompt only, then print and exit
     if dry_run:
-        result = api("POST", f"/tasks/{task_id}/spawn")
+        params = {}
+        if run_mode:
+            params["includeProjectContext"] = "true"
+            params["includeSubtasks"] = "true"
+            params["includeDeps"] = "true"
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        path = f"/tasks/{task_id}/spawn?{qs}" if qs else f"/tasks/{task_id}/spawn"
+        result = api("POST", path)
         prompt = result.get("prompt", "")
         print("─── Agent Spawn Prompt (dry-run) ───")
         print(prompt)
+        if run_mode:
+            if project_context_text:
+                print("\n─── Project Context ───")
+                print(project_context_text)
+            if subtask_summary:
+                print("\n─── Subtasks ───")
+                print(subtask_summary)
+            if dep_summary:
+                print("\n─── Dependencies ───")
+                print(dep_summary)
         print("────────────────────────────────────")
         return
 
@@ -899,12 +1029,30 @@ def cmd_spawn(args):
     task_model = task.get("model") or "anthropic/claude-sonnet-4-6"
     model = model_override or task_model
 
-    # Spawn the agent via backend endpoint (which calls OpenClaw gateway cron.add)
-    print(f"🚀 Spawning agent for task {task_id}...", file=sys.stderr)
+    # ── Step 4+5 (--run): Spawn agent with CLAWBOARD_AGENT=1 env ─────────────
+    print(f"🚀 {'[4/4] ' if run_mode else ''}Spawning agent for task {task_id}...", file=sys.stderr)
+    spawn_payload = {"model": model}
+
+    if run_mode:
+        # Step 5: Set CLAWBOARD_AGENT=1 env convention so the agent knows it's
+        # running inside ClawBoard orchestration (enables subtask workflow commands).
+        spawn_payload["env"] = {"CLAWBOARD_AGENT": "1"}
+        # Request backend to enrich the prompt with project context + subtasks
+        spawn_payload["includeProjectContext"] = True
+        spawn_payload["includeSubtasks"] = True
+        spawn_payload["includeDeps"] = True
+        # Attach pre-fetched context so backend can append it to the prompt
+        if project_context_text:
+            spawn_payload["projectContextText"] = project_context_text
+        if subtask_summary:
+            spawn_payload["subtaskSummary"] = subtask_summary
+        if dep_summary:
+            spawn_payload["depSummary"] = dep_summary
+
     try:
-        spawn_result = api("POST", f"/tasks/{task_id}/spawn-agent", {"model": model})
+        spawn_result = api("POST", f"/tasks/{task_id}/spawn-agent", spawn_payload)
     except Exception as e:
-        print(f"❌ Failed to spawn agent: {e}", file=sys.stderr)
+        print(f"❌ {'Step 4 ' if run_mode else ''}Failed to spawn agent: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not spawn_result.get("success"):
@@ -934,6 +1082,25 @@ def cmd_spawn(args):
     if run_id:
         print(f"   Run ID:  {run_id}")
     print(f"   Dashboard: {dashboard_url}")
+
+    # ── Step 6 (--run): Log spawn action to orchestration log ─────────────────
+    if run_mode:
+        try:
+            log_path = _write_spawn_log(
+                task_id=task_id,
+                task_title=task.get("title", ""),
+                session_key=child_session_key,
+                run_id=run_id,
+                model=model,
+                extra={
+                    "mode": "run",
+                    "project": task.get("project"),
+                    "subtask_count": len(subtasks),
+                }
+            )
+            print(f"   Log:       {log_path}")
+        except Exception as e:
+            print(f"⚠️  Could not write spawn log (non-fatal): {e}", file=sys.stderr)
 
 def cmd_breakdown(args):
     task_id = resolve_task_id(args.id)
@@ -3286,6 +3453,8 @@ Subtask Workflow (6-state lifecycle):
     p_spawn.add_argument("--force", "-f", action="store_true", help="Skip subtask warning")
     p_spawn.add_argument("--dry-run", action="store_true", dest="dry_run", help="Print prompt only, do not spawn agent")
     p_spawn.add_argument("--model", help="Model to use for agent (overrides task model)")
+    p_spawn.add_argument("--run", action="store_true", dest="run",
+                         help="Full auto: move task to in-progress, enrich prompt with project context + subtasks, set CLAWBOARD_AGENT=1, spawn agent, and log the action")
     
     # breakdown
     p_breakdown = sub.add_parser("breakdown", help="AI-generate subtasks for a task")
