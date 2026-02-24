@@ -1,6 +1,6 @@
 import React from 'react';
 import { Project } from '../../types/project';
-import { Clock, CheckCircle2, Circle, Cpu, ListTodo, Eye } from 'lucide-react';
+import { Clock, Eye, ListTodo } from 'lucide-react';
 import './ProjectCard.css';
 
 interface ProjectCardProps {
@@ -11,34 +11,29 @@ interface ProjectCardProps {
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onViewTasks }) => {
   const stats = project.stats;
-  
-  // Calculate progress percentage
-  const progressPercent = stats && stats.total_tasks > 0
-    ? Math.round((stats.completed_tasks / stats.total_tasks) * 100)
-    : 0;
-  
+
   // Get time ago for last activity
   const getTimeAgo = (dateString: string | null): string => {
     if (!dateString) return 'No activity';
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'just now';
     if (diffMins < 60) return `${diffMins}m ago`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
-    
+
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 30) return `${diffDays}d ago`;
-    
+
     const diffMonths = Math.floor(diffDays / 30);
     return `${diffMonths}mo ago`;
   };
-  
+
   const getStatusColor = (status: string): string => {
     switch (status) {
       case 'active': return 'status-active';
@@ -48,68 +43,50 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onVi
       default: return 'status-active';
     }
   };
-  
+
   return (
     <div className="project-card" onClick={onClick}>
-      {/* Header: Name + Status Badge */}
+      {/* Header: Name + Status Badge (+ lock icon for hidden projects) */}
       <div className="project-card-header">
-        <h3 className="project-card-name">{project.name}</h3>
+        <h3 className="project-card-name">
+          {project.is_hidden && <span className="project-card-lock" title="Secret project">🔒</span>}
+          {project.name}
+        </h3>
         <span className={`project-card-status ${getStatusColor(project.status)}`}>
           {project.status}
         </span>
       </div>
-      
-      {/* Description */}
+
+      {/* Description — truncated to 2 lines */}
       {project.description && (
         <p className="project-card-description">{project.description}</p>
       )}
-      
-      {/* Progress Bar */}
-      {stats && stats.total_tasks > 0 && (
-        <div className="project-card-progress">
-          <div className="project-card-progress-header">
-            <span className="project-card-progress-label">Progress</span>
-            <span className="project-card-progress-percent">{progressPercent}%</span>
-          </div>
-          <div className="project-card-progress-bar">
-            <div 
-              className="project-card-progress-fill" 
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Task Stats */}
+
+      {/* Compact inline stats row */}
       {stats && (
-        <div className="project-card-stats">
-          <div className="project-card-stat">
-            <Circle size={14} className="stat-icon stat-icon-total" />
-            <span className="stat-label">{stats.total_tasks} total</span>
-          </div>
-          
-          <div className="project-card-stat">
-            <Clock size={14} className="stat-icon stat-icon-progress" />
-            <span className="stat-label">{stats.in_progress_tasks} in progress</span>
-          </div>
-          
-          <div className="project-card-stat">
-            <CheckCircle2 size={14} className="stat-icon stat-icon-completed" />
-            <span className="stat-label">{stats.completed_tasks} completed</span>
-          </div>
+        <div className="project-card-stats-inline">
+          <span className="stat-pill stat-total">{stats.total_tasks} total</span>
+          {stats.in_progress_tasks > 0 && (
+            <>
+              <span className="stat-sep">·</span>
+              <span className="stat-pill stat-progress">{stats.in_progress_tasks} in progress</span>
+            </>
+          )}
+          {stats.completed_tasks > 0 && (
+            <>
+              <span className="stat-sep">·</span>
+              <span className="stat-pill stat-done">{stats.completed_tasks} done</span>
+            </>
+          )}
+          {stats.active_agents > 0 && (
+            <>
+              <span className="stat-sep">·</span>
+              <span className="stat-pill stat-agents">🤖 {stats.active_agents}</span>
+            </>
+          )}
         </div>
       )}
-      
-      {/* Active Agents Indicator */}
-      {stats && stats.active_agents > 0 && (
-        <div className="project-card-agents">
-          <Cpu size={14} className="agents-icon" />
-          <span className="agents-label">
-            {stats.active_agents} agent{stats.active_agents !== 1 ? 's' : ''} working
-          </span>
-        </div>
-      )}
-      
+
       {/* Quick Actions */}
       <div className="project-card-actions">
         <button
@@ -123,7 +100,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onVi
           <Eye size={14} />
           <span>Details</span>
         </button>
-        
+
         {stats && stats.total_tasks > 0 && (
           <button
             className="project-card-action-btn"
@@ -138,7 +115,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onVi
           </button>
         )}
       </div>
-      
+
       {/* Last Activity */}
       <div className="project-card-footer">
         <Clock size={12} />

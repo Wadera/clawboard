@@ -92,10 +92,10 @@ export const ProjectsPage: React.FC = () => {
     }
   };
   
-  // Filter and sort projects - separate hidden from visible
+  // Filter and sort projects
   useEffect(() => {
-    // First, exclude hidden projects from main list
-    let filtered = projects.filter(p => !p.is_hidden);
+    // Include hidden projects only when Show Secret toggle is on
+    let filtered = projects.filter(p => showSecretProjects ? true : !p.is_hidden);
     
     // Status filter
     if (statusFilter.length > 0) {
@@ -139,12 +139,7 @@ export const ProjectsPage: React.FC = () => {
     });
     
     setFilteredProjects(filtered);
-  }, [projects, searchQuery, sortBy, statusFilter]);
-  
-  // Separate hidden projects
-  const hiddenProjects = React.useMemo(() => {
-    return projects.filter(p => p.is_hidden);
-  }, [projects]);
+  }, [projects, searchQuery, sortBy, statusFilter, showSecretProjects]);
   
   const handleCreateProject = async (projectData: CreateProjectInput) => {
     try {
@@ -279,6 +274,17 @@ export const ProjectsPage: React.FC = () => {
               ))}
             </div>
           </div>
+          <div className="filter-group">
+            <label>Secret:</label>
+            <div className="filter-options">
+              <button
+                className={`filter-option filter-secret ${showSecretProjects ? 'active' : ''}`}
+                onClick={() => setShowSecretProjects(!showSecretProjects)}
+              >
+                🔒 Show Secret
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
@@ -307,37 +313,6 @@ export const ProjectsPage: React.FC = () => {
               onViewTasks={handleViewTasks}
             />
           ))}
-        </div>
-      )}
-      
-      {/* Secret Projects Section */}
-      {hiddenProjects.length > 0 && (
-        <div className="secret-projects-section">
-          <button
-            className="secret-projects-toggle"
-            onClick={() => setShowSecretProjects(!showSecretProjects)}
-          >
-            <span className="secret-projects-label">
-              🔒 Secret Projects
-              <span className="secret-projects-count">{hiddenProjects.length}</span>
-            </span>
-            <span className={`secret-projects-chevron ${showSecretProjects ? 'open' : ''}`}>
-              ▼
-            </span>
-          </button>
-          
-          {showSecretProjects && (
-            <div className="projects-grid secret-projects-grid">
-              {hiddenProjects.map(project => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                  onViewTasks={handleViewTasks}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
       
