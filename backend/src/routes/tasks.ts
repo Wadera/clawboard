@@ -5,6 +5,13 @@ import { taskAutoUpdater } from '../services/TaskAutoUpdater';
 import { taskAnalyzer } from '../services/taskAnalyzer';
 import { generateTaskPromptWithTools } from '../utils/promptTemplate';
 import { notificationManager } from '../services/NotificationManager';
+import type { GatewayConnector } from '../services/GatewayConnector';
+
+let gatewayConnector: GatewayConnector | null = null;
+
+export function setTasksGatewayConnector(connector: GatewayConnector): void {
+  gatewayConnector = connector;
+}
 
 const router = Router();
 
@@ -350,6 +357,94 @@ router.post('/:id/spawn', async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ 
       success: false, 
       error: err instanceof Error ? err.message : 'Unknown error' 
+    });
+  }
+});
+
+/**
+ * POST /tasks/:id/spawn-agent
+ * Spawn an isolated agent for the task via OpenClaw gateway cron.add
+ * Returns { childSessionKey, runId } and updates task activeAgent
+ */
+router.post('/:id/spawn-agent', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const task = await taskManager.getTask(req.params.id);
+    if (!task) {
+      res.status(404).json({ success: false, error: 'Task not found' });
+      return;
+    }
+
+    // Only allow spawning from certain statuses
+    const spawnableStatuses = ['ideas', 'todo', 'stuck', 'in-progress'];
+    if (!spawnableStatuses.includes(task.status)) {
+      res.status(400).json({
+        success: false,
+        error: `Cannot spawn from status "${task.status}". Must be one of: ${spawnableStatuses.join(', ')}`
+      });
+      return;
+    }
+
+    if (!gatewayConnector) {
+      res.status(503).json({ success: false, error: 'Gateway connector not initialized' });
+      return;
+    }
+
+    // Generate the agent prompt
+    const prompt = await generateTaskPromptWithTools(task);
+
+    // Determine model: request body > task field > default
+    const model = req.body?.model || task.model || 'anthropic/claude-sonnet-4-6';
+    const thinking = req.body?.thinking || 'low';
+
+    // Delivery destination: env var or hardcoded fallback
+    const announceTo = process.env.SPAWN_AGENT_ANNOUNCE_TO || 'user:204643948960940033';
+    const announceChannel = process.env.SPAWN_AGENT_ANNOUNCE_CHANNEL || 'discord';
+
+    // Schedule 1 second in the future
+    const at = new Date(Date.now() + 1000).toISOString();
+    const jobName = `spawn-task-${task.id.slice(0, 8)}`;
+
+    // Call cron.add via gateway WebSocket
+    const cronJob = await gatewayConnector.sendGatewayRequest('cron.add', {
+      name: jobName,
+      sessionTarget: 'isolated',
+      schedule: { kind: 'at', at },
+      payload: { kind: 'agentTurn', message: prompt },
+      model,
+      thinking,
+      deleteAfterRun: true,
+      delivery: {
+        mode: 'announce',
+        channel: announceChannel,
+        to: announceTo,
+      },
+    });
+
+    const runId = cronJob.id as string;
+    const childSessionKey = `cron:${runId}`;
+
+    // Update task to in-progress with activeAgent
+    await taskManager.updateTask(task.id, {
+      status: 'in-progress',
+      startedAt: task.startedAt || new Date().toISOString(),
+      activeAgent: { name: 'sub-agent', sessionKey: childSessionKey },
+      executionMode: 'subagent',
+    });
+
+    console.log(`[Tasks API] Spawned agent for task ${task.id}: cron job ${runId}`);
+
+    res.json({
+      success: true,
+      childSessionKey,
+      runId,
+      taskId: task.id,
+      cronJob,
+    });
+  } catch (err) {
+    console.error('[Tasks API] Error spawning agent:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
     });
   }
 });
