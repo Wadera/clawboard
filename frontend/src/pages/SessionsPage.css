@@ -162,6 +162,33 @@
   }
 }
 
+/* Spinner icon for active sessions (replaces static dot) */
+.session-state-spinner {
+  flex-shrink: 0;
+  color: var(--orange-500);
+  filter: drop-shadow(0 0 4px var(--orange-glow));
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Long-running session list item — subtle left accent */
+.session-list-item.long-running {
+  border-left-color: var(--orange-500);
+}
+
+/* Elapsed time indicator (shown instead of "time ago" for active long-running sessions) */
+.session-list-item-elapsed {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--orange-400, #fb923c);
+  font-variant-numeric: tabular-nums;
+}
+
 .session-list-item-content {
   flex: 1;
   min-width: 0;

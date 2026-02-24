@@ -13,11 +13,12 @@ interface GatewaySession {
   label?: string;
   channel?: string;
   updatedAt: number;
-  totalTokens: number;
+  totalTokens: number | null;
   model: string;
   contextTokens: number;
   kind: string;
   chatType?: string;
+  completedAt?: number;
   origin?: {
     label?: string;
     provider?: string;
@@ -55,6 +56,8 @@ interface SessionQueueState {
   };
   kind: string;
   runId?: string;
+  /** True when totalTokens is null from gateway (session still generating) */
+  isGenerating?: boolean;
 }
 
 interface QueueSnapshot {
@@ -437,6 +440,10 @@ export class GatewayConnector {
         const existing = this.sessionStates.get(session.key);
         const timeSinceUpdate = now - session.updatedAt;
 
+        // totalTokens is null while a session is actively generating
+        const isGenerating = session.totalTokens === null;
+        const isSubagent = session.kind === 'subagent' || session.key.includes(':subagent:');
+
         // Determine state based on activity
         let state: SessionQueueState['state'] = 'idle';
         if (existing?.state && existing.state !== 'idle' && timeSinceUpdate < 30000) {
@@ -444,6 +451,12 @@ export class GatewayConnector {
           state = existing.state;
         } else if (timeSinceUpdate < 5000) {
           state = 'busy';
+        } else if (isGenerating) {
+          // totalTokens is null — session hasn't finished yet (e.g. long-running subagent).
+          // updatedAt only refreshes at creation and on completion, so timeSinceUpdate is
+          // misleadingly large for active sessions. Preserve any prior non-idle state, or
+          // fall back to 'busy' so the frontend keeps the session visible.
+          state = (existing?.state && existing.state !== 'idle') ? existing.state : 'busy';
         }
 
         const displayName = session.label || session.displayName || session.key;
@@ -451,6 +464,8 @@ export class GatewayConnector {
 
         // Use the model reported by the gateway — no hardcoded overrides
         const model = session.model || 'unknown';
+
+        const totalTokens = session.totalTokens ?? 0;
 
         this.sessionStates.set(session.key, {
           sessionKey: session.key,
@@ -464,20 +479,45 @@ export class GatewayConnector {
           recentTools: existing?.recentTools || [],
           model,
           tokenUsage: {
-            total: session.totalTokens || 0,
+            total: totalTokens,
             context: session.contextTokens || 200000,
             percentUsed: session.contextTokens
-              ? Math.round((session.totalTokens / session.contextTokens) * 100)
+              ? Math.round((totalTokens / session.contextTokens) * 100)
               : 0,
           },
           kind: session.kind || 'direct',
           runId: existing?.runId,
+          isGenerating,
         });
+
+        // For long-running subagents that have been active before this poll cycle,
+        // keep lastActivity updated to "now" so the frontend's 30-min recency filter
+        // doesn't hide them even if updatedAt is stale.
+        if (isGenerating && isSubagent && existing) {
+          const stored = this.sessionStates.get(session.key);
+          if (stored) {
+            stored.lastActivity = Math.max(stored.lastActivity, existing.lastActivity || now);
+          }
+        }
       }
 
       // Remove sessions that no longer exist — move to historical
       for (const [key, session] of this.sessionStates.entries()) {
         if (!updatedKeys.has(key)) {
+          // Subtask 0: Skip if totalTokens is null-equivalent (still generating) and session is recent (<2h).
+          // This guards against transient gaps in sessions.list responses during active generation.
+          if (session.isGenerating && (now - session.lastActivity) < 2 * 60 * 60 * 1000) {
+            continue;
+          }
+
+          // Subtask 1: Skip if this is a subagent session with no evidence of completion.
+          // Subagents whose updatedAt is stale (long-running) may have tokenUsage.total === 0
+          // because totalTokens was null and got coerced to 0. Don't prune them prematurely.
+          const isSubagentKey = key.includes(':subagent:');
+          if (isSubagentKey && session.tokenUsage.total === 0 && (now - session.lastActivity) < 2 * 60 * 60 * 1000) {
+            continue;
+          }
+
           // Move to historical
           this.historicalSessions.unshift({
             sessionId: session.sessionId,

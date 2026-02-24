@@ -43,6 +43,8 @@ interface SessionQueueState {
   };
   kind: string;
   runId?: string;
+  /** True when the session is still generating (totalTokens null from gateway) */
+  isGenerating?: boolean;
 }
 
 interface QueueSnapshot {
@@ -109,6 +111,16 @@ function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+}
+
+/** Format elapsed running time for long-running active sessions */
+function formatElapsed(startTs: number): string {
+  const seconds = Math.floor((Date.now() - startTs) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ${mins % 60}m`;
 }
 
 function getChannelInfo(channel: string, sessionKey: string, label?: string, kind?: string): { emoji: string; label: string } {
@@ -286,7 +298,8 @@ export const SessionsPage: React.FC = () => {
 
     const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
     const visible = snapshot.sessions.filter(s =>
-      s.state !== 'idle' || s.lastActivity > thirtyMinAgo
+      // Keep sessions that are non-idle, still generating, or recently active
+      s.state !== 'idle' || s.isGenerating || s.lastActivity > thirtyMinAgo
     );
 
     const main = visible.find(s => s.sessionKey.endsWith(':main') || s.label === 'Main Session');
@@ -481,22 +494,39 @@ const SessionListItem: React.FC<SessionListItemProps> = ({ session, isSelected, 
   const isActive = session.state !== 'idle';
   const channelInfo = getChannelInfo(session.channel, session.sessionKey, session.label, session.kind);
 
+  // Show elapsed time for generating/long-running sessions so users know they're still alive
+  const sessionAgeMs = Date.now() - session.lastActivity;
+  const isLongRunning = isActive && sessionAgeMs > 30_000; // running >30s
+  const showElapsed = isLongRunning || session.isGenerating;
+
   return (
     <div
-      className={`session-list-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
+      className={`session-list-item ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''} ${showElapsed ? 'long-running' : ''}`}
       onClick={onClick}
     >
-      <div className={`session-state-dot ${session.state}`} />
+      {/* Animated spinner for generating/active sessions, static dot otherwise */}
+      {isActive ? (
+        <Loader size={12} className={`session-state-spinner ${session.state}`} />
+      ) : (
+        <div className={`session-state-dot ${session.state}`} />
+      )}
       <div className="session-list-item-content">
         <div className="session-list-item-name">{session.label}</div>
         <div className="session-list-item-meta">
           <span className="session-list-item-badge">
             {channelInfo.emoji} {channelInfo.label}
           </span>
-          <span className="session-list-item-time">
-            <Clock size={10} />
-            {formatTimeAgo(session.lastActivity)}
-          </span>
+          {showElapsed ? (
+            <span className="session-list-item-elapsed" title="Session running time">
+              <Zap size={10} />
+              {formatElapsed(session.lastActivity)}
+            </span>
+          ) : (
+            <span className="session-list-item-time">
+              <Clock size={10} />
+              {formatTimeAgo(session.lastActivity)}
+            </span>
+          )}
         </div>
       </div>
     </div>
