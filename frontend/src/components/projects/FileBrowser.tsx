@@ -349,8 +349,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({ projectId, projectName
             <div className="tab-loading">Loading files...</div>
           ) : directories.length === 0 && files.length === 0 ? (
             <div className="files-empty">
-              <p>No files yet</p>
-              <p>Upload files or create a folder to get started</p>
+              <p>No files found</p>
+              <p>Set NFS path in project Resources to browse project files, or upload a file above.</p>
             </div>
           ) : (
             <div className="files-grid">

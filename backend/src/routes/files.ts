@@ -39,6 +39,12 @@ async function resolveProjectDir(projectId: string): Promise<string> {
     if (project.nfs_dir) {
       return getNfsProjectDir(project.nfs_dir);
     }
+    // Check resources for nfs_path (projects that store files on NFS)
+    const resources = project?.resources as any;
+    if (resources?.nfs_path) {
+      const safeName = project.name.replace(/[^a-zA-Z0-9._-]/g, '');
+      return path.join(NFS_BASE_PATH, safeName);
+    }
   } catch {
     // Project not found, fall back to legacy
   }
@@ -261,7 +267,9 @@ router.get('/:id/source-files', async (req: Request, res: Response): Promise<voi
     
     const subPath = (req.query.path as string) || '';
     const safeName = projectName.replace(/[^a-zA-Z0-9._-]/g, '');
-    const baseDir = path.join(SOURCE_BASE_PATH, safeName);
+    const projectDir = path.join(SOURCE_BASE_PATH, safeName);
+    const repoDir = path.join(projectDir, 'repo');
+    const baseDir = fs.existsSync(repoDir) && fs.statSync(repoDir).isDirectory() ? repoDir : projectDir;
     const targetDir = path.resolve(baseDir, subPath);
     
     if (!targetDir.startsWith(baseDir)) {
@@ -318,7 +326,9 @@ router.get('/:id/source-files/content', (req: Request, res: Response): void => {
     }
     
     const safeName = projectName.replace(/[^a-zA-Z0-9._-]/g, '');
-    const baseDir = path.join(SOURCE_BASE_PATH, safeName);
+    const projectDir = path.join(SOURCE_BASE_PATH, safeName);
+    const repoDir = path.join(projectDir, 'repo');
+    const baseDir = fs.existsSync(repoDir) && fs.statSync(repoDir).isDirectory() ? repoDir : projectDir;
     const fullPath = path.resolve(baseDir, filePath);
     
     if (!fullPath.startsWith(baseDir)) {
