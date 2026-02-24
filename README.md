@@ -26,19 +26,43 @@ ClawBoard is a comprehensive web-based dashboard for managing and monitoring you
 
 ## 🖼️ Screenshots
 
-_Screenshots coming soon! After deployment, we'll add visual examples of the dashboard in action._
+### Dashboard
+![Dashboard](docs/screenshots/Dashboard.png)
 
-### Dashboard Overview
-*Placeholder for main dashboard screenshot*
-
-### Task Board
-*Placeholder for Kanban board screenshot*
+### Tasks
+![Tasks Board](docs/screenshots/tastas-main.png)
+![Task Detail](docs/screenshots/task-detail.png)
+![Tasks Expanded](docs/screenshots/tasks-opened.png)
 
 ### Projects
-*Placeholder for project management screenshot*
+![Project Details](docs/screenshots/project-details.png)
+![Project Resources](docs/screenshots/project-res.png)
+![Project Files](docs/screenshots/project-fieles.png)
+![Project Links](docs/screenshots/project-links.png)
+![Project Context](docs/screenshots/project-context.png)
 
-### Agent Status
-*Placeholder for agent monitoring screenshot*
+### Sessions
+![Sessions](docs/screenshots/sessions.png)
+
+### Journal
+![Journal](docs/screenshots/journal-main.png)
+![Journal Post](docs/screenshots/journal-post.png)
+![Status History](docs/screenshots/Journal-status-history.png)
+
+### Stats & Tools
+![Stats](docs/screenshots/stats.png)
+![Tools](docs/screenshots/tools.png)
+![Images](docs/screenshots/images.png)
+
+### Audit
+![Audit](docs/screenshots/audit-top.png)
+![Audit Details](docs/screenshots/audit-details.png)
+
+### GPU Gateway Plugin
+![GPU Gateway](docs/screenshots/gpu-gateway.png)
+![GPU Stats](docs/screenshots/gpu-gateway-stats.png)
+![GPU Voice](docs/screenshots/gpu-gateway-voice.png)
+![GPU Images](docs/screenshots/gpu-gateway-img.png)
 
 ## 🚀 Quick Start
 
