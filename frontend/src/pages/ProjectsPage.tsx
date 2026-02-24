@@ -139,7 +139,7 @@ export const ProjectsPage: React.FC = () => {
     });
     
     setFilteredProjects(filtered);
-  }, [projects, searchQuery, sortBy, statusFilter]);
+  }, [projects, searchQuery, sortBy, statusFilter, showSecretProjects]);
   
   const handleCreateProject = async (projectData: CreateProjectInput) => {
     try {
