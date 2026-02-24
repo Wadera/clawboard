@@ -73,7 +73,8 @@
 
 .search-input {
   width: 100%;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-10);
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-3) var(--space-3) 2.75rem; /* 44px — clears 18px icon at left:12px */
   background: var(--bg-app);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -106,7 +107,7 @@
 }
 
 .sort-select {
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-8) var(--space-3) var(--space-3); /* extra right padding for native arrow */
   background: var(--bg-app);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -114,6 +115,11 @@
   font-size: var(--text-sm);
   cursor: pointer;
   transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
 }
 
 .sort-select:focus {
@@ -151,6 +157,9 @@
 
 /* Filter Panel */
 .projects-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-5) var(--space-8);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
@@ -368,82 +377,14 @@
   background: rgba(249, 115, 22, 0.3);
 }
 
-/* ========================================
-   SECRET PROJECTS SECTION
-   ======================================== */
-
-.secret-projects-section {
-  margin: var(--space-8) var(--space-8) var(--space-6);
-  padding: var(--space-6);
-  background: rgba(139, 92, 246, 0.05);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  border-radius: var(--radius-lg);
+/* Secret filter option — styled slightly different */
+.filter-secret.active {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
 }
 
-.secret-projects-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4);
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  transition: background 0.2s ease;
-  border-radius: var(--radius-md);
-}
-
-.secret-projects-toggle:hover {
-  background: rgba(139, 92, 246, 0.08);
-}
-
-.secret-projects-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-lg);
-}
-
-.secret-projects-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  background: rgba(139, 92, 246, 0.2);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  color: var(--purple-300);
-}
-
-.secret-projects-chevron {
-  color: var(--text-tertiary);
-  transition: transform 0.2s ease;
-  font-size: var(--text-sm);
-}
-
-.secret-projects-chevron.open {
-  transform: rotate(180deg);
-}
-
-.secret-projects-grid {
-  margin-top: var(--space-6);
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.filter-secret:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
 }
