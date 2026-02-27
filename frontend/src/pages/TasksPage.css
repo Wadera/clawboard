@@ -1,0 +1,363 @@
+/* TasksPage Layout - Sidebar Design */
+@import '../styles/variables.css';
+
+.tasks-page-container {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  min-height: 0;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  overflow: hidden;
+  margin: -2rem;
+}
+
+/* Main Content Area (Kanban) */
+.tasks-page-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Header */
+.tasks-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tasks-page-header-title h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  margin: 0;
+}
+
+.tasks-page-header-title p {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin: var(--space-2) 0 0 0;
+}
+
+.tasks-page-header-actions {
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* ========================================
+   SEARCH TOGGLE BUTTON
+   ======================================== */
+.search-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-primary, #111827);
+  border: 1px solid var(--border-color, #374151);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text-secondary, #d1d5db);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  position: relative;
+}
+
+.search-toggle-btn:hover {
+  border-color: var(--accent-primary, #06b6d4);
+  background: rgba(6, 182, 212, 0.08);
+  color: var(--text-primary, #e5e7eb);
+}
+
+.search-toggle-btn.active {
+  border-color: var(--accent-primary, #06b6d4);
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-primary, #06b6d4);
+}
+
+.search-toggle-btn.has-filters {
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(139, 92, 246, 0.1);
+  color: #a78bfa;
+}
+
+.search-toggle-btn.has-filters:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.search-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #8b5cf6;
+  color: white;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ========================================
+   COLLAPSIBLE SEARCH/FILTER PANEL
+   ======================================== */
+.search-filter-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+}
+
+.search-filter-panel-open {
+  max-height: 300px;
+  overflow: visible;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-filter-panel-inner {
+  padding: var(--space-3, 12px) var(--space-6, 24px);
+  padding-bottom: var(--space-2, 8px);
+}
+
+.search-filter-panel-inner .filter-bar {
+  margin-bottom: 0;
+  animation: searchPanelFadeIn 0.25s ease;
+}
+
+@keyframes searchPanelFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
+   KANBAN BOARD - Desktop: fit viewport
+   ======================================== */
+.tasks-page-board {
+  flex: 1;
+  overflow: hidden;
+  padding: var(--space-4) var(--space-6);
+  min-height: 0;
+}
+
+.tasks-page-board-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-4);
+  align-items: stretch;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: none;
+  padding-bottom: var(--space-3);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom Scrollbar for Board */
+.tasks-page-board-inner::-webkit-scrollbar {
+  height: 8px;
+}
+
+.tasks-page-board-inner::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.tasks-page-board-inner::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: var(--radius-md);
+}
+
+.tasks-page-board-inner::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+
+/* Firefox */
+.tasks-page-board-inner {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.4) rgba(15, 23, 42, 0.3);
+}
+
+/* ========================================
+   TABLET (<1024px): Responsive adjustments
+   ======================================== */
+@media (max-width: 1023px) {
+  .tasks-page-header-actions .btn-text {
+    display: none;
+  }
+  .tasks-page-header-actions .btn {
+    padding: var(--space-3);
+  }
+  .search-toggle-label {
+    display: none;
+  }
+  
+  .tasks-page-header-title h1 {
+    font-size: var(--text-xl);
+  }
+
+  /* Fix scroll-snap bug: disable on tablet so all columns are reachable */
+  .tasks-page-board-inner {
+    scroll-snap-type: none;
+  }
+}
+
+/* ========================================
+   MOBILE TAB BAR
+   ======================================== */
+.tasks-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .tasks-mobile-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+    overflow-x: auto;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-padding: 0 16px;
+  }
+  
+  .tasks-mobile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tasks-mobile-tabs::before,
+  .tasks-mobile-tabs::after {
+    content: '';
+    flex: 0 0 4px;
+  }
+
+  .tasks-mobile-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-weight: var(--font-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--font-body);
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .tasks-mobile-tab.active {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: var(--text-primary);
+    font-weight: var(--font-semibold);
+  }
+
+  .tasks-mobile-tab-count {
+    background: rgba(139, 92, 246, 0.4);
+    color: white;
+    font-size: 10px;
+    font-weight: var(--font-bold);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .tasks-mobile-tab.active .tasks-mobile-tab-count {
+    background: rgba(139, 92, 246, 0.7);
+  }
+}
+
+/* Mobile: Search toggle */
+@media (max-width: 767px) {
+  .search-toggle-label {
+    display: none;
+  }
+  
+  .search-toggle-btn {
+    padding: 8px 10px;
+  }
+
+  .search-filter-panel-inner {
+    padding: 0 12px;
+    padding-bottom: 4px;
+  }
+}
+
+/* Mobile: Single column view */
+@media (max-width: 767px) {
+  .tasks-page-container {
+    height: 100vh;
+    margin: -1rem;
+  }
+
+  .tasks-page-board-inner {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: none;
+    height: auto;
+  }
+  
+  .task-column-expanded {
+    flex: none;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .tasks-page-header {
+    padding: 12px;
+    padding-left: 76px; /* Space for fixed hamburger (44px @ left:16px) + gap; extra to offset negative page margin */
+  }
+  
+  .tasks-page-header-title h1 {
+    font-size: var(--text-lg);
+  }
+  
+  .tasks-page-header-title p {
+    font-size: 0.75rem;
+    margin-top: 4px;
+  }
+  
+  .tasks-page-board {
+    padding: 12px;
+    overflow: auto;
+  }
+
+  .tasks-page-board-inner {
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+}
+
+/* Loading State */
+.tasks-page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text-tertiary);
+}

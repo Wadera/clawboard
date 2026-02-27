@@ -1,0 +1,238 @@
+name: clawboard
+
+services:
+  # PostgreSQL Database
+  clawboard-db:
+    image: postgres:16-alpine
+    container_name: clawboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clawboard}
+      POSTGRES_USER: ${POSTGRES_USER:-clawboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clawboard} -d ${POSTGRES_DB:-clawboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=false"
+
+  # Backend API
+  clawboard-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clawboard-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: ${PORT:-3001}
+      
+      # Database
+      DB_HOST: clawboard-db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-clawboard}
+      DB_USER: ${POSTGRES_USER:-clawboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      
+      # Auth
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:?Dashboard password hash required}
+      
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8082}
+      
+      # OpenClaw integration — env var names must match what the backend reads
+      # Sessions file and transcripts directory
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      # OpenClaw config file (openclaw.json)
+      CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
+      # Gateway WebSocket URL — connects to the OpenClaw gateway on the host
+      # Default port 18789 is the standard OpenClaw gateway port
+      CLAWDBOT_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      # Workspace path (bot's workspace with SOUL.md, memory/, etc.)
+      WORKSPACE_PATH: /workspace
+    volumes:
+      # OpenClaw session data (read-only)
+      # Mount the agent's sessions directory containing sessions.json and transcript files
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/clawdbot/sessions:ro
+      # OpenClaw config file (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/openclaw.json:/clawdbot/clawdbot.json:ro
+      # OpenClaw workspace (read-only) — SOUL.md, memory/, HEARTBEAT.md, etc.
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
+      
+      # Data directory for ClawBoard's own data (read-write)
+      - ${DATA_DIR:-./data}:/data:rw
+      
+      # ClawBoard dashboard config (read-only)
+      - ./clawboard.config.json:/app/clawboard.config.json:ro
+      # Plugin registry config (read-only)
+      - ./clawboard.plugins.json:/app/clawboard.plugins.json:ro
+      
+      # OpenClaw media (for generated images, etc.)
+      - ${OPENCLAW_DIR:-~/.openclaw}/media:/clawdbot/media:ro
+      # Auth profiles
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
+      # Bot workspace memory
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/memory:/clawdbot/memory:rw
+      # Generated media (journal images, voice notes, avatars)
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/media/generated:/clawd-media/generated:ro
+      # Project media
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/media/projects:/clawd-media/projects:ro
+      # Project sources (for source_dir references)
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/projects:/project-sources:ro
+      # NFS projects (optional — mount your projects NFS share here)
+      # Set NFS_PROJECTS_DIR in .env to your NFS mount path, or remove this line if not used
+      - ${NFS_PROJECTS_DIR:-/mnt/nfs/projects}:/nfs-projects:ro
+    ports:
+      - "${BACKEND_PORT:-3001}:${PORT:-3001}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      clawboard-db:
+        condition: service_healthy
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3001}/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+    #   - "traefik.http.routers.clawboard-api.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard-api.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard-api.loadbalancer.server.port=${PORT:-3001}"
+
+  # Frontend (React + Vite built into nginx)
+  clawboard-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:${PORT:-3001}}
+        - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:${PORT:-3001}}
+    container_name: clawboard-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - clawboard-backend
+    networks:
+      - clawboard-network
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/dashboard/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.clawboard.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard.loadbalancer.server.port=80"
+
+  # ========================================
+  # CLAW-ORB PLUGIN (optional)
+  # ========================================
+  claw-orb:
+    build:
+      context: ${CLAW_ORB_PATH:-./plugins/claw-orb}
+      dockerfile: Dockerfile
+    container_name: claw-orb
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3030
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3030/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # EXAMPLE PLUGIN SERVICE
+  # ========================================
+  # To add a plugin, create a service like this and add it to clawboard.plugins.json
+  # 
+  # claw-myplugin:
+  #   build:
+  #     context: ./plugins/claw-myplugin
+  #     dockerfile: Dockerfile
+  #   container_name: claw-myplugin
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3020
+  #     # Plugin receives the ClawBoard API URL for internal communication
+  #     CLAWBOARD_CORE_URL: http://clawboard-backend:3001
+  #   networks:
+  #     - clawboard-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3020/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   # Note: Plugins don't expose ports directly - they're accessed via the backend proxy
+  #   # The backend proxies /api/plugins/{name}/* to the plugin container
+  #
+  # Then register in clawboard.plugins.json:
+  # {
+  #   "plugins": [
+  #     {
+  #       "name": "claw-myplugin",
+  #       "source": "./plugins/claw-myplugin",
+  #       "enabled": true
+  #     }
+  #   ]
+  # }
+  #
+  # The backend automatically:
+  # - Proxies /api/plugins/{name}/* to the plugin's internal_port
+  # - Proxies /plugins/{name}/ui/* to the plugin's UI route
+  # - Performs health checks every 60 seconds
+  # - Reports plugin status via GET /api/plugins
+  #
+  # For nginx reverse proxy setups, ensure these locations pass through:
+  #   location /api/plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Upgrade $http_upgrade;
+  #     proxy_set_header Connection 'upgrade';
+  #     proxy_set_header Host $host;
+  #     proxy_cache_bypass $http_upgrade;
+  #   }
+  #
+  #   location /plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Host $host;
+  #   }
+
+volumes:
+  postgres_data:
+    name: clawboard_postgres_data
+
+networks:
+  clawboard-network:
+    name: clawboard_network
+    driver: bridge

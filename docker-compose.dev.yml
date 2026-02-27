@@ -1,0 +1,159 @@
+name: clawboard-dev
+
+services:
+  # PostgreSQL Database (Development)
+  db:
+    image: postgres:16-alpine
+    container_name: clawboard-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clawboard_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-clawboard_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
+    ports:
+      - "5435:5432"  # Different port than prod to allow running both simultaneously
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clawboard_dev} -d ${POSTGRES_DB:-clawboard_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Development — hot-reload with ts-node)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: ${PORT:-3006}
+
+      # Database — matches the db service above
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-clawboard_dev}
+      DB_USER: ${POSTGRES_USER:-clawboard_dev}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_change_me}
+
+      # Auth
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
+      LOGIN_PASSWORD: ${LOGIN_PASSWORD}
+
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3007}
+
+      # OpenClaw integration
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      CLAWDBOT_CONFIG_PATH: /clawdbot/clawdbot.json
+      CLAWDBOT_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      AUTH_PROFILES_PATH: /clawdbot/auth-profiles.json
+      WORKSPACE_PATH: /workspace
+      MEMORY_DIR: /workspace/memory
+
+    ports:
+      - "${PORT:-3006}:${PORT:-3006}"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./clawboard.config.json:/app/clawboard.config.json:ro
+      - ./clawboard.plugins.json:/app/clawboard.plugins.json:ro
+
+      # OpenClaw session data (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/clawdbot/sessions:ro
+      # OpenClaw config file (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/openclaw.json:/clawdbot/clawdbot.json:ro
+      # Model config (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/models.json:/clawdbot/models.json:ro
+      # Auth profiles (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/agent/auth-profiles.json:/clawdbot/auth-profiles.json:ro
+      # OpenClaw media (read-only)
+      - ${OPENCLAW_DIR:-~/.openclaw}/media:/clawdbot/media:ro
+
+      # Bot workspace (read-write for memory updates)
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:rw
+      # Generated media
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/media/generated:/clawd-media/generated:rw
+      # Project media
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/media/projects:/clawd-media/projects:rw
+      # Project sources (for source_dir references)
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}/projects:/project-sources:ro
+
+      # NFS projects (optional — set NFS_PROJECTS_DIR in .env.dev)
+      - ${NFS_PROJECTS_DIR:-/mnt/nfs/projects}:/nfs-projects:ro
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - clawboard-network-dev
+    command: npm run dev
+
+  # Frontend (Development — Vite dev server with HMR)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: /api/dev
+    ports:
+      - "3007:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - clawboard-network-dev
+    command: npm run dev
+
+  # Nginx Reverse Proxy (Development)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: clawboard-dev-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - clawboard-network-dev
+
+  # ClawOrb WebGL Avatar Plugin (optional — comment out if not using)
+  # To enable: build the claw-orb image first, or set CLAW_ORB_IMAGE in .env.dev
+  claw-orb:
+    image: ${CLAW_ORB_IMAGE:-claw-orb}
+    container_name: claw-orb-dev
+    restart: unless-stopped
+    ports:
+      - "3030:3030"
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  clawboard-network-dev:
+    driver: bridge

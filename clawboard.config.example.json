@@ -1,0 +1,56 @@
+{
+  "bot": {
+    "name": "ClawBot",
+    "displayName": "My ClawBoard",
+    "emoji": "🤖",
+    "description": "My OpenClaw Dashboard",
+    "avatarUrl": "/assets/avatar-placeholder.png"
+  },
+  "branding": {
+    "primaryColor": "#6366f1",
+    "accentColor": "#8b5cf6",
+    "backgroundColor": "#0f172a",
+    "surfaceColor": "#1e293b",
+    "textColor": "#e2e8f0",
+    "sidebarTitle": "ClawBoard",
+    "loginTitle": "Welcome to ClawBoard",
+    "loginSubtitle": "Your AI Dashboard",
+    "faviconUrl": "/favicon.svg"
+  },
+  "features": {
+    "journal": true,
+    "imageGeneration": false,
+    "taskBoard": true,
+    "projects": true,
+    "tools": true,
+    "sessions": true,
+    "auditLog": true,
+    "stats": true,
+    "botStatus": true,
+    "avatarPage": false
+  },
+  "paths": {
+    "dataDir": "/data",
+    "openclawDir": "/home/user/.openclaw",
+    "mediaDir": "/data/media",
+    "sessionsDir": "/home/user/.openclaw/agents/main/sessions"
+  },
+  "services": {
+    "taskApiUrl": "http://localhost:3001/api",
+    "openclawGatewayWs": "ws://localhost:18789",
+    "openclawApiUrl": "http://localhost:18789",
+    "imageGenEndpoint": "",
+    "imageGenProvider": "none"
+  },
+  "deployment": {
+    "domain": "localhost",
+    "port": 8082,
+    "useHttps": false,
+    "corsOrigin": "http://localhost:8082"
+  },
+  "plugins": {
+    "configFile": "./clawboard.plugins.json",
+    "enabled": true,
+    "healthCheckIntervalMs": 60000
+  }
+}

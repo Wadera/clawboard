@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    {
+      "name": "claw-myplugin",
+      "source": "./plugins/claw-myplugin",
+      "enabled": false,
+      "config_override": {}
+    }
+  ]
+}
