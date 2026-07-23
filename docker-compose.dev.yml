@@ -1,0 +1,273 @@
+name: clawboard-dev
+
+services:
+  # PostgreSQL Database (Development)
+  db:
+    image: postgres:16-alpine
+    container_name: clawboard-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clawboard_dev
+      POSTGRES_USER: clawboard_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password_change_me}
+    ports:
+      - "5435:5432"  # Different port for dev
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clawboard_dev -d clawboard_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-backend
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: 3006
+      DB_HOST: clawboard-dev-db
+      DB_PORT: 5432
+      DB_NAME: clawboard_dev
+      DB_USER: clawboard_dev
+      JWT_SECRET: ${JWT_SECRET_DEV:-dev_secret_change_me}
+      CORS_ORIGIN: https://nimspace.skyday.eu
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      # Isolate DEV collector proof from the shared production quota snapshot.
+      USAGE_STATS_PATH: /data/usage-stats-dev.json
+      # Config-family files are read via the /clawdbot-home DIRECTORY mount
+      # (see volumes) so atomic rename-writes on the host are visible without
+      # a container recreate. Do NOT point these back at single-file binds.
+      CLAWDBOT_CONFIG_PATH: /clawdbot-home/openclaw.json
+      CLAWDBOT_MODELS_PATH: /clawdbot-home/agents/main/agent/models.json
+      CLAWDBOT_GATEWAY_WS_URL: ws://192.168.40.150:18789
+      AUTH_PROFILES_PATH: /clawdbot-home/agents/main/agent/auth-profiles.json
+      CLAWBOARD_CONFIG: /workspace/clawboard.config.json
+      CLAWBOARD_PLUGINS_CONFIG: /workspace/clawboard.plugins.json
+      CLAWBOARD_CLI: /deployed-repo/cli/clawboard
+      CLAW_JOURNAL_RUN_ROOT: /claw-journal-runs
+      CLAW_JOURNAL_PYTHONPATH: /claw-journal-src
+      CLAW_JOURNAL_PYTHON: python3
+      CLAWBOARD_JOURNAL_PUBLISH_API_KEY: ${CLAWBOARD_JOURNAL_PUBLISH_API_KEY:?Dedicated Journal publisher key required}
+      # DEV reads the existing internal, private Content Engine sidecar over the
+      # shared Docker network; it never receives filesystem access to artifacts.
+      CONTENT_ENGINE_REPORT_API_URL: http://content-engine-report-api:8765
+      CONTENT_ENGINE_REPORT_API_TOKEN: ${CONTENT_ENGINE_REPORT_API_TOKEN:?Dedicated Content Engine report API token required}
+      # kf-broker binds the LAN IP only — host.docker.internal will NOT reach it.
+      # KF_DASHBOARD_CREDENTIAL comes from env_file .env.dev (a compose
+      # ${...} line here would override it with the empty host-env value).
+      KF_BROKER_URL: http://192.168.40.150:8940
+      CLAWD_MEDIA_ROOT: /clawd-media
+      CLAWD_PRIVATE_MEDIA_ROOT: /clawd-private-media
+      CLAWBOARD_DISCORD_JOURNAL_CHANNEL_ID: ${CLAWBOARD_DISCORD_JOURNAL_CHANNEL_ID:-1479392188667527320}
+      CLAWBOARD_JOURNAL_DASHBOARD_URL: https://nimspace.skyday.eu/dashboard-dev/journal
+      HERMES_HOME_PATH: /data/hermes-home
+      HERMES_PROJECT_PATH: /home/hermes/hermes-agent
+      HERMES_BINARY_PATH: /home/hermes/hermes-agent/venv/bin/hermes
+      HERMES_WORKSPACE_PATH: /workspace
+      HERMES_TASK_CWD: /workspace
+      HERMES_STATE_DB_PATH: /data/hermes-home/.hermes/state.db
+      HERMES_AUTH_JSON_PATH: /data/hermes-home/.hermes/auth.json
+      # Read path (session list, status, models) uses the read-only /hermes-live view
+      # of the live Hermes home; SQLite is opened immutable for /hermes-live/ paths.
+      # HERMES_HOME_PATH/HERMES_STATE_DB_PATH above stay on the writable seeded home
+      # under /data (used only by spawned task runs), never the real /home/hermes/.hermes.
+      HERMES_READ_HOME_PATH: /hermes-live
+      HERMES_READ_STATE_DB_PATH: /hermes-live/.hermes/state.db
+      HERMES_BOOTSTRAP_SOURCE: /seed/hermes-config
+      DEPLOYED_REPO_PATH: /deployed-repo
+      # Trust the bind-mounted deployed repo despite the host-uid ownership mismatch.
+      # The dev backend runs as root, but the mounted worktree + gitdir are owned by
+      # uid 1002 (clawd), so git aborts with "detected dubious ownership" and the
+      # /workspace/version (public: /api/dev/workspace/version) endpoint reports
+      # null branch/commit. These safe.directory entries opt out of that check.
+      GIT_CONFIG_COUNT: "2"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /deployed-repo
+      GIT_CONFIG_KEY_1: safe.directory
+      GIT_CONFIG_VALUE_1: /srv/ai-stack/projects/nimspace/clawboard/repo/.git
+      # Discord task-thread notification transport. New CLAWBOARD_DISCORD_* keys
+      # are read first; legacy DISCORD_* aliases remain for one transition cycle.
+      # Token must come from server env/secret injection only; never commit it.
+      CLAWBOARD_DISCORD_TRANSPORT: ${CLAWBOARD_DISCORD_TRANSPORT:-disabled}
+      CLAWBOARD_DISCORD_FALLBACK_TRANSPORT: ${CLAWBOARD_DISCORD_FALLBACK_TRANSPORT:-disabled}
+      CLAWBOARD_DISCORD_BOT_TOKEN: ${CLAWBOARD_DISCORD_BOT_TOKEN:-}
+      CLAWBOARD_DISCORD_GUILD_ID: ${CLAWBOARD_DISCORD_GUILD_ID:-1292093857038598155}
+      CLAWBOARD_DISCORD_TASK_THREAD_CHANNEL_ID: ${CLAWBOARD_DISCORD_TASK_THREAD_CHANNEL_ID:-1292093858154414153}
+      CLAWBOARD_DISCORD_ALLOWED_STEER_USERS: ${CLAWBOARD_DISCORD_ALLOWED_STEER_USERS:-204643948960940033}
+      CLAWBOARD_DISCORD_POLL_INTERVAL_MS: ${CLAWBOARD_DISCORD_POLL_INTERVAL_MS:-15000}
+      CLAWBOARD_DISCORD_STREAM_BATCH_MS: ${CLAWBOARD_DISCORD_STREAM_BATCH_MS:-7000}
+      CLAWBOARD_DISCORD_MAX_MESSAGE_LEN: ${CLAWBOARD_DISCORD_MAX_MESSAGE_LEN:-1900}
+      CLAWBOARD_DISCORD_ARCHIVE_ON_COMPLETE: ${CLAWBOARD_DISCORD_ARCHIVE_ON_COMPLETE:-true}
+      CLAWBOARD_DISCORD_LOCK_ON_COMPLETE: ${CLAWBOARD_DISCORD_LOCK_ON_COMPLETE:-false}
+      # Image generation provider bridge. Secrets come only from runtime env.
+      CLAWBOARD_IMAGE_PROVIDER: ${CLAWBOARD_IMAGE_PROVIDER:-litellm}
+      CLAWBOARD_IMAGE_FALLBACK_PROVIDER: ${CLAWBOARD_IMAGE_FALLBACK_PROVIDER:-}
+      CLAWBOARD_IMAGE_OUTPUT_DIR: ${CLAWBOARD_IMAGE_OUTPUT_DIR:-/clawd-media/generated}
+      CLAWBOARD_IMAGE_OPENCLAW_COMMAND: ${CLAWBOARD_IMAGE_OPENCLAW_COMMAND:-/usr/bin/env}
+      CLAWBOARD_IMAGE_OPENCLAW_ARGS_TEMPLATE: ${CLAWBOARD_IMAGE_OPENCLAW_ARGS_TEMPLATE:-HOME=/home/clawd PATH=/home/clawd/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin openclaw infer image generate --prompt {prompt} --model {model} --output {output}}
+      CLAWBOARD_IMAGE_OPENCLAW_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_OPENCLAW_AVATAR_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_AVATAR_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_OPENCLAW_BANNER_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_BANNER_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_LITELLM_URL: ${CLAWBOARD_IMAGE_LITELLM_URL:-https://litellm.skyday.eu/v1/images/generations}
+      CLAWBOARD_IMAGE_LITELLM_MODEL: ${CLAWBOARD_IMAGE_LITELLM_MODEL:-gemini/gemini-3-pro-image-preview}
+      CLAWBOARD_IMAGE_LITELLM_AVATAR_MODEL: ${CLAWBOARD_IMAGE_LITELLM_AVATAR_MODEL:-gemini/gemini-3-pro-image-preview}
+      CLAWBOARD_IMAGE_LITELLM_BANNER_MODEL: ${CLAWBOARD_IMAGE_LITELLM_BANNER_MODEL:-gemini/gemini-3-pro-image-preview}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      # Server-only LiteLLM administration adapter. Mutations remain fail-closed
+      # until encryption-key continuity has been repaired and explicitly enabled.
+      LITELLM_ADMIN_API_URL: ${LITELLM_ADMIN_API_URL:-https://litellm.skyday.eu}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      LITELLM_ADMIN_ALLOW_MUTATIONS: ${LITELLM_ADMIN_ALLOW_MUTATIONS:-false}
+      LITELLM_ADMIN_TIMEOUT_MS: ${LITELLM_ADMIN_TIMEOUT_MS:-15000}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-1292093857038598155}
+      DISCORD_TASK_THREAD_CHANNEL_ID: ${DISCORD_TASK_THREAD_CHANNEL_ID:-1292093858154414153}
+      DISCORD_ALLOWED_STEER_USERS: ${DISCORD_ALLOWED_STEER_USERS:-204643948960940033}
+      MEMORY_DIR: /workspace/memory
+      TASKS_FILE: /workspace/memory/tasks.json
+      AGENT_HISTORY_FILE: /workspace/memory/agent-history.json
+    ports:
+      - "3006:3006"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ../../nim-orb:/plugins/nim-orb:ro
+      - /home/clawd/.openclaw/agents/main/sessions:/clawdbot/sessions:ro
+      - /home/clawd/.openclaw/cron/runs:/clawdbot/cron-runs:ro
+      # OpenClaw config-family files (openclaw.json, models.json,
+      # auth-profiles.json) are mounted via their PARENT DIRECTORY, not as
+      # single-file binds. OpenClaw rewrites these atomically (temp file +
+      # rename), and a single-file bind mount pins the pre-rename inode: the
+      # container keeps reading STALE content until it is recreated (observed
+      # live 2026-07-03 — a default-model change was invisible in-container).
+      # A directory mount resolves file names on every open, so rename-writes
+      # are picked up immediately.
+      # BLAST RADIUS: ~/.openclaw contains secrets (identity/, credentials/,
+      # agents/*/agent/auth-profiles.json OAuth tokens, state/). Mounted :ro.
+      # The backend reads ONLY these subpaths of /clawdbot-home:
+      #   openclaw.json                         (CLAWDBOT_CONFIG_PATH)
+      #   agents/main/agent/models.json         (CLAWDBOT_MODELS_PATH)
+      #   agents/main/agent/auth-profiles.json  (AUTH_PROFILES_PATH)
+      # Sessions, cron runs and media keep their dedicated dir mounts below
+      # (dir mounts are already rename-safe).
+      - /home/clawd/.openclaw:/clawdbot-home:ro
+      - /home/clawd/.openclaw:/home/clawd/.openclaw:ro
+      # OpenClaw CLI writes health/runtime state on startup. Keep the token/config tree read-only,
+      # but overlay the state directory read-write so the CLI can run without copying secrets.
+      - /home/clawd/.openclaw/state:/home/clawd/.openclaw/state:rw
+      - /home/clawd/.npm-global:/home/clawd/.npm-global:ro
+      - /home/clawd/.codex:/home/clawd/.codex:ro
+      - /home/clawd/.openclaw/media:/clawdbot/media:ro
+      - /home/hermes/hermes-agent:/home/hermes/hermes-agent:ro
+      - /home/hermes/.local/share/uv:/home/hermes/.local/share/uv:ro
+      # Real Hermes home is exposed READ-ONLY to ClawBoard. Hermes re-secures ~/.hermes
+      # (0700 dir, 0600 secrets), so a RW bind mount causes permission fights and is a
+      # security defect. Two read-only views (mirrors the prod pattern):
+      #   /seed/hermes-config -> seed source for the writable runtime home (see command:)
+      #   /hermes-live/.hermes/* -> live read view for the dashboard (immutable SQLite)
+      - /home/hermes/.hermes:/seed/hermes-config:ro
+      - /home/hermes/.hermes/state.db:/hermes-live/.hermes/state.db:ro
+      - /home/hermes/.hermes/auth.json:/hermes-live/.hermes/auth.json:ro
+      - /home/clawd/clawd:/workspace:rw
+      - /srv/ai-stack/projects/nimspace/clawboard/dev:/deployed-repo:ro
+      - /srv/ai-stack/projects/nimspace/clawboard/repo/.git:/srv/ai-stack/projects/nimspace/clawboard/repo/.git:ro
+      - ./data:/data:rw
+      - /home/clawd/clawd/media/generated:/clawd-media/generated:rw
+      - /home/clawd/clawd/private-media:/clawd-private-media:ro
+      - /home/clawd/clawd/media/projects:/clawd-media/projects:rw
+      - /srv/ai-stack/projects/claw-journal/src:/claw-journal-src:ro
+      - /srv/ai-stack/projects/claw-journal/runs:/claw-journal-runs:rw
+      - /mnt/nfs/NimsProjects:/nfs-projects:rw
+      - /home/clawd/clawd/projects:/project-sources:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - clawboard-network-dev
+      - clawboard_network
+    # Seed a private, writable Hermes runtime home from the read-only host profile, then
+    # start. Mirrors the prod entrypoint's seed_hermes_runtime(); dev's Dockerfile.dev has
+    # no entrypoint and runs as root, so seeding is inline here. Spawned Hermes task runs
+    # (launchHermesTurn -> HOME=/data/hermes-home) then use this writable home, never the
+    # real /home/hermes/.hermes. "[ -f ]" skips config.json/settings.json (dirs on the host home).
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /data/hermes-home/.hermes
+        for f in auth.json config.json config.yaml settings.json context_length_cache.yaml .env; do
+          if [ -f "/seed/hermes-config/$$f" ]; then cp "/seed/hermes-config/$$f" "/data/hermes-home/.hermes/$$f"; fi
+        done
+        chmod 600 /data/hermes-home/.hermes/.env /data/hermes-home/.hermes/auth.json 2>/dev/null || true
+        exec npm run dev
+
+  # Frontend (Stable QA preview for development backend)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: clawboard-dev-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      VITE_API_BASE_URL: /api/dev
+      VITE_BASE_PATH: /dashboard-dev/
+    ports:
+      - "3007:3000"
+    networks:
+      - clawboard-network-dev
+    command: sh -c "npm run build && npm run preview -- --host 0.0.0.0 --port 3000"
+
+  # Nginx Reverse Proxy (Development)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: clawboard-dev-nginx
+    restart: unless-stopped
+    ports:
+      - "8085:80"  # Development port
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - clawboard-network-dev
+
+  # NimOrb WebGL Avatar Plugin
+  nim-orb:
+    image: nim-orb
+    container_name: nim-orb-dev
+    restart: unless-stopped
+    ports:
+      - "3030:3030"
+    networks:
+      - clawboard-network-dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  clawboard-network-dev:
+    driver: bridge
+  clawboard_network:
+    external: true

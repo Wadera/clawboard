@@ -1,0 +1,61 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, BookOpen, CalendarDays, ExternalLink, Headphones, Image as ImageIcon, RefreshCw, ShieldCheck } from 'lucide-react';
+import { authenticatedFetch } from '../utils/auth';
+import { PrivateMediaLifecycle } from '../utils/privateMediaLifecycle';
+import { usePrivateAudioPlayer } from '../contexts/PrivateAudioPlayer';
+import './ContentEnginePage.css';
+
+const API = import.meta.env.VITE_API_BASE_URL || '/api';
+const BASE = `${API}/content-engine/v1/daily-reports`;
+
+type Artifact={artifact_id:string;kind:'audio'|'image'|string;media_type:string;provider?:string;status:string};
+type Item={rank:number;title:string;summary?:string;why_it_matters?:string;caveats?:string[];key_claims?:string[];source_links?:string[];verdict?:string;duration_minutes?:number;time_saved_minutes?:number;timestamp_links?:Array<{label:string;url:string}>;provenance?:Record<string,unknown>};
+type ArticleSection={section_id?:string;heading:string;body:string;item_ids:string[];evidence_ids:string[];featured?:boolean};
+type Article={headline:string;dek?:string;sections:ArticleSection[]};
+type Source={item_id:string;state:'gathered'|'eligible'|'working_set'|'featured';canonical_url:string;title:string;source_name:string;source_type:string;category:string;exclusion_reason?:string|null};
+type Readiness=Record<'article'|'source_appendix'|'local_audio'|'notebooklm_audio'|'hero_image'|'report','pending'|'completed'|'failed'>;
+type Report={report_id:string;run_id:string;report_date:string;title:string;state:'complete'|'partial'|'stale'|'failed'|'superseded';generated_at:string;items:Item[];artifacts:Artifact[];metrics?:Record<string,unknown>;fallback?:{reason?:string};error?:{message?:string}|string;article?:Article;source_appendix?:Source[];notebooklm?:{notebook_url:string;private:true;audio_artifact_id?:string};visual?:{style:string;rationale?:string;artifact_id?:string;status:string};readiness?:Readiness};
+type ListResponse={data:Report[];page:{next_cursor?:string|null};navigation?:{newest_date:string;oldest_date:string}};
+
+const stateCopy:Record<Report['state'],string>={complete:'Complete briefing',partial:'Partial briefing — available sources were retained',stale:'Stale briefing — showing the last durable result',failed:'Generation failed',superseded:'Superseded by a newer run'};
+
+type AudioCardProps={title:string;artifact?:Artifact;active?:boolean;busy?:boolean;error?:string;onLoad:(artifact:Artifact,title:string)=>void};
+function AudioCard({title,artifact,active=false,busy=false,error,onLoad}:AudioCardProps){return <div className="ce-audio-card"><Headphones size={20}/><div><strong>{title}</strong>{artifact?<button onClick={()=>onLoad(artifact,title)} disabled={busy}>{busy?'Loading…':active?'Reload private audio':'Load private audio'}</button>:<span>Awaiting generation</span>}</div>{artifact&&active&&<small>Playing in the persistent NimSpace audio player.</small>}{artifact&&error&&<small role="alert">{error}</small>}</div>}
+function NarrativeBody({text}:{text:string}){return <>{text.split(/\n\n+/).map((paragraph,paragraphIndex)=>{const parts:React.ReactNode[]=[];const links=/\[([^\]]+)]\(<(https:\/\/[^>]+)>\)/g;let start=0,match:RegExpExecArray|null;while((match=links.exec(paragraph))){parts.push(paragraph.slice(start,match.index));parts.push(<a key={`${paragraphIndex}-${match.index}`} href={match[2]} target="_blank" rel="noreferrer">{match[1]}<ExternalLink size={13}/></a>);start=match.index+match[0].length;}parts.push(paragraph.slice(start));return <p key={paragraphIndex}>{parts}</p>;})}</>}
+
+export function ContentEnginePage(){
+ const [reports,setReports]=useState<Report[]>([]),[selected,setSelected]=useState<Report|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState('');
+ const [media,setMedia]=useState<Record<string,string>>({}),[mediaBusy,setMediaBusy]=useState<Record<string,boolean>>({});
+ const selectedRef=useRef<Report|null>(null),mediaLifecycle=useRef(new PrivateMediaLifecycle());
+ const {active:activeAudio,busy:audioBusy,error:audioError,load:loadAudioTrack,clear:clearAudio}=usePrivateAudioPlayer();
+ const clearMedia=useCallback(()=>{mediaLifecycle.current.clear();setMedia({});setMediaBusy({});},[]);
+ useEffect(()=>clearMedia, [clearMedia]);
+ const load=useCallback(async()=>{setLoading(true);setError('');try{const q=new URLSearchParams({limit:'30'});if(from)q.set('from',from);if(to)q.set('to',to);const r=await authenticatedFetch(`${BASE}/?${q}`);if(!r.ok)throw new Error(`HTTP ${r.status}`);const d:ListResponse=await r.json();const next=(d.data||[]).find(x=>x.report_id===selectedRef.current?.report_id)||d.data?.[0]||null;if(selectedRef.current&&selectedRef.current.report_id!==next?.report_id){clearMedia();clearAudio();}selectedRef.current=next;setReports(d.data||[]);setSelected(next);}catch{setError('Daily briefings are temporarily unavailable.');}finally{setLoading(false);}},[from,to,clearMedia,clearAudio]);
+ useEffect(()=>{load();},[load]);
+ function choose(r:Report){clearMedia();if(selectedRef.current?.report_id!==r.report_id)clearAudio();selectedRef.current=r;setSelected(r);}
+ async function loadArtifact(a:Artifact){const reportId=selectedRef.current?.report_id;if(!reportId)return;const request=mediaLifecycle.current.begin(a.artifact_id);setMediaBusy(x=>({...x,[a.artifact_id]:true}));try{const r=await authenticatedFetch(`${BASE}/${encodeURIComponent(reportId)}/artifacts/${encodeURIComponent(a.artifact_id)}`);if(!r.ok)throw new Error();const blob=await r.blob();const url=mediaLifecycle.current.install(request,blob);if(!url)return;setMedia(x=>({...x,[a.artifact_id]:url}));}catch{/* The private hero keeps its unavailable fallback. */}finally{if(mediaLifecycle.current.isCurrent(request))setMediaBusy(x=>({...x,[a.artifact_id]:false}));}}
+ function loadAudio(a:Artifact,subtitle:string){const current=selectedRef.current;if(!current)return;void loadAudioTrack({artifactId:a.artifact_id,reportId:current.report_id,title:current.article?.headline||current.title,subtitle});}
+ const isNotebookLmAudio=(a:Artifact)=>a.provider==='notebooklm'||a.artifact_id==='notebooklm-deep-dive'||a.artifact_id===selected?.notebooklm?.audio_artifact_id;
+ const localAudio=selected?.artifacts?.find(a=>a.status==='available'&&a.kind==='audio'&&!isNotebookLmAudio(a));
+ const deepDive=selected?.artifacts?.find(a=>a.status==='available'&&a.kind==='audio'&&isNotebookLmAudio(a));
+ const hero=selected?.artifacts?.find(a=>a.status==='available'&&a.kind==='image');
+ useEffect(()=>{if(hero&&!media[hero.artifact_id]&&!mediaBusy[hero.artifact_id])void loadArtifact(hero);},[selected?.report_id,hero?.artifact_id]);
+ return <div className="ce-page fade-in">
+  <header className="ce-hero"><div><span className="ce-kicker"><ShieldCheck size={15}/> Private daily intelligence</span><h1>Content Engine</h1><p>Evidence-linked news, videos and practical signals — ranked to save time.</p></div><button className="ce-refresh" onClick={load} disabled={loading}><RefreshCw size={16}/> Refresh</button></header>
+  <section className="ce-history" aria-label="Briefing history"><div className="ce-date"><CalendarDays size={16}/><label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>To<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></div><div className="ce-days" role="list">{reports.map(r=><button role="listitem" key={r.report_id} className={selected?.report_id===r.report_id?'active':''} onClick={()=>choose(r)}><strong>{new Date(`${r.report_date}T12:00:00`).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</strong><span>{r.state}</span></button>)}</div></section>
+  {loading&&<div className="ce-state"><div className="reports-spinner"/><p>Loading your briefings…</p></div>}
+  {error&&<div className="ce-state ce-error" role="alert"><AlertTriangle/><p>{error}</p><button onClick={load}>Try again</button></div>}
+  {!loading&&!error&&!selected&&<div className="ce-state"><p>No briefings match this date range.</p></div>}
+  {selected&&<main className="ce-report">
+   <div className={`ce-banner state-${selected.state}`} role="status"><strong>{stateCopy[selected.state]}</strong>{selected.fallback?.reason&&<span>{selected.fallback.reason.replace(/_/g,' ')}</span>}{selected.error&&<span>{typeof selected.error==='string'?selected.error:selected.error.message}</span>}</div>
+   {selected.readiness&&<div className="ce-readiness" aria-label="Edition readiness">{Object.entries(selected.readiness).map(([key,value])=><span key={key} className={`is-${value}`}>{key.replace(/_/g,' ')} · {value}</span>)}</div>}
+   {selected.article&&<>
+    <section className="ce-article-hero">{hero&&media[hero.artifact_id]?<img src={media[hero.artifact_id]} alt={`${selected.visual?.style||'Editorial'} illustration for this briefing`}/>:<div className="ce-hero-placeholder"><ImageIcon/><span>{mediaBusy[hero?.artifact_id||'']?'Loading private hero…':'Hero unavailable'}</span></div>}<div className="ce-article-overlay"><span className="ce-date-label">{new Date(`${selected.report_date}T12:00:00`).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span><h2>{selected.article.headline}</h2>{selected.article.dek&&<p>{selected.article.dek}</p>}</div></section>
+    <section className="ce-media-grid" aria-label="Edition audio"><AudioCard title="Article narration" artifact={localAudio} active={!!localAudio&&activeAudio?.reportId===selected.report_id&&activeAudio.artifactId===localAudio.artifact_id} busy={audioBusy} error={audioError} onLoad={loadAudio}/><AudioCard title="NotebookLM deep dive" artifact={deepDive} active={!!deepDive&&activeAudio?.reportId===selected.report_id&&activeAudio.artifactId===deepDive.artifact_id} busy={audioBusy} error={audioError} onLoad={loadAudio}/>{selected.notebooklm?.notebook_url&&<a className="ce-notebook-link" href={selected.notebooklm.notebook_url} target="_blank" rel="noreferrer"><BookOpen/>Open private NotebookLM notebook<ExternalLink size={14}/></a>}</section>
+    <article className="ce-narrative">{selected.article.sections.map((section,index)=><section key={section.section_id||index} className={section.featured?'featured':''}><span>Theme {index+1}</span><h3>{section.heading}</h3><NarrativeBody text={section.body}/></section>)}</article>
+    {selected.source_appendix&&<details className="ce-sources"><summary>All gathered sources ({selected.source_appendix.length})</summary><div>{selected.source_appendix.map(source=><a key={source.item_id} href={source.canonical_url} target="_blank" rel="noreferrer"><strong>{source.title}</strong><span>{source.source_name} · {source.category} · {source.state.replace('_',' ')}{source.exclusion_reason?` · ${source.exclusion_reason.replace(/_/g,' ')}`:''}</span><ExternalLink size={14}/></a>)}</div></details>}
+   </>}
+   {!selected.article&&<><section className="ce-summary"><div><span className="ce-date-label">{new Date(`${selected.report_date}T12:00:00`).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span><h2>{selected.title}</h2><p>{selected.items.length} ranked item{selected.items.length===1?'':'s'} · generated {new Date(selected.generated_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</p></div><AudioCard title="Private audio" artifact={localAudio} active={!!localAudio&&activeAudio?.reportId===selected.report_id&&activeAudio.artifactId===localAudio.artifact_id} busy={audioBusy} error={audioError} onLoad={loadAudio}/></section><div className="ce-items">{selected.items.map(item=><article className="ce-item" key={`${selected.report_id}-${item.rank}`}><div className="ce-rank">{item.rank}</div><div className="ce-item-body"><div className="ce-item-head"><h3>{item.title}</h3>{item.verdict&&<span className="ce-verdict">{item.verdict.replace(/_/g,' ')}</span>}</div>{item.summary&&<p className="ce-item-summary">{item.summary}</p>}<div className="ce-links">{item.source_links?.map(url=><a key={url} href={url} target="_blank" rel="noreferrer">Original source<ExternalLink size={13}/></a>)}</div></div></article>)}</div></>}
+  </main>}
+ </div>;
+}

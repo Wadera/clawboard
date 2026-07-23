@@ -1,0 +1,408 @@
+name: clawboard
+
+services:
+  # PostgreSQL Database
+  clawboard-db:
+    image: postgres:16-alpine
+    container_name: clawboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clawboard}
+      POSTGRES_USER: ${POSTGRES_USER:-clawboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clawboard} -d ${POSTGRES_DB:-clawboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=false"
+
+  # Backend API
+  clawboard-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        - RELEASE_SHA=${RELEASE_SHA:-unknown}
+        - RELEASE_DIRTY=${RELEASE_DIRTY:-unknown}
+        - RELEASE_BUILD_CONTEXT=${RELEASE_BUILD_CONTEXT:-unknown}
+        - RELEASE_BUILT_AT=${RELEASE_BUILT_AT:-unknown}
+    container_name: clawboard-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NODE_OPTIONS: "--max-old-space-size=512"
+      PORT: ${PORT:-3001}
+      
+      # Database
+      DB_HOST: clawboard-db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-clawboard}
+      DB_USER: ${POSTGRES_USER:-clawboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      
+      # Auth
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:?Dashboard password hash required}
+      CLAWBOARD_API_KEY: ${CLAWBOARD_API_KEY:-}
+      TOKEN_EXPIRY: ${TOKEN_EXPIRY:-30d}
+      
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8082}
+      
+      # OpenClaw integration — env var names must match what the backend reads
+      # Sessions file and transcripts directory
+      CLAWDBOT_SESSIONS_PATH: /clawdbot/sessions/sessions.json
+      CLAWDBOT_TRANSCRIPTS_DIR: /clawdbot/sessions
+      # OpenClaw config file (openclaw.json) — read via the /clawdbot-home
+      # DIRECTORY mount (see volumes) so atomic rename-writes on the host are
+      # visible without a container recreate. Do NOT point these back at
+      # single-file binds.
+      CLAWDBOT_CONFIG_PATH: /clawdbot-home/openclaw.json
+      # Per-agent models catalog (rate-limit/model metadata)
+      CLAWDBOT_MODELS_PATH: /clawdbot-home/agents/main/agent/models.json
+      # Gateway WebSocket URL — connects to the OpenClaw gateway on the host
+      # Default port 18789 is the standard OpenClaw gateway port
+      CLAWDBOT_GATEWAY_WS_URL: ${OPENCLAW_GATEWAY_URL:-ws://host.docker.internal:18789}
+      AUTH_PROFILES_PATH: /clawdbot-home/agents/main/agent/auth-profiles.json
+      CLAWBOARD_CONFIG: /project-sources/clawboard-nim/repo/clawboard.config.json
+      CLAWBOARD_PLUGINS_CONFIG: /deployed-repo/clawboard.plugins.json
+      CLAWBOARD_CLI: /deployed-repo/cli/clawboard
+      CLAW_JOURNAL_RUN_ROOT: /claw-journal-runs
+      CLAW_JOURNAL_PYTHONPATH: /claw-journal-src
+      CLAW_JOURNAL_PYTHON: python3
+      CLAWBOARD_JOURNAL_PUBLISH_API_KEY: ${CLAWBOARD_JOURNAL_PUBLISH_API_KEY:?Dedicated Journal publisher key required}
+      CONTENT_ENGINE_REPORT_API_URL: http://content-engine-report-api:8765
+      CONTENT_ENGINE_REPORT_API_TOKEN: ${CONTENT_ENGINE_REPORT_API_TOKEN:?Dedicated Content Engine report API token required}
+      # kf-broker binds the LAN IP only — host.docker.internal will NOT reach it
+      KF_BROKER_URL: http://192.168.40.150:8940
+      KF_DASHBOARD_CREDENTIAL: ${KF_DASHBOARD_CREDENTIAL:-}
+      CLAWD_MEDIA_ROOT: /clawd-media
+      CLAWD_PRIVATE_MEDIA_ROOT: /clawd-private-media
+      CLAWBOARD_DISCORD_JOURNAL_CHANNEL_ID: ${CLAWBOARD_DISCORD_JOURNAL_CHANNEL_ID:-1479392188667527320}
+      CLAWBOARD_JOURNAL_DASHBOARD_URL: https://nimspace.skyday.eu/dashboard/journal
+      HERMES_TASK_CWD: /task-projects/clawboard-nim/repo
+      TASK_PROJECTS_ROOT: /task-projects
+      AGENT_WORKSPACE_DIR: /data/agent-workspace
+      # Workspace path (bot's workspace with SOUL.md, memory/, etc.)
+      WORKSPACE_PATH: /workspace
+      # Hermes integration
+      HERMES_HOME_PATH: /data/hermes-home
+      HERMES_PROJECT_PATH: /home/hermes/hermes-agent
+      HERMES_BINARY_PATH: /home/hermes/hermes-agent/venv/bin/hermes
+      HERMES_WORKSPACE_PATH: /task-projects/clawboard-nim/repo
+      DEPLOYED_REPO_PATH: /deployed-repo
+      AGENCY_AGENTS_REPO: /agency-agents
+      HERMES_STATE_DB_PATH: /data/hermes-home/.hermes/state.db
+      HERMES_AUTH_JSON_PATH: /data/hermes-home/.hermes/auth.json
+      HERMES_BOOTSTRAP_SOURCE: /seed/hermes-config
+      HERMES_READ_HOME_PATH: /hermes-live
+      HERMES_READ_STATE_DB_PATH: /hermes-live/.hermes/state.db
+      # Discord task-thread notification transport. New CLAWBOARD_DISCORD_* keys
+      # are read first; legacy DISCORD_* aliases remain for one transition cycle.
+      # Token must come from server env/secret injection only; never commit it.
+      CLAWBOARD_DISCORD_TRANSPORT: ${CLAWBOARD_DISCORD_TRANSPORT:-disabled}
+      CLAWBOARD_DISCORD_FALLBACK_TRANSPORT: ${CLAWBOARD_DISCORD_FALLBACK_TRANSPORT:-disabled}
+      CLAWBOARD_DISCORD_BOT_TOKEN: ${CLAWBOARD_DISCORD_BOT_TOKEN:-}
+      CLAWBOARD_DISCORD_GUILD_ID: ${CLAWBOARD_DISCORD_GUILD_ID:-1292093857038598155}
+      CLAWBOARD_DISCORD_TASK_THREAD_CHANNEL_ID: ${CLAWBOARD_DISCORD_TASK_THREAD_CHANNEL_ID:-1292093858154414153}
+      CLAWBOARD_DISCORD_ALLOWED_STEER_USERS: ${CLAWBOARD_DISCORD_ALLOWED_STEER_USERS:-204643948960940033}
+      CLAWBOARD_DISCORD_POLL_INTERVAL_MS: ${CLAWBOARD_DISCORD_POLL_INTERVAL_MS:-15000}
+      CLAWBOARD_DISCORD_STREAM_BATCH_MS: ${CLAWBOARD_DISCORD_STREAM_BATCH_MS:-7000}
+      CLAWBOARD_DISCORD_MAX_MESSAGE_LEN: ${CLAWBOARD_DISCORD_MAX_MESSAGE_LEN:-1900}
+      CLAWBOARD_DISCORD_ARCHIVE_ON_COMPLETE: ${CLAWBOARD_DISCORD_ARCHIVE_ON_COMPLETE:-true}
+      CLAWBOARD_DISCORD_LOCK_ON_COMPLETE: ${CLAWBOARD_DISCORD_LOCK_ON_COMPLETE:-false}
+      # Image generation provider bridge. Secrets come only from runtime env.
+      CLAWBOARD_IMAGE_PROVIDER: ${CLAWBOARD_IMAGE_PROVIDER:-litellm}
+      CLAWBOARD_IMAGE_FALLBACK_PROVIDER: ${CLAWBOARD_IMAGE_FALLBACK_PROVIDER:-}
+      CLAWBOARD_IMAGE_OUTPUT_DIR: ${CLAWBOARD_IMAGE_OUTPUT_DIR:-/clawd-media/generated}
+      CLAWBOARD_IMAGE_OPENCLAW_COMMAND: ${CLAWBOARD_IMAGE_OPENCLAW_COMMAND:-/usr/bin/env}
+      CLAWBOARD_IMAGE_OPENCLAW_ARGS_TEMPLATE: ${CLAWBOARD_IMAGE_OPENCLAW_ARGS_TEMPLATE:-HOME=/home/clawd PATH=/home/clawd/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin openclaw infer image generate --prompt {prompt} --model {model} --output {output}}
+      CLAWBOARD_IMAGE_OPENCLAW_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_OPENCLAW_AVATAR_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_AVATAR_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_OPENCLAW_BANNER_MODEL: ${CLAWBOARD_IMAGE_OPENCLAW_BANNER_MODEL:-openai/gpt-image-2}
+      CLAWBOARD_IMAGE_LITELLM_URL: ${CLAWBOARD_IMAGE_LITELLM_URL:-https://litellm.skyday.eu/v1/images/generations}
+      CLAWBOARD_IMAGE_LITELLM_MODEL: ${CLAWBOARD_IMAGE_LITELLM_MODEL:-gemini/gemini-3-pro-image-preview}
+      CLAWBOARD_IMAGE_LITELLM_AVATAR_MODEL: ${CLAWBOARD_IMAGE_LITELLM_AVATAR_MODEL:-gemini/gemini-3-pro-image-preview}
+      CLAWBOARD_IMAGE_LITELLM_BANNER_MODEL: ${CLAWBOARD_IMAGE_LITELLM_BANNER_MODEL:-gemini/gemini-3-pro-image-preview}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      # Server-only LiteLLM administration adapter. Mutations remain fail-closed
+      # until encryption-key continuity has been repaired and explicitly enabled.
+      LITELLM_ADMIN_API_URL: ${LITELLM_ADMIN_API_URL:-https://litellm.skyday.eu}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      LITELLM_ADMIN_ALLOW_MUTATIONS: ${LITELLM_ADMIN_ALLOW_MUTATIONS:-false}
+      LITELLM_ADMIN_TIMEOUT_MS: ${LITELLM_ADMIN_TIMEOUT_MS:-15000}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-1292093857038598155}
+      DISCORD_TASK_THREAD_CHANNEL_ID: ${DISCORD_TASK_THREAD_CHANNEL_ID:-1292093858154414153}
+      # Comma-separated Discord user IDs allowed to steer tasks via thread replies
+      DISCORD_ALLOWED_STEER_USERS: ${DISCORD_ALLOWED_STEER_USERS:-204643948960940033}
+    volumes:
+      # OpenClaw session data (read-only)
+      # Mount the agent's sessions directory containing sessions.json and transcript files
+      # (includes both active .jsonl and renamed .jsonl.deleted.* transcripts)
+      - ${OPENCLAW_DIR:-~/.openclaw}/agents/main/sessions:/clawdbot/sessions:ro
+      # OpenClaw cron run results (read-only)
+      # Note: cron/runs/ JSONL files are job summaries (not session transcripts).
+      # Format: {"ts":..., "jobId":..., "action":"finished", "status":..., "summary":...}
+      # Mounted for potential future use; message ingestion is NOT done from this directory.
+      - ${OPENCLAW_DIR:-~/.openclaw}/cron/runs:/clawdbot/cron-runs:ro
+      # OpenClaw config-family files (openclaw.json, models.json,
+      # auth-profiles.json) are mounted via their PARENT DIRECTORY, not as
+      # single-file binds. OpenClaw rewrites these atomically (temp file +
+      # rename), and a single-file bind mount pins the pre-rename inode: the
+      # container keeps reading STALE content until it is recreated (observed
+      # live 2026-07-03 — a default-model change was invisible in-container).
+      # A directory mount resolves file names on every open, so rename-writes
+      # are picked up immediately.
+      # BLAST RADIUS: ~/.openclaw contains secrets (identity/, credentials/,
+      # agents/*/agent/auth-profiles.json OAuth tokens, state/). Mounted :ro.
+      # The backend reads ONLY these subpaths of /clawdbot-home:
+      #   openclaw.json                         (CLAWDBOT_CONFIG_PATH)
+      #   agents/main/agent/models.json         (CLAWDBOT_MODELS_PATH)
+      #   agents/main/agent/auth-profiles.json  (AUTH_PROFILES_PATH)
+      # Sessions, cron runs and media keep their dedicated dir mounts
+      # (dir mounts are already rename-safe).
+      - ${OPENCLAW_DIR:-~/.openclaw}:/clawdbot-home:ro
+      - ${OPENCLAW_DIR:-~/.openclaw}:/home/clawd/.openclaw:ro
+      # OpenClaw CLI writes health/runtime state on startup. Keep the token/config tree read-only,
+      # but overlay the state directory read-write so the CLI can run without copying secrets.
+      - ${OPENCLAW_DIR:-~/.openclaw}/state:/home/clawd/.openclaw/state:rw
+      - ${OPENCLAW_NPM_GLOBAL:-~/.npm-global}:/home/clawd/.npm-global:ro
+      - ${CODEX_HOME:-~/.codex}:/home/clawd/.codex:ro
+      # OpenClaw workspace (read-only) — SOUL.md, memory/, HEARTBEAT.md, etc.
+      - ${OPENCLAW_WORKSPACE:-~/.openclaw/workspace}:/workspace:ro
+      - /srv/ai-stack/projects/nimspace/clawboard/repo:/deployed-repo:ro
+      - /srv/ai-stack/projects/nimspace/agency-agents:/agency-agents:ro
+      # Hermes binary/runtime split: code stays read-only, runtime state is seeded into /data
+      - /home/hermes/hermes-agent:/home/hermes/hermes-agent:ro
+      - /home/hermes/.local/share/uv:/home/hermes/.local/share/uv:ro
+      - /home/hermes/.hermes:/seed/hermes-config:ro
+      - /home/hermes/.hermes/state.db:/hermes-live/.hermes/state.db:ro
+      - /home/hermes/.hermes/auth.json:/hermes-live/.hermes/auth.json:ro
+      - /home/hermes/.hermes/config.json:/hermes-live/.hermes/config.json:ro
+      - /home/hermes/.hermes/settings.json:/hermes-live/.hermes/settings.json:ro
+      - /home/hermes/.hermes/.env:/hermes-live/.hermes/.env:ro
+      # NimOrb plugin source for manifest loading/proxy metadata.
+      # Canonical clone of Homelab/nim-orb (plugin.json + repo/); the old
+      # /home/clawd/clawd/projects/nim-orb checkout is a WIP working copy
+      # and must not feed production.
+      - /srv/ai-stack/projects/nimspace/nim-orb:/plugins/nim-orb:ro
+      
+      # Data directory for ClawBoard's own data (read-write)
+      - ${DATA_DIR:-./data}:/data:rw
+      
+      # OpenClaw media (for generated images, etc.)
+      - ${OPENCLAW_DIR:-~/.openclaw}/media:/clawdbot/media:ro
+      # Auth profiles: served from the /clawdbot-home directory mount above
+      # (AUTH_PROFILES_PATH) — the old single-file bind went stale on rename.
+      # Bot workspace memory
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/memory:/clawdbot/memory:rw
+      # Generated public media remains writable for the existing image bridge;
+      # private Mindscape bytes are isolated and read-only to the backend.
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/media/generated:/clawd-media/generated:rw
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/private-media:/clawd-private-media:ro
+      # Project media
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/media/projects:/clawd-media/projects:ro
+      - /srv/ai-stack/projects/claw-journal/src:/claw-journal-src:ro
+      - /srv/ai-stack/projects/claw-journal/runs:/claw-journal-runs:rw
+      # Project sources (for source_dir references)
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/projects:/project-sources:ro
+      # Writable task project repos/worktrees for Hermes task execution
+      - ${OPENCLAW_WORKSPACE:-~/clawd}/projects:/task-projects:rw
+      # NFS projects (for nfs_dir references)
+      - /mnt/nfs/NimsProjects:/nfs-projects:ro
+    ports:
+      - "${BACKEND_PORT:-3001}:${PORT:-3001}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      clawboard-db:
+        condition: service_healthy
+      content-engine-report-api:
+        condition: service_healthy
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3001}/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+    #   - "traefik.http.routers.clawboard-api.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard-api.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard-api.loadbalancer.server.port=${PORT:-3001}"
+
+  # Private Content Engine daily-report API (internal network only; no host port)
+  content-engine-report-api:
+    image: python:3.11-slim
+    container_name: content-engine-report-api
+    restart: unless-stopped
+    environment:
+      CONTENT_ENGINE_REPORT_API_TOKEN: ${CONTENT_ENGINE_REPORT_API_TOKEN:?Dedicated Content Engine report API token required}
+    command:
+      - python3
+      - /app/scripts/daily_report_api.py
+      - --db
+      - /state/content-engine.sqlite3
+      - --artifact-root
+      - /state
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+    volumes:
+      - /home/clawd/clawd/projects/content-engine:/app:ro
+      - /home/clawd/clawd/projects/content-engine/.prd-state:/state:rw
+    networks:
+      - clawboard-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import os,urllib.request;
+          r=urllib.request.Request('http://127.0.0.1:8765/v1/daily-reports/?limit=1',headers={'Authorization':'Bearer '+os.environ['CONTENT_ENGINE_REPORT_API_TOKEN']});
+          raise SystemExit(0 if urllib.request.urlopen(r,timeout=3).status==200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Frontend (React + Vite built into nginx)
+  clawboard-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:${PORT:-3001}}
+        - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:${PORT:-3001}}
+        - RELEASE_SHA=${RELEASE_SHA:-unknown}
+        - RELEASE_DIRTY=${RELEASE_DIRTY:-unknown}
+        - RELEASE_BUILD_CONTEXT=${RELEASE_BUILD_CONTEXT:-unknown}
+        - RELEASE_BUILT_AT=${RELEASE_BUILT_AT:-unknown}
+    container_name: clawboard-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - clawboard-backend
+    networks:
+      - clawboard-network
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/dashboard/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Uncomment for Traefik integration
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.clawboard.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.clawboard.entrypoints=websecure"
+    #   - "traefik.http.routers.clawboard.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.clawboard.loadbalancer.server.port=80"
+
+  # ========================================
+  # NIM-ORB PLUGIN
+  # ========================================
+  nim-orb:
+    build:
+      # Canonical clone of Homelab/nim-orb main — not the WIP working copy
+      # under /home/clawd. VITE_BASE_URL default in the Dockerfile is the
+      # production mount path; the runtime-derived router basename makes the
+      # bundle work under the dev mount path too.
+      context: /srv/ai-stack/projects/nimspace/nim-orb/repo
+      dockerfile: Dockerfile
+    container_name: nim-orb
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3030
+    networks:
+      - clawboard-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3030/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # EXAMPLE PLUGIN SERVICE
+  # ========================================
+  # To add a plugin, create a service like this and add it to clawboard.plugins.json
+  # 
+  # claw-myplugin:
+  #   build:
+  #     context: ./plugins/claw-myplugin
+  #     dockerfile: Dockerfile
+  #   container_name: claw-myplugin
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3020
+  #     # Plugin receives the ClawBoard API URL for internal communication
+  #     CLAWBOARD_CORE_URL: http://clawboard-backend:3001
+  #   networks:
+  #     - clawboard-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3020/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   # Note: Plugins don't expose ports directly - they're accessed via the backend proxy
+  #   # The backend proxies /api/plugins/{name}/* to the plugin container
+  #
+  # Then register in clawboard.plugins.json:
+  # {
+  #   "plugins": [
+  #     {
+  #       "name": "claw-myplugin",
+  #       "source": "./plugins/claw-myplugin",
+  #       "enabled": true
+  #     }
+  #   ]
+  # }
+  #
+  # The backend automatically:
+  # - Proxies /api/plugins/{name}/* to the plugin's internal_port
+  # - Proxies /plugins/{name}/ui/* to the plugin's UI route
+  # - Performs health checks every 60 seconds
+  # - Reports plugin status via GET /api/plugins
+  #
+  # For nginx reverse proxy setups, ensure these locations pass through:
+  #   location /api/plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Upgrade $http_upgrade;
+  #     proxy_set_header Connection 'upgrade';
+  #     proxy_set_header Host $host;
+  #     proxy_cache_bypass $http_upgrade;
+  #   }
+  #
+  #   location /plugins/ {
+  #     proxy_pass http://clawboard-backend:3001;
+  #     proxy_http_version 1.1;
+  #     proxy_set_header Host $host;
+  #   }
+
+volumes:
+  postgres_data:
+    name: clawboard_postgres_data
+
+networks:
+  clawboard-network:
+    name: clawboard_network
+    driver: bridge

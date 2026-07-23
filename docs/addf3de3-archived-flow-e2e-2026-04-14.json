@@ -1,0 +1,58 @@
+{
+  "taskId": "addf3de3-10a6-486c-952d-e38eac6b3fff",
+  "taskShortId": "addf3de3",
+  "verifiedAtUtc": "2026-04-14T18:59:00Z",
+  "summary": {
+    "frontendBuild": "pass",
+    "verificationMode": "direct API verification with temporary real archived records on DEV and PRD, plus code review of the archived UX frontend diff"
+  },
+  "environments": [
+    {
+      "name": "dev",
+      "base": "http://localhost:3006",
+      "tag": "archive-e2e-dev-1776192999",
+      "steps": [
+        {"step": "create_1", "status": 201, "taskId": "07636728-4579-4d59-af32-ace9e6b2b1e2", "title": "ARCHIVE E2E DEV 1776192999 #1"},
+        {"step": "archive_1", "status": 200},
+        {"step": "create_2", "status": 201, "taskId": "b7ec1ae1-fff8-488c-af18-beb134393bda", "title": "ARCHIVE E2E DEV 1776192999 #2"},
+        {"step": "archive_2", "status": 200},
+        {"step": "archived_page_1", "status": 200, "total": 2, "hasMore": true, "titles": ["ARCHIVE E2E DEV 1776192999 #2"]},
+        {"step": "archived_page_2", "status": 200, "total": 2, "hasMore": false, "titles": ["ARCHIVE E2E DEV 1776192999 #1"]},
+        {"step": "filter_options_include_archived", "status": 200, "tagPresent": true, "projectPresent": false},
+        {"step": "filter_options_exclude_archived", "status": 200, "tagPresent": false},
+        {"step": "archived_search_tag_filter", "status": 200, "total": 2, "titles": ["ARCHIVE E2E DEV 1776192999 #2", "ARCHIVE E2E DEV 1776192999 #1"]},
+        {"step": "restore_to_completed", "status": 200, "taskId": "07636728-4579-4d59-af32-ace9e6b2b1e2", "newStatus": "completed"},
+        {"step": "completed_search_after_restore", "status": 200, "titles": ["ARCHIVE E2E DEV 1776192999 #1"]},
+        {"step": "archived_search_after_restore", "status": 200, "titles": ["ARCHIVE E2E DEV 1776192999 #2"]},
+        {"step": "cleanup", "status": 200, "notes": "Temporary verification tasks deleted"}
+      ]
+    },
+    {
+      "name": "prod",
+      "base": "https://nimspace.skyday.eu/api",
+      "tag": "archive-e2e-prd-1776193123",
+      "steps": [
+        {"step": "create_1", "status": 201, "taskId": "44900be6-d922-4fdf-9933-cea784a36129", "title": "ARCHIVE E2E PRD 1776193123 #1"},
+        {"step": "archive_1", "status": 200},
+        {"step": "create_2", "status": 201, "taskId": "6ee7675d-e1d6-40a8-b500-0bad8dbbc9f6", "title": "ARCHIVE E2E PRD 1776193123 #2"},
+        {"step": "archive_2", "status": 200},
+        {"step": "archived_page_1", "status": 200, "total": 2, "hasMore": true, "titles": ["ARCHIVE E2E PRD 1776193123 #2"]},
+        {"step": "archived_page_2", "status": 200, "total": 2, "hasMore": false, "titles": ["ARCHIVE E2E PRD 1776193123 #1"]},
+        {"step": "filter_options_include_archived", "status": 200, "tagPresent": true, "projectPresent": true},
+        {"step": "filter_options_exclude_archived", "status": 200, "tagPresent": false},
+        {"step": "archived_search_tag_filter", "status": 200, "total": 2, "titles": ["ARCHIVE E2E PRD 1776193123 #2", "ARCHIVE E2E PRD 1776193123 #1"]},
+        {"step": "restore_to_completed", "status": 200, "taskId": "44900be6-d922-4fdf-9933-cea784a36129", "newStatus": "completed"},
+        {"step": "completed_search_after_restore", "status": 200, "titles": ["ARCHIVE E2E PRD 1776193123 #1"]},
+        {"step": "archived_search_after_restore", "status": 200, "titles": ["ARCHIVE E2E PRD 1776193123 #2"]},
+        {"step": "cleanup", "status": 200, "notes": "Temporary verification tasks deleted"}
+      ]
+    }
+  ],
+  "conclusion": {
+    "archivedBrowseAndPagination": true,
+    "loadMoreOffsetBehavior": true,
+    "searchAndTagFilteringWithArchived": true,
+    "restoreFromArchivedToCompleted": true,
+    "includeArchivedFilterOptionBehavior": true
+  }
+}

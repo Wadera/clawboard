@@ -1,0 +1,56 @@
+# Traefik Dynamic Configuration
+# https://doc.traefik.io/traefik/
+
+http:
+  # Middlewares
+  middlewares:
+    # Security headers
+    secure-headers:
+      headers:
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customFrameOptionsValue: "SAMEORIGIN"
+
+    # Rate limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+
+    # Basic auth (optional, for Traefik dashboard)
+    # Generate password: echo $(htpasswd -nb admin YourPassword) | sed -e s/\\$/\\$\\$/g
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$$apr1$$change$$this"  # CHANGE THIS
+
+  # Routers
+  routers:
+    # Traefik Dashboard (optional, secure this!)
+    traefik-dashboard:
+      rule: "Host(`traefik.yourdomain.com`)"  # CHANGE THIS
+      service: api@internal
+      entryPoints:
+        - websecure
+      middlewares:
+        - dashboard-auth
+        - secure-headers
+      tls:
+        certResolver: letsencrypt
+
+# TLS Options
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305

@@ -1,0 +1,83 @@
+{
+  "generatedAt": "2026-04-14T14:52:32.143160Z",
+  "proof": [
+    {
+      "step": "create",
+      "httpStatus": 201,
+      "taskId": "80d3de53-7ce7-493c-87f7-3c6eefe9497d",
+      "observed": {
+        "title": "Task option DEV E2E proof 20260414-145231",
+        "status": "todo",
+        "model": "litellm/claude-sonnet-4-6",
+        "thinking": "medium",
+        "executionMode": "interactive",
+        "accessProfile": "browser",
+        "requiredCapabilities": [
+          "browser",
+          "network",
+          "discord-thread"
+        ],
+        "allowOverrideAtSpawn": false
+      }
+    },
+    {
+      "step": "view-after-create",
+      "httpStatus": 200,
+      "observed": {
+        "title": "Task option DEV E2E proof 20260414-145231",
+        "model": "litellm/claude-sonnet-4-6",
+        "executionMode": "interactive",
+        "accessProfile": "browser",
+        "requiredCapabilities": [
+          "browser",
+          "network",
+          "discord-thread"
+        ],
+        "allowOverrideAtSpawn": false
+      }
+    },
+    {
+      "step": "edit",
+      "httpStatus": 200,
+      "observed": {
+        "model": "litellm/claude-opus-4-6-1m",
+        "thinking": "high",
+        "executionMode": "subagent",
+        "accessProfile": "safe",
+        "requiredCapabilities": [
+          "long-running"
+        ],
+        "allowOverrideAtSpawn": true
+      }
+    },
+    {
+      "step": "view-after-edit",
+      "httpStatus": 200,
+      "observed": {
+        "model": "litellm/claude-opus-4-6-1m",
+        "thinking": "high",
+        "executionMode": "subagent",
+        "accessProfile": "safe",
+        "requiredCapabilities": [
+          "long-running"
+        ],
+        "allowOverrideAtSpawn": true
+      }
+    },
+    {
+      "step": "models-status",
+      "httpStatus": 200,
+      "observed": {
+        "preferredDefaultModel": "openai-codex/gpt-5.4",
+        "availableCount": 19,
+        "containsOpus1m": true,
+        "containsSonnet46": true
+      }
+    },
+    {
+      "step": "cleanup",
+      "httpStatus": 200,
+      "taskId": "80d3de53-7ce7-493c-87f7-3c6eefe9497d"
+    }
+  ]
+}

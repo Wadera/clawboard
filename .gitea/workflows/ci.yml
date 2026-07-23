@@ -1,0 +1,122 @@
+name: CI
+
+# tsc / jest / build / migrate on push (task 3fd2cb6d)
+# First Actions workflow on this Gitea instance.
+# Runner: ai-vm-clawboard (repo-scoped act_runner on the AI VM,
+# /srv/ai-stack/ci/gitea-act-runner).
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  backend:
+    name: backend tsc + jest + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: node:20-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        working-directory: backend
+        run: npm ci --no-fund --no-audit
+      - name: Type check
+        working-directory: backend
+        run: npx tsc --noEmit
+      - name: Unit tests
+        working-directory: backend
+        run: npm test -- --ci --runInBand
+      - name: Build
+        working-directory: backend
+        run: |
+          npm run build
+          test -f dist/server.js
+          test -f dist/db/migrate.js
+
+  frontend:
+    name: frontend build (tsc + vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: node:20-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci --no-fund --no-audit
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  migrate:
+    name: migrations on fresh postgres (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: node:20-bookworm
+    # BLOCKING since task 475a54c9 (2026-07-04). Flow:
+    #   init.sql (authoritative fresh-install baseline through migration 042)
+    #   -> npm run migrate (stamps BASELINE-listed files, executes only 043+)
+    #   -> spot-check critical tables + non-empty ledger.
+    # See backend/src/migrations/README.md for the full migration story.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clawboard_ci
+          POSTGRES_PASSWORD: clawboard_ci
+          POSTGRES_DB: clawboard_ci
+    env:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: clawboard_ci
+      DB_USER: clawboard_ci
+      DB_PASSWORD: clawboard_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        working-directory: backend
+        run: npm ci --no-fund --no-audit
+      - name: Wait for postgres
+        working-directory: backend
+        run: |
+          node -e '
+          const {Pool}=require("pg");
+          const cfg={host:process.env.DB_HOST,port:+process.env.DB_PORT,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME,connectionTimeoutMillis:2000};
+          (async()=>{for(let i=0;i<30;i++){try{const p=new Pool(cfg);await p.query("select 1");await p.end();console.log("postgres ready");process.exit(0);}catch(e){await new Promise(r=>setTimeout(r,2000));}}console.error("postgres not ready after 60s");process.exit(1);})();
+          '
+      - name: Apply base schema (init.sql = authoritative baseline through 042)
+        working-directory: backend
+        run: |
+          node -e '
+          const fs=require("fs");const {Pool}=require("pg");
+          const p=new Pool({host:process.env.DB_HOST,port:+process.env.DB_PORT,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});
+          p.query(fs.readFileSync("../database/init.sql","utf8")).then(()=>{console.log("init.sql applied");return p.end();}).catch(e=>{console.error(e);process.exit(1);});
+          '
+      - name: Run migration chain (baseline stamp + post-baseline apply)
+        working-directory: backend
+        run: npm run migrate
+      - name: Prove hardened orchestration historical upgrade, fresh chain, and replay
+        working-directory: backend
+        run: npm run test:migrations:hardened
+      - name: Spot-check critical tables and migration ledger
+        working-directory: backend
+        run: |
+          node -e '
+          const {Pool}=require("pg");
+          const p=new Pool({host:process.env.DB_HOST,port:+process.env.DB_PORT,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});
+          (async()=>{
+            const tables=["tasks","sessions","task_timeline_events","schema_migrations","projects","agent_types"];
+            for(const t of tables){
+              const r=await p.query("SELECT to_regclass($1) AS reg",["public."+t]);
+              if(!r.rows[0].reg){console.error("MISSING TABLE: "+t);process.exit(1);}
+              console.log("table ok: "+t);
+            }
+            const c=await p.query("SELECT COUNT(*)::int AS n FROM schema_migrations");
+            if(c.rows[0].n < 32){console.error("schema_migrations has only "+c.rows[0].n+" entries (expected >= 32 baseline stamps)");process.exit(1);}
+            console.log("ledger ok: "+c.rows[0].n+" entries");
+            await p.end();
+          })().catch(e=>{console.error(e);process.exit(1);});
+          '
