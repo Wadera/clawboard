@@ -1,0 +1,345 @@
+/* JournalPostPage.css — individual journal entry view */
+
+.journal-post-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Loading & Error states */
+.journal-post-loading,
+.journal-post-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 1rem;
+  color: #a8a29e;
+  text-align: center;
+}
+
+.journal-post-error h2 {
+  color: #ef4444;
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.journal-post-error p {
+  color: #78716c;
+  margin: 0.5rem 0 1.5rem;
+}
+
+/* Navigation bar */
+.journal-post-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  margin-bottom: 1.5rem;
+}
+
+.journal-post-nav-bottom {
+  margin-top: 2rem;
+  margin-bottom: 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(245, 158, 11, 0.1);
+}
+
+.journal-post-back-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: #fbbf24;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.journal-post-back-link:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.journal-post-nav-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.journal-post-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.journal-post-nav-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.journal-post-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Article container */
+.journal-post-article {
+  background: linear-gradient(135deg, rgba(41, 37, 36, 0.7), rgba(28, 25, 23, 0.9));
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Header */
+.journal-post-header {
+  margin-bottom: 2rem;
+}
+
+.journal-post-mood {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.journal-post-mood-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.journal-post-mood-tag {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  letter-spacing: 0.02em;
+}
+
+.journal-post-date {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fef3c7;
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Image */
+.journal-post-image {
+  margin: 2rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.journal-post-image img {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+}
+
+/* Audio player */
+.journal-post-audio {
+  margin: 2rem 0;
+  padding: 1rem 1.25rem;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 12px;
+}
+
+.journal-post-audio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.journal-post-audio-player {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+}
+
+/* Reflection text */
+.journal-post-text {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: #d6d3d1;
+  margin: 2rem 0;
+}
+
+.journal-post-text p {
+  margin-bottom: 1rem;
+}
+
+.journal-post-text p:last-child {
+  margin-bottom: 0;
+}
+
+.journal-post-text strong {
+  color: #fef3c7;
+  font-weight: 600;
+}
+
+.journal-post-text em {
+  color: #fbbf24;
+  font-style: italic;
+}
+
+.journal-post-text h1,
+.journal-post-text h2,
+.journal-post-text h3,
+.journal-post-text h4 {
+  color: #fef3c7;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.journal-post-text a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.journal-post-text a:hover {
+  color: #93c5fd;
+}
+
+.journal-post-text ul,
+.journal-post-text ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.journal-post-text li {
+  margin-bottom: 0.5rem;
+}
+
+.journal-post-text code {
+  padding: 0.2rem 0.4rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #fbbf24;
+}
+
+.journal-post-text pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.journal-post-text pre code {
+  padding: 0;
+  background: none;
+}
+
+/* Highlights */
+.journal-post-highlights {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.journal-post-highlights h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fbbf24;
+  margin: 0 0 1rem;
+}
+
+.journal-post-highlights ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.journal-post-highlights li {
+  font-size: 0.95rem;
+  color: #a8a29e;
+  padding-left: 1.5rem;
+  position: relative;
+  line-height: 1.6;
+}
+
+.journal-post-highlights li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #f59e0b;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Footer */
+.journal-post-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(245, 158, 11, 0.1);
+  text-align: center;
+}
+
+.journal-post-created {
+  font-size: 0.8rem;
+  color: #78716c;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .journal-post-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .journal-post-article {
+    padding: 1.5rem 1rem;
+  }
+
+  .journal-post-date {
+    font-size: 1.5rem;
+  }
+
+  .journal-post-nav {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .journal-post-nav-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .journal-post-back-link {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .journal-post-text {
+    font-size: 1rem;
+  }
+}

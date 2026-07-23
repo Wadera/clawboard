@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Exact-main production deploy wrapper for ClawBoard.
+# Installed at /usr/local/sbin/clawboard-deploy-main (root-owned); this copy in
+# scripts/ is the versioned source of truth — install with:
+#   sudo install -m 755 scripts/clawboard-deploy-main /usr/local/sbin/clawboard-deploy-main
+# v2 (convergence-20260723): untracked-source gate + baked release provenance.
+
+usage() {
+  echo "Usage: sudo clawboard-deploy-main <expected-origin-main-sha> [clawboard-backend] [clawboard-frontend]" >&2
+  exit 2
+}
+
+[[ $# -ge 1 ]] || usage
+EXPECTED="$1"
+shift
+[[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || usage
+
+if [[ $# -eq 0 ]]; then
+  SERVICES=(clawboard-backend clawboard-frontend)
+else
+  SERVICES=("$@")
+fi
+for service in "${SERVICES[@]}"; do
+  case "$service" in
+    clawboard-backend|clawboard-frontend) ;;
+    *) echo "Refusing unsupported service: $service" >&2; exit 2 ;;
+  esac
+done
+
+DEP=/srv/ai-stack/projects/nimspace/clawboard/worktrees/4abab434-prod-deploy
+ENV_FILE=/srv/ai-stack/projects/nimspace/clawboard/repo/.env
+OVERRIDE=/srv/ai-stack/projects/nimspace/clawboard/worktrees/4abab434-prod-deploy.override.yml
+DATA_DIR=/srv/ai-stack/projects/nimspace/clawboard/runtime/prod-data
+LOCK=/run/lock/clawboard-production-deploy.lock
+
+exec 9>"$LOCK"
+flock -n 9 || { echo "Another ClawBoard production deployment is active" >&2; exit 1; }
+
+[[ -d "$DEP/.git" || -f "$DEP/.git" ]] || { echo "Missing dedicated deployment checkout: $DEP" >&2; exit 1; }
+[[ -f "$ENV_FILE" && -f "$OVERRIDE" && -d "$DATA_DIR" ]] || { echo "Missing deployment prerequisite" >&2; exit 1; }
+
+sudo -n -u clawd git -C "$DEP" fetch origin main
+if [[ -n "$(sudo -n -u clawd git -C "$DEP" status --porcelain --untracked-files=no)" ]]; then
+  echo "Dedicated deployment checkout has tracked changes" >&2
+  exit 1
+fi
+sudo -n -u clawd git -C "$DEP" switch main
+sudo -n -u clawd git -C "$DEP" merge --ff-only origin/main
+HEAD_SHA=$(sudo -n -u clawd git -C "$DEP" rev-parse HEAD)
+ORIGIN_SHA=$(sudo -n -u clawd git -C "$DEP" rev-parse origin/main)
+if [[ "$HEAD_SHA" != "$EXPECTED" || "$ORIGIN_SHA" != "$EXPECTED" ]]; then
+  echo "Exact-main preflight failed: expected=$EXPECTED checkout=$HEAD_SHA origin=$ORIGIN_SHA" >&2
+  exit 1
+fi
+
+# Untracked-source gate: runtime data/ leftovers are exempt (documented
+# disposition), anything else untracked in the deployment checkout aborts.
+UNTRACKED=$(sudo -n -u clawd git -C "$DEP" status --porcelain --untracked-files=all | grep '^??' | grep -vE '^\?\? data/' || true)
+if [[ -n "$UNTRACKED" ]]; then
+  echo "Deployment checkout has untracked non-runtime files:" >&2
+  echo "$UNTRACKED" >&2
+  exit 1
+fi
+
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+for service in "${SERVICES[@]}"; do
+  if docker inspect "$service" >/dev/null 2>&1; then
+    IMAGE=$(docker inspect "$service" --format '{{.Image}}')
+    docker tag "$IMAGE" "${service}:rollback-${STAMP}"
+  fi
+done
+
+# Baked release provenance: consumed by the Dockerfiles as build args and
+# written into /release-manifest.json inside each image. The checkout is
+# verified clean above, so dirty is always "clean" on this path.
+export RELEASE_SHA="$HEAD_SHA"
+export RELEASE_DIRTY="clean"
+export RELEASE_BUILD_CONTEXT="$DEP"
+export RELEASE_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$DEP/docker-compose.prod.yml" -f "$OVERRIDE")
+DATA_DIR="$DATA_DIR" "${COMPOSE[@]}" build "${SERVICES[@]}"
+
+for service in "${SERVICES[@]}"; do
+  if [[ "$service" == clawboard-backend ]]; then
+    sudo -n -u clawd install -m 700 "$DEP/scripts/update_usage_stats.py" /home/clawd/clawd/tools/update-usage-stats.py
+    sudo -n -u clawd python3 /home/clawd/clawd/tools/update-usage-stats.py
+    break
+  fi
+done
+
+DATA_DIR="$DATA_DIR" "${COMPOSE[@]}" up -d --no-deps "${SERVICES[@]}"
+echo "ClawBoard production deployed from exact origin/main $EXPECTED: ${SERVICES[*]}"

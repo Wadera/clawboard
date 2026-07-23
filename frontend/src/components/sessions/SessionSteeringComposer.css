@@ -1,0 +1,285 @@
+@import '../../styles/variables.css';
+
+.session-steering-composer {
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.03));
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.session-steering-composer.disabled {
+  border-color: var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.session-steering-composer.compact {
+  padding: 4px;
+  gap: 4px;
+  border-radius: 10px;
+  border-color: rgba(59, 130, 246, 0.12);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.session-steering-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.session-steering-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.session-steering-description {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.session-steering-helper,
+.session-steering-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.session-steering-helper {
+  justify-content: flex-start;
+}
+
+.session-steering-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.session-steering-alert-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--yellow-300, #fcd34d);
+}
+
+.session-steering-alert-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green-300, #86efac);
+}
+
+.session-steering-alert-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--red-300, #fca5a5);
+}
+
+.session-steering-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.session-steering-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.session-steering-attachment-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-steering-attachment-size {
+  color: var(--text-quaternary);
+}
+
+.session-steering-attachment-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-quaternary);
+  cursor: pointer;
+}
+
+.session-steering-attachment-chip button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.session-steering-input-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.session-steering-input {
+  flex: 1;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-primary);
+  padding: var(--space-3);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.session-steering-composer.compact .session-steering-input-row {
+  align-items: center;
+  gap: 4px;
+}
+
+.session-steering-composer.compact .session-steering-input {
+  min-height: 32px;
+  height: 32px;
+  max-height: 32px;
+  resize: none;
+  padding: 5px 8px;
+  overflow-y: auto;
+  border-radius: 8px;
+  line-height: 1.2;
+}
+
+.session-steering-composer.compact .session-steering-actions {
+  flex-direction: row;
+  min-width: auto;
+}
+
+.session-steering-composer.compact .session-steering-attach-btn,
+.session-steering-composer.compact .session-steering-send-btn {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.session-steering-composer.compact .session-steering-attach-btn span,
+.session-steering-composer.compact .session-steering-send-btn span {
+  font-size: 11px;
+}
+
+.session-steering-composer.compact .session-steering-attachments {
+  margin-top: 2px;
+}
+
+.session-steering-input:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18);
+}
+
+.session-steering-input::placeholder {
+  color: var(--text-quaternary);
+}
+
+.session-steering-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 112px;
+}
+
+.session-steering-attach-btn,
+.session-steering-send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.session-steering-attach-btn:hover:not(:disabled),
+.session-steering-send-btn:hover:not(:disabled) {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+  background: var(--bg-glass);
+}
+
+.session-steering-send-btn {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--blue-200, #bfdbfe);
+}
+
+.session-steering-send-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.session-steering-attach-btn:disabled,
+.session-steering-send-btn:disabled,
+.session-steering-input:disabled,
+.session-steering-attachment-chip button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.session-steering-file-input {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .session-steering-input-row {
+    flex-direction: column;
+  }
+
+  .session-steering-actions {
+    min-width: 0;
+    flex-direction: row;
+  }
+
+  .session-steering-attach-btn,
+  .session-steering-send-btn {
+    flex: 1;
+  }
+
+  .session-steering-composer.compact .session-steering-input-row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .session-steering-composer.compact .session-steering-actions {
+    min-width: auto;
+    flex-direction: row;
+  }
+
+  .session-steering-composer.compact .session-steering-attach-btn,
+  .session-steering-composer.compact .session-steering-send-btn {
+    flex: 0 0 auto;
+  }
+
+  .session-steering-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

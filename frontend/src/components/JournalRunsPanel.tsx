@@ -1,0 +1,16 @@
+import { useCallback, useEffect, useState } from 'react';
+import { authenticatedFetch } from '../utils/auth';
+import './JournalRunsPanel.css';
+
+const API = import.meta.env.VITE_API_BASE_URL || '/api';
+type Run={key:string;date:string|null;entryType:string|null;operation:string|null;contentAuthor:string|null;executor:string|null;state:string;updatedAt:string|null;requestedMedia:string[];validationOk:boolean|null;availableActions:string[]};
+type Event={at:string|null;state:string;reasonCode:string|null};
+export function JournalRunsPanel(){
+ const [runs,setRuns]=useState<Run[]>([]),[busy,setBusy]=useState(''),[error,setError]=useState(''),[open,setOpen]=useState(''),[history,setHistory]=useState<Record<string,Event[]>>({});
+ const load=useCallback(async()=>{try{const r=await authenticatedFetch(`${API}/journal/runs?limit=20`);if(!r.ok)throw new Error(`HTTP ${r.status}`);const d=await r.json();setRuns(d.runs||[]);setError('');}catch{setError('Pipeline status is temporarily unavailable.');}},[]);
+ useEffect(()=>{load();},[load]);
+ async function events(key:string){setOpen(open===key?'':key);if(history[key])return;const r=await authenticatedFetch(`${API}/journal/runs/${key}/history`);if(r.ok){const d=await r.json();setHistory(h=>({...h,[key]:d.history||[]}));}}
+ async function act(run:Run,action:string){let note='';if(action==='approve'&&!window.confirm('Approve this unchanged, validated journal package?'))return;if(action==='reject'){note=window.prompt('Reason for rejection (required):')||'';if(!note.trim())return;}if(action==='retry'&&!window.confirm('Retry validation or reconciliation for this run?'))return;setBusy(run.key);try{const endpoint=action==='retry'?'retry':'review';const body=action==='retry'?undefined:JSON.stringify({decision:action,note});const r=await authenticatedFetch(`${API}/journal/runs/${run.key}/${endpoint}`,{method:'POST',headers:body?{'content-type':'application/json'}:undefined,body});if(!r.ok)throw new Error();await load();}catch{setError('Action failed safely; the run was not advanced.');}finally{setBusy('');}}
+ if(!runs.length&&!error)return null;
+ return <section className="journal-runs" aria-label="Journal pipeline runs"><div className="journal-runs-head"><h2>Pipeline runs</h2><button onClick={load}>Refresh</button></div>{error&&<p role="alert" className="journal-runs-error">{error}</p>}{runs.map(r=><article key={r.key} className="journal-run-card"><div className="journal-run-summary"><div><strong>{r.date||'Unknown date'}</strong> <span className={`journal-run-state state-${r.state}`}>{r.state.replace(/_/g,' ')}</span><div className="journal-run-meta">{r.contentAuthor||'Unknown'} · {r.executor||'Unknown'} · {r.requestedMedia.join(', ')||'no media'}</div></div><button onClick={()=>events(r.key)} aria-expanded={open===r.key}>{open===r.key?'Hide history':'History'}</button></div><div className="journal-run-actions">{r.availableActions.map(a=><button key={a} disabled={busy===r.key} onClick={()=>act(r,a)}>{busy===r.key?'Working…':a}</button>)}</div>{open===r.key&&<ol className="journal-run-history">{(history[r.key]||[]).map((e,i)=><li key={i}><time>{e.at?new Date(e.at).toLocaleString():'Unknown time'}</time> — {e.state.replace(/_/g,' ')}</li>)}</ol>}</article>)}</section>;
+}
