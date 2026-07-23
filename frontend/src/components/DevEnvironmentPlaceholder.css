@@ -1,0 +1,102 @@
+.dev-placeholder-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 120px);
+  padding: 2rem;
+}
+
+.dev-placeholder-card {
+  background: var(--card-bg, #1e1e1e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  padding: 3rem;
+  max-width: 800px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dev-placeholder-icon {
+  font-size: 4rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.dev-placeholder-card h2 {
+  color: var(--text-primary, #e0e0e0);
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.dev-placeholder-description {
+  color: var(--text-secondary, #b0b0b0);
+  font-size: 1.1rem;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.dev-placeholder-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--hover-bg, #252525);
+  border-radius: 8px;
+}
+
+.dev-placeholder-section h3 {
+  color: var(--text-primary, #e0e0e0);
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dev-placeholder-section ul,
+.dev-placeholder-section ol {
+  color: var(--text-secondary, #b0b0b0);
+  line-height: 1.8;
+  margin-left: 1.5rem;
+}
+
+.dev-placeholder-section li {
+  margin-bottom: 0.5rem;
+}
+
+.dev-placeholder-section code {
+  background: var(--code-bg, #2d2d2d);
+  color: var(--accent-color, #4a9eff);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.dev-placeholder-footer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, #333);
+  text-align: center;
+}
+
+.dev-placeholder-footer p {
+  color: var(--text-secondary, #b0b0b0);
+  line-height: 1.6;
+}
+
+.dev-placeholder-footer strong {
+  color: var(--accent-color, #4a9eff);
+}
+
+@media (max-width: 768px) {
+  .dev-placeholder-card {
+    padding: 2rem;
+  }
+
+  .dev-placeholder-card h2 {
+    font-size: 1.5rem;
+  }
+
+  .dev-placeholder-section {
+    padding: 1rem;
+  }
+}

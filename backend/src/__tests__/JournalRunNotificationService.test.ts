@@ -1,0 +1,14 @@
+import { JournalRunNotificationService } from '../services/JournalRunNotificationService';
+import { pool } from '../db/connection';
+import { journalRunService } from '../services/JournalRunService';
+import { discordThreadService } from '../services/DiscordThreadService';
+jest.mock('../db/connection',()=>({pool:{query:jest.fn()}}));
+jest.mock('../services/JournalRunService',()=>({journalRunService:{list:jest.fn(),history:jest.fn()}}));
+jest.mock('../services/DiscordThreadService',()=>({discordThreadService:{sendSystemChannelMessage:jest.fn()}}));
+const q=pool.query as jest.Mock;const list=journalRunService.list as jest.Mock;const history=journalRunService.history as jest.Mock;const send=discordThreadService.sendSystemChannelMessage as jest.Mock;
+const run={key:'a'.repeat(32),date:'2026-07-12',state:'review_ready'};
+describe('JournalRunNotificationService',()=>{beforeEach(()=>{jest.clearAllMocks();list.mockResolvedValue([run]);history.mockResolvedValue([{at:new Date().toISOString(),state:'review_ready',reasonCode:null}]);send.mockResolvedValue({messageId:'m1'});});
+ it('sends one compact meaningful notice and marks it sent',async()=>{q.mockResolvedValueOnce({rowCount:1,rows:[{id:'1',status:'pending',attempt_count:0}]}).mockResolvedValueOnce({rows:[{n:0}]}).mockResolvedValueOnce({});await new JournalRunNotificationService('channel').tick();expect(send).toHaveBeenCalledTimes(1);const msg=send.mock.calls[0][1];expect(msg).toContain('ready for review');expect(msg).toContain('aaaaaaaa');expect(msg).not.toContain('source');expect(q.mock.calls[2][0]).toContain("status='sent'");});
+ it('baselines old events as suppressed without sending',async()=>{history.mockResolvedValue([{at:'2026-01-01T00:00:00Z',state:'approved',reasonCode:null}]);q.mockResolvedValueOnce({rowCount:1,rows:[{id:'1',status:'suppressed',attempt_count:0}]});await new JournalRunNotificationService('channel').tick();expect(send).not.toHaveBeenCalled();});
+ it('records a failed send without persisting raw transport errors',async()=>{q.mockResolvedValueOnce({rowCount:1,rows:[{id:'1',status:'pending',attempt_count:0}]}).mockResolvedValueOnce({rows:[{n:0}]}).mockResolvedValueOnce({});send.mockRejectedValueOnce(new Error('token SECRET'));await new JournalRunNotificationService('channel').tick();expect(q.mock.calls[2][0]).toContain("last_error_code='send_failed'");expect(JSON.stringify(q.mock.calls)).not.toContain('SECRET');});
+});

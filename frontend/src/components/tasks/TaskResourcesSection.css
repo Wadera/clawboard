@@ -1,0 +1,157 @@
+/* TaskResourcesSection - Phase 3: Task-specific resources */
+@import '../../styles/variables.css';
+
+.task-resources-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+}
+
+.task-resources-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+}
+
+.task-resources-title svg {
+  color: var(--purple-400);
+}
+
+/* Resource groups */
+.task-resources-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-resources-group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--font-medium);
+}
+
+.task-resources-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+}
+
+/* Link items */
+.task-resource-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  transition: all var(--transition-fast) ease;
+}
+
+.task-resource-link:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: var(--text-primary);
+}
+
+.task-resource-icon {
+  display: flex;
+  align-items: center;
+  color: var(--purple-400);
+  flex-shrink: 0;
+}
+
+.task-resource-link-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-resource-link-type {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* File items */
+.task-resource-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+
+.task-resource-file svg {
+  flex-shrink: 0;
+}
+
+.task-resource-file-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Related task items */
+.task-resource-related-task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-sm);
+  color: var(--blue-400);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.task-resource-related-task:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.task-resource-task-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .task-resources-items {
+    padding-left: var(--space-2);
+  }
+  
+  .task-resource-link,
+  .task-resource-file,
+  .task-resource-related-task {
+    padding: var(--space-2);
+  }
+}
