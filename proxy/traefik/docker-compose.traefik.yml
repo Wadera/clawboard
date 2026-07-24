@@ -1,0 +1,49 @@
+name: traefik
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+      # Dashboard port (optional, only if you want direct access)
+      # - "8080:8080"
+    environment:
+      - TZ=UTC
+    volumes:
+      # Traefik configuration
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+      
+      # Docker socket (read-only for security)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Let's Encrypt certificates
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - clawboard_network
+    labels:
+      - "traefik.enable=true"
+      # Dummy service (required when using the docker provider)
+      - "traefik.http.routers.traefik.service=api@internal"
+
+volumes:
+  traefik_letsencrypt:
+    name: traefik_letsencrypt
+
+networks:
+  clawboard_network:
+    external: true
+    name: clawboard_network
+
+# Usage:
+# 1. Edit traefik.yml and change the email address
+# 2. Edit dynamic.yml and secure the dashboard auth
+# 3. Run: docker compose -f docker-compose.traefik.yml up -d
+# 4. Uncomment Traefik labels in main docker-compose.yml
+# 5. Set DOMAIN in .env file
+# 6. Run: docker compose up -d

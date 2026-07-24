@@ -1,0 +1,21 @@
+{
+    "plugins": [
+        {
+            "name": "nim-orb",
+            "source": "/plugins/nim-orb",
+            "enabled": true,
+            "config_override": {}
+        },
+        {
+            "name": "gpu-gateway",
+            "source": "/project-sources/gpu-gateway",
+            "enabled": true,
+            "config_override": {
+                "docker": {
+                    "runtime": "nvidia",
+                    "network_mode": "host"
+                }
+            }
+        }
+    ]
+}

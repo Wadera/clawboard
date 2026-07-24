@@ -1,0 +1,62 @@
+/* StatusOrb - Simple animated status indicator */
+
+.status-orb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.status-orb-inner {
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--status-orb-highlight), var(--status-orb-color));
+  transition: background 0.4s ease;
+}
+
+.status-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--status-orb-color);
+  opacity: 0.4;
+  transition: border-color 0.4s ease, opacity 0.4s ease;
+}
+
+.status-orb-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--status-orb-color);
+  opacity: 0;
+  animation: orb-pulse 2s ease-out infinite;
+}
+
+/* State colors */
+.status-orb--idle {
+  --status-orb-color: var(--text-tertiary, #64748b);
+  --status-orb-highlight: var(--text-secondary, #94a3b8);
+}
+
+.status-orb--active {
+  --status-orb-color: var(--orange-500, #f97316);
+  --status-orb-highlight: var(--yellow-500, #eab308);
+}
+
+.status-orb--error {
+  --status-orb-color: var(--red-500, #ef4444);
+  --status-orb-highlight: var(--red-400, #f87171);
+}
+
+@keyframes orb-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
